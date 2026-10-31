@@ -288,6 +288,25 @@ export class ImagePlugins {
                 if (!result || typeof result !== "object") {
                     throw new Error("Invalid image result.");
                 }
+                if (
+                    result.metadata !== undefined &&
+                    (!result.metadata ||
+                        typeof result.metadata !== "object" ||
+                        Array.isArray(result.metadata) ||
+                        Object.keys(result.metadata).length > 200 ||
+                        !Object.entries(result.metadata).every(
+                            ([key, value]) =>
+                                key.length <= 200 &&
+                                (value === null ||
+                                    typeof value === "boolean" ||
+                                    (typeof value === "number" &&
+                                        Number.isFinite(value)) ||
+                                    (typeof value === "string" &&
+                                        value.length <= 10000))
+                        ))
+                ) {
+                    throw new Error("Invalid image metadata.");
+                }
                 for (const dimension of [result.width, result.height]) {
                     if (
                         dimension !== undefined &&
@@ -309,6 +328,9 @@ export class ImagePlugins {
                     );
                 }
                 return {
+                    ...(result.metadata !== undefined
+                        ? { metadata: result.metadata }
+                        : {}),
                     name: path.basename(filePath),
                     path: filePath,
                     pluginId: manifest.id,

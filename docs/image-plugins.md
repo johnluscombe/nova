@@ -186,3 +186,22 @@ objects are rejected during discovery. The host passes the frozen object to
 receive an empty object; existing handlers can ignore the extra argument.
 Plugins validate their own parameter names and values. Restart Nova after edits.
 For bundled plugins in an installed app, configure a user copy with the same ID.
+
+## Image metadata
+
+Image results may include a `metadata` object mapping display labels to strings,
+finite numbers, booleans, or null. For example:
+
+```js
+return {
+    width: 1024,
+    height: 512,
+    metadata: { Collector: "Example", "Row spacing (m)": 0.5 }
+};
+```
+
+The global View group's Metadata button toggles a panel to the right of the
+active widget's image. File details and dimensions are always available; plugin
+fields appear when decoding finishes, including when restoring saved widgets.
+Metadata is displayed as text. Results allow up to 200 fields, labels up to 200
+characters, and string values up to 10,000 characters. Nested objects are rejected.

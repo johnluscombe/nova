@@ -14,6 +14,7 @@ export interface ImagePluginManifest {
 }
 
 export interface ImagePluginResult {
+    metadata?: Record<string, string | number | boolean | null>;
     width?: number;
     height?: number;
     previewDataUrl?: string;

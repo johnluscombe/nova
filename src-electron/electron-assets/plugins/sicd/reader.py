@@ -16,6 +16,33 @@ def png_grayscale(pixels):
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(scanlines)) + chunk(b"IEND", b"")
 
 
+def image_metadata(metadata):
+    fields = {
+        "Collector": "CollectionInfo.CollectorName",
+        "Collection": "CollectionInfo.CoreName",
+        "Classification": "CollectionInfo.Classification",
+        "Radar mode": "CollectionInfo.RadarMode.ModeType",
+        "Collection time (UTC)": "Timeline.CollectStart",
+        "Duration (seconds)": "Timeline.CollectDuration",
+        "Pixel type": "ImageData.PixelType",
+        "Image plane": "Grid.ImagePlane",
+        "Grid type": "Grid.Type",
+        "Row spacing (m)": "Grid.Row.SS",
+        "Column spacing (m)": "Grid.Col.SS",
+        "Polarization": "ImageFormation.TxRcvPolarizationProc",
+        "Side of track": "SCPCOA.SideOfTrack",
+        "Grazing angle (degrees)": "SCPCOA.GrazeAng",
+    }
+    result = {"Format": "SICD / NITF", "Preview": "Log magnitude, 1st–99th percentile stretch"}
+    for label, field in fields.items():
+        value = metadata
+        for part in field.split("."):
+            value = getattr(value, part, None)
+        if value is not None:
+            result[label] = str(value)
+    return result
+
+
 def render(file_path):
     import numpy as np
     from sarpy.io.complex.sicd import SICDReader
@@ -47,7 +74,7 @@ def render(file_path):
                 pixels[~positive] = 0
             else:
                 pixels[positive] = 127
-        return {"width": width, "height": height, "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
+        return {"metadata": image_metadata(metadata), "width": width, "height": height, "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
     finally:
         reader.close()
 

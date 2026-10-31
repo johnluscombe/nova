@@ -47,6 +47,8 @@ class SicdPreviewTests(unittest.TestCase):
                     self.fixture(file, data, encoding)
                     result = reader.render(str(file))
                     self.assertEqual((result["width"], result["height"]), (48, 32))
+                    self.assertEqual(result["metadata"]["Pixel type"], encoding)
+                    self.assertEqual(result["metadata"]["Format"], "SICD / NITF")
                     png = base64.b64decode(result["previewDataUrl"].split(",")[1])
                     self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
                     self.assertEqual(struct.unpack(">II", png[16:24]), (48, 32))

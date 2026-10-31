@@ -73,26 +73,59 @@
                         />
                     </div>
                 </div>
-                <div class="widget-content">
-                    <div
-                        v-if="widget.loading"
-                        class="column items-center q-gutter-md"
-                        role="status"
-                        aria-live="polite"
-                    >
-                        <q-spinner color="primary" size="40px" />
-                        <span>Loading image…</span>
+                <div class="widget-body">
+                    <div class="widget-content">
+                        <div
+                            v-if="widget.loading"
+                            class="column items-center q-gutter-md"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <q-spinner color="primary" size="40px" />
+                            <span>Loading image…</span>
+                        </div>
+                        <img
+                            v-else-if="widget.image.previewDataUrl"
+                            :src="widget.image.previewDataUrl"
+                            :alt="widget.image.name"
+                            draggable="false"
+                        />
+                        <p v-else>{{
+                            widget.error ??
+                            "This plugin did not provide an image preview."
+                        }}</p>
                     </div>
-                    <img
-                        v-else-if="widget.image.previewDataUrl"
-                        :src="widget.image.previewDataUrl"
-                        :alt="widget.image.name"
-                        draggable="false"
-                    />
-                    <p v-else>{{
-                        widget.error ??
-                        "This plugin did not provide an image preview."
-                    }}</p>
+                    <aside
+                        v-if="widget.metadataOpen"
+                        class="metadata-panel"
+                        aria-label="Image metadata"
+                    >
+                        <div class="row items-center justify-between">
+                            <strong>Metadata</strong>
+                            <q-btn
+                                flat
+                                dense
+                                round
+                                icon="close"
+                                aria-label="Close metadata"
+                                @click="widget.metadataOpen = false"
+                            />
+                        </div>
+                        <p v-if="widget.loading" role="status"
+                            >Loading metadata…</p
+                        >
+                        <dl>
+                            <template
+                                v-for="(
+                                    [label, value], index
+                                ) in metadataEntries(widget)"
+                                :key="index"
+                            >
+                                <dt>{{ label }}</dt
+                                ><dd>{{ value ?? "Not available" }}</dd>
+                            </template>
+                        </dl>
+                    </aside>
                 </div>
                 <div class="widget-status" :title="widget.image.path"
                     >{{ widget.image.pluginName
@@ -139,7 +172,14 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, reactive, watch } from "vue";
+import {
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    reactive,
+    watch,
+    computed
+} from "vue";
 import type { RestoredImageWindow, SavedImageWindow } from "@/types/workspace";
 import type { ImageInfo } from "@/types/image";
 import { activeScenario } from "@/composables/useScenario";
@@ -157,6 +197,27 @@ interface ImageWindow {
     z: number;
     error?: string;
     loading?: boolean;
+    metadataOpen?: boolean;
+}
+const activeWidget = computed(() =>
+    windows.value.find(
+        widget => widget.id === activeId.value && !widget.minimized
+    )
+);
+function toggleMetadata() {
+    if (activeWidget.value) {
+        activeWidget.value.metadataOpen = !activeWidget.value.metadataOpen;
+    }
+}
+function metadataEntries(widget: ImageWindow) {
+    return [
+        ["Name", widget.image.name],
+        ["Path", widget.image.path],
+        ["Reader", widget.image.pluginName],
+        ["Width", widget.image.width],
+        ["Height", widget.image.height],
+        ...Object.entries(widget.image.metadata ?? {})
+    ];
 }
 const canvas = ref<HTMLDivElement>();
 const windows = ref<ImageWindow[]>([]);
@@ -245,7 +306,13 @@ function hydrate(saved: RestoredImageWindow[]) {
     zIndex = Math.max(0, ...saved.map(widget => widget.z));
     activeId.value = windows.value.find(widget => widget.z === zIndex)?.id;
 }
-const emit = defineEmits<{ change: [windows: SavedImageWindow[]] }>();
+const emit = defineEmits<{
+    change: [windows: SavedImageWindow[]];
+    activeChange: [available: boolean];
+}>();
+watch(activeWidget, widget => emit("activeChange", !!widget), {
+    immediate: true
+});
 watch(
     snapshot,
     value => {
@@ -255,7 +322,7 @@ watch(
     },
     { deep: true }
 );
-defineExpose({ add, complete, fail, hydrate, snapshot });
+defineExpose({ add, complete, fail, hydrate, snapshot, toggleMetadata });
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;
     return {
@@ -454,7 +521,33 @@ onBeforeUnmount(() => {
     background: #c42b1c;
     color: white;
 }
+.widget-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.metadata-panel {
+    flex: 0 0 240px;
+    max-width: 50%;
+    overflow: auto;
+    padding: 12px;
+    background: #f6f8fa;
+    color: #243447;
+    border-left: 1px solid #ccd4de;
+    font-size: 12px;
+}
+.metadata-panel dt {
+    font-weight: 600;
+    margin-top: 10px;
+}
+.metadata-panel dd {
+    margin: 3px 0 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
 .widget-content {
+    min-width: 0;
     flex: 1;
     min-height: 0;
     display: flex;

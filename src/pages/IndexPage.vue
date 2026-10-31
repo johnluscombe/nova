@@ -116,6 +116,26 @@
                     </div>
                 </template>
                 <div
+                    class="ribbon-group"
+                    role="group"
+                    aria-labelledby="view-group-label"
+                >
+                    <div class="ribbon-actions">
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
+                            icon="info"
+                            label="Metadata"
+                            :disable="!hasActiveWidget"
+                            @click="workspace?.toggleMetadata()"
+                        />
+                    </div>
+                    <div id="view-group-label" class="ribbon-group-label"
+                        >View</div
+                    >
+                </div>
+                <div
                     v-for="group in extraGroups"
                     :key="group.key"
                     class="ribbon-group"
@@ -201,6 +221,7 @@
                 </q-banner>
             </div>
             <ImageWorkspace
+                @active-change="hasActiveWidget = $event"
                 :key="workspaceSession"
                 ref="workspace"
                 @change="saveLayout"
@@ -219,6 +240,7 @@ import { activeScenario as scenario } from "@/composables/useScenario";
 const busy = ref(false);
 const error = ref("");
 const workspace = ref<InstanceType<typeof ImageWorkspace>>();
+const hasActiveWidget = ref(false);
 const workspaceSession = ref(0);
 
 const pluginStatus = ref<ImagePluginStatus | null>(null);
@@ -497,14 +519,21 @@ async function closeScenario() {
     z-index: 5;
 }
 .ribbon-tabs {
-    min-height: 40px;
+    min-height: 30px;
     color: #234c78;
+}
+.ribbon-tabs :deep(.q-tab) {
+    min-height: 30px;
+    padding: 0 12px;
+}
+.ribbon-tabs :deep(.q-tab__label) {
+    font-size: 12px;
 }
 .ribbon-content {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     border-top: 1px solid #e7ecf2;
-    padding: 8px 16px 4px;
+    padding: 4px 12px 3px;
     overflow-x: auto;
 }
 .ribbon-group {
@@ -512,21 +541,27 @@ async function closeScenario() {
     display: inline-flex;
     flex-direction: column;
     border-right: 1px solid #d8dfe8;
-    padding-right: 12px;
+    padding-right: 8px;
 }
 .ribbon-actions {
     display: flex;
-    min-height: 72px;
+    min-height: 50px;
 }
 .ribbon-actions :deep(.q-btn) {
-    min-width: 68px;
+    min-width: 52px;
+    padding: 4px 8px;
+    font-size: 11px;
+    line-height: 1.3;
     color: #234c78;
+}
+.ribbon-actions :deep(.q-btn .q-icon) {
+    font-size: 22px;
 }
 .ribbon-group-label {
     text-align: center;
-    font-size: 12px;
+    font-size: 10px;
     color: #66758a;
-    padding-top: 4px;
+    padding-top: 2px;
 }
 .ribbon-progress {
     position: absolute;

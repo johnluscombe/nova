@@ -400,3 +400,29 @@ void test("passes plugin parameters to image handlers and rejects malformed para
             assert.match(state.errors.join(), /Plugin parameters/);
         }
     }));
+
+void test("preserves scalar metadata and rejects invalid plugin metadata", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "metadata",
+            `export default { open() { return { metadata: { Collector: 'Example', Spacing: 1.5, Calibrated: false, Missing: null } }; } };`
+        );
+        await host.reload();
+        assert.deepEqual((await host.open("file.test")).metadata, {
+            Collector: "Example",
+            Spacing: 1.5,
+            Calibrated: false,
+            Missing: null
+        });
+        await plugin(
+            directory,
+            "invalid-metadata",
+            `export default { open() { return { metadata: { nested: {} } }; } };`
+        );
+        await host.reload();
+        await assert.rejects(
+            host.open("file.test", "invalid-metadata"),
+            /Invalid image metadata/
+        );
+    }));
