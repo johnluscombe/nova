@@ -1,0 +1,79 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import path from "node:path";
+
+const execute = promisify(execFile);
+export async function openSicd(filePath, parameters = {}, run = execute) {
+    const configuredPython =
+        parameters.python ??
+        (process.platform === "win32" ? "python" : "python3");
+    if (typeof configuredPython !== "string" || !configuredPython.trim()) {
+        throw new Error(
+            "SICD's python parameter must be a nonempty Python executable path or command."
+        );
+    }
+    const python =
+        configuredPython.startsWith("~/") || configuredPython.startsWith("~\\")
+            ? path.join(homedir(), configuredPython.slice(2))
+            : configuredPython;
+    let stdout;
+    try {
+        ({ stdout } = await run(
+            python,
+            [fileURLToPath(new URL("./reader.py", import.meta.url)), filePath],
+            {
+                encoding: "utf8",
+                timeout: 120_000,
+                maxBuffer: 16 * 1024 * 1024,
+                windowsHide: true,
+                env: {
+                    ...process.env,
+                    PYTHONIOENCODING: "utf-8",
+                    PYTHONDONTWRITEBYTECODE: "1"
+                }
+            }
+        ));
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            throw new Error(
+                `SICD could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/sicd-plugin.md.`
+            );
+        }
+        if (error.code === "EACCES") {
+            throw new Error(
+                `SICD cannot execute Python interpreter ${JSON.stringify(python)}: permission denied.`
+            );
+        }
+        if (error.killed) {
+            throw new Error("SICD preview exceeded the two-minute time limit.");
+        }
+        throw new Error(
+            `SICD reader failed: ${String(error.stderr || error.message)
+                .trim()
+                .slice(-2000)}`
+        );
+    }
+    let result;
+    try {
+        result = JSON.parse(stdout);
+    } catch {
+        throw new Error("SICD reader returned invalid output.");
+    }
+    if (
+        !result ||
+        !Number.isSafeInteger(result.width) ||
+        result.width <= 0 ||
+        !Number.isSafeInteger(result.height) ||
+        result.height <= 0 ||
+        typeof result.previewDataUrl !== "string" ||
+        !result.previewDataUrl.startsWith("data:image/png;base64,")
+    ) {
+        throw new Error("SICD reader returned an invalid preview.");
+    }
+    return result;
+}
+export default {
+    open: (filePath, parameters) => openSicd(filePath, parameters)
+};

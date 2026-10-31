@@ -1,4 +1,8 @@
 import type { PluginRibbon, RibbonActionResult } from "./ribbon";
+export type PluginParameters = Readonly<
+    Record<string, string | number | boolean | null>
+>;
+
 export interface ImagePluginManifest {
     apiVersion: 1;
     id: string;
@@ -6,6 +10,7 @@ export interface ImagePluginManifest {
     main: string;
     extensions: string[];
     ribbon?: PluginRibbon;
+    parameters?: PluginParameters;
 }
 
 export interface ImagePluginResult {

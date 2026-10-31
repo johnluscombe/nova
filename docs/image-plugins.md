@@ -1,6 +1,6 @@
 # Image plugins
 
-Nova ships with raster (JPG/PNG) and vector (SVG) plugins, enabled by default.
+Nova ships with raster (JPG/PNG), vector (SVG), and SICD plugins, enabled by default.
 Open Image is disabled if no valid plugins load. The main process also rejects image opening without plugins.
 No built-in fallback reads or decodes image files.
 
@@ -45,10 +45,10 @@ in the plugin's own `node_modules` directory.
 ```js
 export default {
     // Optional. Inspect file contents here when an extension is shared by formats.
-    async canOpen(filePath) {
+    async canOpen(filePath, parameters) {
         return true;
     },
-    async open(filePath) {
+    async open(filePath, parameters) {
         // All format-specific reads, parsing, decoding, and conversions go here.
         return {
             width: 1024,
@@ -86,8 +86,10 @@ assets in development and packaged builds; no first-run copy is needed.
 - `nova.vector`: SVG. Reads the file and returns a vector data URL (up to 16 MB),
   preserving sharpness when the image window is resized.
 
-`examples/plugins/raster/` remains a reference for user plugins. SICD decoders can
-implement the same API; no SICD decoder is included yet.
+- `nova.sicd`: SICD-in-NITF radar images. Uses a separate Python/SarPy environment
+  for bounded grayscale previews. See [SICD setup](sicd-plugin.md).
+
+`examples/plugins/raster/` remains a reference for user plugins.
 
 ## Ribbon contributions
 
@@ -145,7 +147,7 @@ The module's default export handles declared button IDs:
 
 ```js
 export default {
-    async executeRibbonAction(actionId, context) {
+    async executeRibbonAction(actionId, context, parameters) {
         if (actionId === "inspect") {
             return { message: `Scenario: ${context.scenarioPath}` };
         }
@@ -163,3 +165,24 @@ renderer execution. Image plugin handlers can coexist with ribbon handlers.
 
 Copy `examples/plugins/ribbon/` to the user plugins directory and restart Nova
 for a runnable example that adds a Home group, an Image button, and a new tab.
+
+## Plugin parameters
+
+Plugins can accept configuration through an optional `parameters` object in
+`plugin.json`, for example:
+
+```json
+"parameters": {
+    "python": "/absolute/path/to/venv/bin/python",
+    "previewSize": 1600,
+    "enabled": true
+}
+```
+
+Values may be strings, finite numbers, booleans, or null. Arrays and nested
+objects are rejected during discovery. The host passes the frozen object to
+`canOpen(filePath, parameters)`, `open(filePath, parameters)`, and
+`executeRibbonAction(actionId, context, parameters)`. Plugins without parameters
+receive an empty object; existing handlers can ignore the extra argument.
+Plugins validate their own parameter names and values. Restart Nova after edits.
+For bundled plugins in an installed app, configure a user copy with the same ID.

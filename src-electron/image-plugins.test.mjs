@@ -223,8 +223,8 @@ void test("ribbon-only plugins contribute controls and dispatch only declared ac
         await plugin(
             directory,
             "ribbon",
-            `export default {executeRibbonAction(id, context) {return {message: id + ':' + context.scenarioPath};}};`,
-            { extensions: [], ribbon }
+            `export default {executeRibbonAction(id, context, parameters) {if (parameters.python !== '/custom/python') throw new Error('Missing parameters'); return {message: id + ':' + context.scenarioPath};}};`,
+            { extensions: [], ribbon, parameters: { python: "/custom/python" } }
         );
         const state = await host.reload();
         assert.equal(state.errors.length, 0);
@@ -344,7 +344,7 @@ void test("plugin action exceptions and invalid results are reported", () =>
             directory,
             "actions",
             "export default {executeRibbonAction(id) {if (id === 'fail') {throw new Error('action failed');} return {message: 42};}};",
-            { extensions: [], ribbon }
+            { extensions: [], ribbon, parameters: { python: "/custom/python" } }
         );
         await host.reload();
         await assert.rejects(
@@ -357,4 +357,46 @@ void test("plugin action exceptions and invalid results are reported", () =>
             }),
             /Invalid plugin action result/
         );
+    }));
+
+void test("passes plugin parameters to image handlers and rejects malformed parameters", () =>
+    fixture(async directory => {
+        await plugin(
+            directory,
+            "configured",
+            `export default {
+            canOpen(file, parameters) {
+                if (parameters.python !== '/custom/python' || !Object.isFrozen(parameters)) throw new Error('Missing parameters');
+                return true;
+            },
+            open(file, parameters) { return { width: parameters.size }; }
+        };`,
+            {
+                parameters: {
+                    python: "/custom/python",
+                    size: 42,
+                    enabled: true,
+                    optional: null
+                }
+            }
+        );
+        const host = new ImagePlugins(directory);
+        assert.equal((await host.reload()).plugins.length, 1);
+        assert.equal((await host.open("file.test")).width, 42);
+        for (const [index, parameters] of [
+            [],
+            null,
+            "python",
+            { nested: {} }
+        ].entries()) {
+            await plugin(
+                directory,
+                `invalid-${index}`,
+                "export default { open() { return {}; } };",
+                { parameters }
+            );
+            const state = await host.reload();
+            assert.equal(state.plugins.length, 1);
+            assert.match(state.errors.join(), /Plugin parameters/);
+        }
     }));

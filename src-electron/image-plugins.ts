@@ -7,6 +7,7 @@ import { mkdir, readdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
+    PluginParameters,
     ImageInfo,
     ImagePluginStatus,
     ImagePluginManifest,
@@ -14,11 +15,18 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
-    canOpen?(filePath: string): boolean | Promise<boolean>;
-    open?(filePath: string): ImagePluginResult | Promise<ImagePluginResult>;
+    canOpen?(
+        filePath: string,
+        parameters: PluginParameters
+    ): boolean | Promise<boolean>;
+    open?(
+        filePath: string,
+        parameters: PluginParameters
+    ): ImagePluginResult | Promise<ImagePluginResult>;
     executeRibbonAction?(
         actionId: string,
-        context: RibbonActionContext
+        context: RibbonActionContext,
+        parameters: PluginParameters
     ): RibbonActionResult | void | Promise<RibbonActionResult | void>;
 }
 
@@ -103,6 +111,29 @@ export class ImagePlugins {
                     throw new Error(
                         "Invalid image plugin manifest or unsupported API version."
                     );
+                }
+                if (
+                    manifest.parameters !== undefined &&
+                    (!manifest.parameters ||
+                        typeof manifest.parameters !== "object" ||
+                        Array.isArray(manifest.parameters) ||
+                        !Object.values(manifest.parameters).every(
+                            value =>
+                                value === null ||
+                                typeof value === "string" ||
+                                typeof value === "boolean" ||
+                                (typeof value === "number" &&
+                                    Number.isFinite(value))
+                        ))
+                ) {
+                    throw new Error(
+                        "Plugin parameters must be an object of strings, finite numbers, booleans, or null."
+                    );
+                }
+                if (manifest.parameters !== undefined) {
+                    manifest.parameters = Object.freeze({
+                        ...manifest.parameters
+                    });
                 }
                 if (manifest.ribbon !== undefined) {
                     validateRibbon(manifest.ribbon);
@@ -212,7 +243,8 @@ export class ImagePlugins {
         }
         const result = await plugin.implementation.executeRibbonAction(
             actionId,
-            { scenarioPath: context.scenarioPath }
+            { scenarioPath: context.scenarioPath },
+            plugin.manifest.parameters ?? Object.freeze({})
         );
         if (result === undefined) {
             return {};
@@ -242,11 +274,17 @@ export class ImagePlugins {
             try {
                 if (
                     implementation.canOpen &&
-                    !(await implementation.canOpen(filePath))
+                    !(await implementation.canOpen(
+                        filePath,
+                        manifest.parameters ?? Object.freeze({})
+                    ))
                 ) {
                     continue;
                 }
-                const result = await implementation.open!(filePath);
+                const result = await implementation.open!(
+                    filePath,
+                    manifest.parameters ?? Object.freeze({})
+                );
                 if (!result || typeof result !== "object") {
                     throw new Error("Invalid image result.");
                 }
