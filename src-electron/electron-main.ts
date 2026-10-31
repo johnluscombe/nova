@@ -118,32 +118,51 @@ async function createWindow() {
         );
         await rename(`${preferencesPath}.tmp`, preferencesPath);
     }
-    async function restoreWorkspace(info: ScenarioInfo): Promise<ScenarioInfo> {
-        const workspace = [];
-        for (const saved of scenario.readWorkspace()) {
-            try {
-                workspace.push({
-                    ...saved,
-                    image: await imagePlugins.open(saved.path, saved.pluginId)
-                });
-            } catch (cause) {
-                workspace.push({
-                    ...saved,
-                    image: {
-                        name: path.basename(saved.path),
-                        path: saved.path,
-                        pluginId: saved.pluginId,
-                        pluginName: saved.pluginId
-                    },
-                    error:
-                        cause instanceof Error
-                            ? cause.message
-                            : "Unable to restore image."
-                });
-            }
-        }
-        return { ...info, workspace };
+    function restoreWorkspace(info: ScenarioInfo): ScenarioInfo {
+        return {
+            ...info,
+            workspace: scenario.readWorkspace().map(saved => ({
+                ...saved,
+                loading: true,
+                image: {
+                    name: path.basename(saved.path),
+                    path: saved.path,
+                    pluginId: saved.pluginId,
+                    pluginName: saved.pluginId
+                }
+            }))
+        };
     }
+    mainWindow.webContents.ipc.handle("scenario:load-images", () =>
+        documentAction(async () => {
+            for (const saved of scenario.readWorkspace()) {
+                let update;
+                try {
+                    update = {
+                        id: saved.id,
+                        image: await imagePlugins.open(
+                            saved.path,
+                            saved.pluginId
+                        )
+                    };
+                } catch (cause) {
+                    update = {
+                        id: saved.id,
+                        error:
+                            cause instanceof Error
+                                ? cause.message
+                                : "Unable to restore image."
+                    };
+                }
+                if (!mainWindow.webContents.isDestroyed()) {
+                    mainWindow.webContents.send(
+                        "scenario:image-restored",
+                        update
+                    );
+                }
+            }
+        })
+    );
     mainWindow.webContents.ipc.handle(
         "scenario:workspace",
         (_event, filePath: string, windows: unknown) =>
@@ -179,9 +198,7 @@ async function createWindow() {
                 return null;
             }
             try {
-                return await restoreWorkspace(
-                    await scenario.open(lastScenario)
-                );
+                return restoreWorkspace(await scenario.open(lastScenario));
             } catch (cause) {
                 scenario.close();
                 throw new Error(
@@ -248,9 +265,16 @@ async function createWindow() {
                 properties: ["openFile"]
             });
             const filePath = result.filePaths[0];
-            return result.canceled || !filePath
-                ? null
-                : imagePlugins.open(filePath);
+            if (result.canceled || !filePath) {
+                return null;
+            }
+            mainWindow.webContents.send("image:loading", {
+                name: path.basename(filePath),
+                path: filePath,
+                pluginId: "",
+                pluginName: "Loading…"
+            });
+            return imagePlugins.open(filePath);
         })
     );
     mainWindow.webContents.ipc.handle("scenario:open", () =>

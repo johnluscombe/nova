@@ -1,3 +1,4 @@
+import type { ImageInfo } from "./image";
 import type { RestoredImageWindow, SavedImageWindow } from "./workspace";
 export interface ScenarioInfo {
     name: string;
@@ -12,7 +13,16 @@ export interface ScenarioRows {
     hasMore: boolean;
 }
 
+export interface RestoredImageUpdate {
+    id: number;
+    image?: ImageInfo;
+    error?: string;
+}
+
 export interface ScenarioAPI {
+    loadImages(
+        onRestored: (update: RestoredImageUpdate) => void
+    ): Promise<void>;
     restoreLast(): Promise<ScenarioInfo | null>;
     saveWorkspace(path: string, windows: SavedImageWindow[]): Promise<void>;
     onFlushRequested(callback: () => void): () => void;

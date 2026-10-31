@@ -370,22 +370,32 @@ onMounted(async () => {
 onBeforeUnmount(() => stopFlushListener?.());
 
 async function openImage() {
-    if (!scenario.value) {
+    if (!scenario.value || busy.value) {
         return;
     }
     busy.value = true;
     error.value = "";
+    let loadingId: number | undefined;
     try {
         if (!window.images) {
             throw new Error("Open images in the Nova desktop app.");
         }
-        const opened = await window.images.open();
+        const opened = await window.images.open(image => {
+            loadingId = workspace.value?.add(image, true);
+        });
         if (opened) {
-            workspace.value?.add(opened);
+            if (loadingId !== undefined) {
+                workspace.value?.complete(loadingId, opened);
+            } else {
+                workspace.value?.add(opened);
+            }
         }
     } catch (cause) {
         error.value =
             cause instanceof Error ? cause.message : "Unable to open image.";
+        if (loadingId !== undefined) {
+            workspace.value?.fail(loadingId, error.value);
+        }
     } finally {
         busy.value = false;
     }
@@ -396,6 +406,18 @@ async function showScenario(opened: ScenarioInfo) {
     scenario.value = opened;
     await nextTick();
     workspace.value?.hydrate(opened.workspace ?? []);
+    if (opened.workspace?.some(widget => widget.loading)) {
+        await window.scenario.loadImages(update => {
+            if (update.image) {
+                workspace.value?.complete(update.id, update.image);
+            } else {
+                workspace.value?.fail(
+                    update.id,
+                    update.error ?? "Unable to restore image."
+                );
+            }
+        });
+    }
 }
 
 async function newScenario() {

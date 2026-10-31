@@ -33,7 +33,7 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
-    open(): Promise<ImageInfo | null>;
+    open(onLoading?: (image: ImageInfo) => void): Promise<ImageInfo | null>;
     plugins(): Promise<ImagePluginStatus>;
     executeRibbonAction(
         pluginId: string,

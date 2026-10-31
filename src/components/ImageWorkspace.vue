@@ -74,8 +74,17 @@
                     </div>
                 </div>
                 <div class="widget-content">
+                    <div
+                        v-if="widget.loading"
+                        class="column items-center q-gutter-md"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <q-spinner color="primary" size="40px" />
+                        <span>Loading image…</span>
+                    </div>
                     <img
-                        v-if="widget.image.previewDataUrl"
+                        v-else-if="widget.image.previewDataUrl"
                         :src="widget.image.previewDataUrl"
                         :alt="widget.image.name"
                         draggable="false"
@@ -147,6 +156,7 @@ interface ImageWindow {
     maximized: boolean;
     z: number;
     error?: string;
+    loading?: boolean;
 }
 const canvas = ref<HTMLDivElement>();
 const windows = ref<ImageWindow[]>([]);
@@ -172,11 +182,12 @@ function activate(widget: ImageWindow) {
         activeId.value = widget.id;
     }
 }
-function add(image: ImageInfo) {
+function add(image: ImageInfo, loading = false) {
     const position = (windows.value.length % 8) * 28 + 16;
     const widget: ImageWindow = {
         id: ++sequence,
         image,
+        loading,
         rect: fitWindow(
             { x: position, y: position, width: 520, height: 360 },
             bounds
@@ -187,22 +198,43 @@ function add(image: ImageInfo) {
     };
     windows.value.push(widget);
     activeId.value = widget.id;
+    return widget.id;
+}
+function complete(id: number, image: ImageInfo) {
+    const widget = windows.value.find(item => item.id === id);
+    if (!widget) {
+        return;
+    }
+    widget.image = image;
+    widget.loading = false;
+}
+function fail(id: number, message: string) {
+    const widget = windows.value.find(item => item.id === id);
+    if (!widget) {
+        return;
+    }
+    widget.loading = false;
+    widget.error = message;
+    widget.image.pluginName = "Failed to load";
 }
 function snapshot(): SavedImageWindow[] {
-    return windows.value.map(widget => ({
-        id: widget.id,
-        path: widget.image.path,
-        pluginId: widget.image.pluginId,
-        rect: { ...widget.rect },
-        minimized: widget.minimized,
-        maximized: widget.maximized,
-        z: widget.z
-    }));
+    return windows.value
+        .filter(widget => widget.image.pluginId)
+        .map(widget => ({
+            id: widget.id,
+            path: widget.image.path,
+            pluginId: widget.image.pluginId,
+            rect: { ...widget.rect },
+            minimized: widget.minimized,
+            maximized: widget.maximized,
+            z: widget.z
+        }));
 }
 function hydrate(saved: RestoredImageWindow[]) {
     windows.value = saved.map(widget => ({
         id: widget.id,
         image: widget.image,
+        loading: widget.loading ?? false,
         rect: fitWindow(widget.rect, bounds),
         minimized: widget.minimized,
         maximized: widget.maximized,
@@ -223,7 +255,7 @@ watch(
     },
     { deep: true }
 );
-defineExpose({ add, hydrate, snapshot });
+defineExpose({ add, complete, fail, hydrate, snapshot });
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;
     return {

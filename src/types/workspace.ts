@@ -11,6 +11,7 @@ export interface SavedImageWindow {
 export interface RestoredImageWindow extends SavedImageWindow {
     image: ImageInfo;
     error?: string;
+    loading?: boolean;
 }
 export function validateWorkspace(value: unknown): SavedImageWindow[] {
     if (!Array.isArray(value) || value.length > 1000) {
