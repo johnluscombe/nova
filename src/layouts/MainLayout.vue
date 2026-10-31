@@ -1,94 +1,150 @@
 <template>
-  <q-layout view="lHh Lpr lFf">
-    <q-header elevated>
-      <q-toolbar>
-        <q-btn
-          flat
-          dense
-          round
-          icon="menu"
-          aria-label="Menu"
-          @click="toggleLeftDrawer"
-        />
-
-        <q-toolbar-title> Quasar App </q-toolbar-title>
-
-        <div>Quasar v{{ $q.version }}</div>
-      </q-toolbar>
-    </q-header>
-
-    <q-drawer v-model="leftDrawerOpen" show-if-above bordered>
-      <q-list>
-        <q-item-label header> Essential Links </q-item-label>
-
-        <EssentialLink
-          v-for="link in linksList"
-          :key="link.label"
-          v-bind="link"
-        />
-      </q-list>
-    </q-drawer>
-
-    <q-page-container>
-      <router-view />
-    </q-page-container>
-  </q-layout>
+    <q-layout view="lHh Lpr lFf">
+        <q-header class="nova-titlebar">
+            <q-toolbar
+                class="nova-toolbar"
+                :class="{ 'nova-toolbar-mac': isMac }"
+            >
+                <span
+                    v-if="activeScenario"
+                    class="text-caption scenario-name"
+                    :title="activeScenario.name"
+                    >{{ activeScenario.name }}</span
+                >
+                <q-space />
+                <div
+                    v-if="controls && !isMac"
+                    class="window-controls"
+                    role="group"
+                    aria-label="Window controls"
+                >
+                    <q-btn
+                        flat
+                        square
+                        dense
+                        icon="remove"
+                        aria-label="Minimize window"
+                        title="Minimize"
+                        @click="runWindowAction(() => controls!.minimize())"
+                    />
+                    <q-btn
+                        flat
+                        square
+                        dense
+                        :icon="maximized ? 'filter_none' : 'crop_square'"
+                        :aria-label="
+                            maximized ? 'Restore window' : 'Maximize window'
+                        "
+                        :title="maximized ? 'Restore' : 'Maximize'"
+                        @click="
+                            runWindowAction(() => controls!.toggleMaximize())
+                        "
+                    />
+                    <q-btn
+                        flat
+                        square
+                        dense
+                        icon="close"
+                        class="window-close"
+                        aria-label="Close window"
+                        title="Close"
+                        @click="runWindowAction(() => controls!.close())"
+                    />
+                </div>
+            </q-toolbar>
+        </q-header>
+        <q-page-container>
+            <q-banner
+                v-if="windowError"
+                class="bg-red-1 text-negative"
+                role="alert"
+                >{{ windowError }}</q-banner
+            >
+            <router-view />
+        </q-page-container>
+    </q-layout>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import EssentialLink, {
-  type EssentialLinkProps
-} from "@/components/EssentialLink.vue";
+import { onMounted, onBeforeUnmount, ref } from "vue";
+import type { WindowState } from "@/types/window-controls";
+import { activeScenario } from "@/composables/useScenario";
 
-const linksList: EssentialLinkProps[] = [
-  {
-    label: "Docs",
-    caption: "quasar.dev",
-    icon: "school",
-    link: "https://quasar.dev"
-  },
-  {
-    label: "GitHub",
-    caption: "github.com/quasarframework",
-    icon: "code",
-    link: "https://github.com/quasarframework"
-  },
-  {
-    label: "Discord Chat Channel",
-    caption: "chat.quasar.dev",
-    icon: "chat",
-    link: "https://chat.quasar.dev"
-  },
-  {
-    label: "Forum",
-    caption: "forum.quasar.dev",
-    icon: "record_voice_over",
-    link: "https://forum.quasar.dev"
-  },
-  {
-    label: "Twitter",
-    caption: "@quasarframework",
-    icon: "rss_feed",
-    link: "https://twitter.quasar.dev"
-  },
-  {
-    label: "Facebook",
-    caption: "@QuasarFramework",
-    icon: "public",
-    link: "https://facebook.quasar.dev"
-  },
-  {
-    label: "Quasar Awesome",
-    caption: "Community Quasar projects",
-    icon: "favorite",
-    link: "https://awesome.quasar.dev"
-  }
-];
+const controls = window.windowControls;
+const isMac = controls?.platform === "darwin";
+const maximized = ref(false);
+const windowError = ref("");
+let unsubscribe: (() => void) | undefined;
+let mounted = false;
+const updateState = (state: WindowState) => {
+    maximized.value = state.maximized;
+};
 
-const leftDrawerOpen = ref(false);
-
-function toggleLeftDrawer() {
-  leftDrawerOpen.value = !leftDrawerOpen.value;
+async function runWindowAction(action: () => Promise<unknown>) {
+    windowError.value = "";
+    try {
+        await action();
+    } catch {
+        windowError.value = "Unable to update the window. Please try again.";
+    }
 }
+
+onMounted(async () => {
+    mounted = true;
+    if (!controls) {
+        return;
+    }
+    unsubscribe = controls.onStateChanged(updateState);
+    await runWindowAction(async () => {
+        const state = await controls.getState();
+        if (mounted) {
+            updateState(state);
+        }
+    });
+});
+onBeforeUnmount(() => {
+    mounted = false;
+    unsubscribe?.();
+});
 </script>
+
+<style scoped>
+.nova-titlebar {
+    background: #234c78;
+}
+.nova-toolbar {
+    height: 36px;
+    min-height: 36px;
+    padding-right: 0;
+    -webkit-app-region: drag;
+    app-region: drag;
+    user-select: none;
+}
+.window-controls {
+    display: flex;
+    align-self: stretch;
+    margin-left: 24px;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+}
+.nova-toolbar-mac {
+    /* Leave room for macOS's native close, minimize, and fullscreen buttons. */
+    padding-left: 88px;
+    padding-right: 16px;
+}
+.window-controls :deep(.q-btn) {
+    width: 46px;
+    border-radius: 0;
+}
+.window-close:hover,
+.window-close:focus-visible {
+    background: #c42b1c;
+    color: white;
+}
+.scenario-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+</style>

@@ -1,0 +1,58 @@
+{
+    "apiVersion": 1,
+    "id": "nova.ribbon-example",
+    "name": "Ribbon example",
+    "main": "index.mjs",
+    "extensions": [],
+    "ribbon": {
+        "tabs": [
+            {
+                "id": "home",
+                "label": "Home",
+                "groups": [
+                    {
+                        "id": "image",
+                        "label": "Image",
+                        "buttons": [
+                            {
+                                "id": "scenario-info",
+                                "label": "Scenario info",
+                                "icon": "info",
+                                "requiresScenario": true
+                            }
+                        ]
+                    },
+                    {
+                        "id": "utilities",
+                        "label": "Utilities",
+                        "buttons": [
+                            {
+                                "id": "about",
+                                "label": "About plugin",
+                                "icon": "extension"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "id": "tools",
+                "label": "Example tools",
+                "groups": [
+                    {
+                        "id": "diagnostics",
+                        "label": "Diagnostics",
+                        "buttons": [
+                            {
+                                "id": "check",
+                                "label": "Check scenario",
+                                "icon": "fact_check",
+                                "requiresScenario": true
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

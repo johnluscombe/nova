@@ -1,23 +1,531 @@
 <template>
-  <q-page class="flex flex-center">
-    <div class="column items-center">
-      <img
-        alt="Quasar logo"
-        src="~@/assets/quasar-logo-vertical.svg"
-        style="width: 200px; height: 200px"
-      />
-
-      <q-btn
-        class="q-mt-md"
-        color="primary"
-        to="/second"
-        label="Go to Second Page"
-        no-caps
-      />
-    </div>
-  </q-page>
+    <q-page class="scenario-page">
+        <section class="ribbon" aria-label="Scenario ribbon">
+            <q-tabs
+                v-model="activeTab"
+                dense
+                no-caps
+                align="left"
+                class="ribbon-tabs"
+                active-color="primary"
+                indicator-color="primary"
+            >
+                <q-tab name="home" label="Home" />
+                <q-tab
+                    v-for="tab in pluginTabs"
+                    :key="tab.key"
+                    :name="tab.key"
+                    :label="tab.label"
+                />
+            </q-tabs>
+            <div class="ribbon-content">
+                <template v-if="activeTab === 'home'">
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="file-group-label"
+                    >
+                        <div class="ribbon-actions">
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="note_add"
+                                label="New"
+                                :disable="busy"
+                                @click="newScenario"
+                            />
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="folder_open"
+                                label="Open"
+                                :disable="busy"
+                                @click="openScenario"
+                            />
+                            <q-separator vertical inset class="q-mx-sm" />
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="close"
+                                label="Close"
+                                :disable="busy || !scenario"
+                                @click="closeScenario"
+                            />
+                            <q-btn
+                                v-for="button in homeButtons('file')"
+                                :key="button.key"
+                                flat
+                                stack
+                                no-caps
+                                :icon="button.icon ?? 'extension'"
+                                :label="button.label"
+                                :disable="
+                                    busy ||
+                                    (button.requiresScenario && !scenario)
+                                "
+                                @click="
+                                    runPluginAction(button.pluginId, button.id)
+                                "
+                            />
+                        </div>
+                        <div id="file-group-label" class="ribbon-group-label"
+                            >File</div
+                        >
+                    </div>
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="image-group-label"
+                    >
+                        <div class="ribbon-actions">
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="add_photo_alternate"
+                                label="Open"
+                                aria-label="Open image"
+                                :disable="
+                                    busy || !scenario || !hasImageDecoders
+                                "
+                                @click="openImage"
+                            />
+                            <q-btn
+                                v-for="button in homeButtons('image')"
+                                :key="button.key"
+                                flat
+                                stack
+                                no-caps
+                                :icon="button.icon ?? 'extension'"
+                                :label="button.label"
+                                :disable="
+                                    busy ||
+                                    (button.requiresScenario && !scenario)
+                                "
+                                @click="
+                                    runPluginAction(button.pluginId, button.id)
+                                "
+                            />
+                        </div>
+                        <div id="image-group-label" class="ribbon-group-label"
+                            >Image</div
+                        >
+                    </div>
+                </template>
+                <div
+                    v-for="group in extraGroups"
+                    :key="group.key"
+                    class="ribbon-group"
+                    role="group"
+                    :aria-label="group.label"
+                >
+                    <div class="ribbon-actions">
+                        <q-btn
+                            v-for="button in group.buttons"
+                            :key="button.key"
+                            flat
+                            stack
+                            no-caps
+                            :icon="button.icon ?? 'extension'"
+                            :label="button.label"
+                            :disable="
+                                busy || (button.requiresScenario && !scenario)
+                            "
+                            @click="runPluginAction(button.pluginId, button.id)"
+                        />
+                    </div>
+                    <div class="ribbon-group-label">{{ group.label }}</div>
+                </div>
+            </div>
+            <q-linear-progress
+                v-if="busy"
+                indeterminate
+                color="primary"
+                class="ribbon-progress"
+            />
+        </section>
+        <q-dialog
+            :model-value="!!actionMessage"
+            @update:model-value="actionMessage = ''"
+        >
+            <q-card
+                ><q-card-section>{{ actionMessage }}</q-card-section
+                ><q-card-actions align="right"
+                    ><q-btn
+                        flat
+                        label="OK"
+                        @click="actionMessage = ''" /></q-card-actions
+            ></q-card>
+        </q-dialog>
+        <main class="scenario-content" :aria-busy="busy">
+            <div
+                v-if="
+                    error ||
+                    (pluginStatus &&
+                        (!hasImageDecoders || pluginStatus.errors.length))
+                "
+                class="workspace-info"
+            >
+                <q-banner
+                    v-if="error"
+                    class="bg-red-1 text-negative q-mb-md"
+                    role="alert"
+                    >{{ error }}</q-banner
+                >
+                <q-banner
+                    v-if="
+                        pluginStatus &&
+                        (!hasImageDecoders || pluginStatus.errors.length)
+                    "
+                    class="bg-blue-1 q-mb-md"
+                >
+                    <div v-if="!hasImageDecoders"
+                        >Install an image plugin to enable Open Image.</div
+                    >
+                    <div class="text-caption image-path"
+                        >Plugin folder: {{ pluginStatus.directory }}</div
+                    >
+                    <div
+                        v-for="issue in pluginStatus.errors"
+                        :key="issue"
+                        class="text-negative"
+                        >{{ issue }}</div
+                    >
+                    <div class="text-caption"
+                        >Restart Nova after installing or changing a
+                        plugin.</div
+                    >
+                </q-banner>
+            </div>
+            <ImageWorkspace
+                :key="workspaceSession"
+                ref="workspace"
+                @change="saveLayout"
+            />
+        </main>
+    </q-page>
 </template>
 
 <script setup lang="ts">
-//
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import ImageWorkspace from "@/components/ImageWorkspace.vue";
+import type { ImagePluginStatus } from "../types/image";
+import type { SavedImageWindow } from "../types/workspace";
+import type { ScenarioInfo } from "../types/scenario";
+import { activeScenario as scenario } from "@/composables/useScenario";
+const busy = ref(false);
+const error = ref("");
+const workspace = ref<InstanceType<typeof ImageWorkspace>>();
+const workspaceSession = ref(0);
+
+const pluginStatus = ref<ImagePluginStatus | null>(null);
+
+const activeTab = ref("home");
+const hasImageDecoders = computed(
+    () =>
+        pluginStatus.value?.plugins.some(plugin => plugin.extensions.length) ??
+        false
+);
+const pluginTabs = computed(() =>
+    (pluginStatus.value?.plugins ?? []).flatMap(plugin =>
+        (plugin.ribbon?.tabs ?? [])
+            .filter(tab => tab.id !== "home")
+            .map(tab => ({ key: `${plugin.id}:${tab.id}`, label: tab.label }))
+    )
+);
+const ribbonGroups = computed(() =>
+    (pluginStatus.value?.plugins ?? []).flatMap(plugin =>
+        (plugin.ribbon?.tabs ?? []).flatMap(tab =>
+            tab.groups.map(group => ({
+                key: `${plugin.id}:${tab.id}:${group.id}`,
+                id: group.id,
+                tab: tab.id === "home" ? "home" : `${plugin.id}:${tab.id}`,
+                label: group.label,
+                buttons: group.buttons.map(button => ({
+                    ...button,
+                    pluginId: plugin.id,
+                    key: `${plugin.id}:${button.id}`
+                }))
+            }))
+        )
+    )
+);
+const extraGroups = computed(() =>
+    ribbonGroups.value.filter(
+        group =>
+            group.tab === activeTab.value &&
+            !(
+                activeTab.value === "home" &&
+                ["file", "image"].includes(group.id)
+            )
+    )
+);
+function homeButtons(groupId: string) {
+    return ribbonGroups.value
+        .filter(group => group.tab === "home" && group.id === groupId)
+        .flatMap(group => group.buttons);
+}
+async function runPluginAction(pluginId: string, actionId: string) {
+    if (!window.images || busy.value) {
+        return;
+    }
+    busy.value = true;
+    error.value = "";
+    try {
+        await flushLayout();
+        const result = await window.images.executeRibbonAction(
+            pluginId,
+            actionId
+        );
+        if (result.message) {
+            actionMessage.value = result.message;
+        }
+    } catch (cause) {
+        error.value =
+            cause instanceof Error ? cause.message : "Plugin action failed.";
+    } finally {
+        busy.value = false;
+    }
+}
+const actionMessage = ref("");
+
+async function loadPlugins() {
+    if (!window.images) {
+        return;
+    }
+    busy.value = true;
+    error.value = "";
+    try {
+        pluginStatus.value = await window.images.plugins();
+    } catch (cause) {
+        error.value =
+            cause instanceof Error
+                ? cause.message
+                : "Unable to load image plugins.";
+    } finally {
+        busy.value = false;
+    }
+}
+let saves: Promise<void> = Promise.resolve();
+let saveFailure: unknown;
+let stopFlushListener: (() => void) | undefined;
+function saveLayout(windows: SavedImageWindow[]) {
+    const filePath = scenario.value?.path;
+    if (!filePath) {
+        return;
+    }
+    // Send immediately; Electron serializes and finishes pending writes before closing.
+    const request = window.scenario.saveWorkspace(filePath, windows);
+    saves = Promise.all([saves, request])
+        .then(() => {
+            saveFailure = undefined;
+        })
+        .catch(cause => {
+            saveFailure = cause;
+            error.value =
+                cause instanceof Error
+                    ? cause.message
+                    : "Unable to save workspace.";
+        });
+}
+async function flushLayout() {
+    if (scenario.value && workspace.value) {
+        saveLayout(workspace.value.snapshot());
+    }
+    await saves;
+    if (saveFailure) {
+        throw saveFailure;
+    }
+}
+onMounted(async () => {
+    stopFlushListener = window.scenario?.onFlushRequested(() => {
+        void flushLayout()
+            .then(() => window.scenario.confirmClose())
+            .catch(cause => {
+                error.value = `Unable to save before closing: ${cause instanceof Error ? cause.message : String(cause)}`;
+            });
+    });
+    await loadPlugins();
+    if (!window.scenario) {
+        return;
+    }
+    busy.value = true;
+    try {
+        const restored = await window.scenario.restoreLast();
+        if (restored) {
+            await showScenario(restored);
+        }
+    } catch (cause) {
+        error.value =
+            cause instanceof Error
+                ? cause.message
+                : "Unable to restore scenario.";
+    } finally {
+        busy.value = false;
+    }
+});
+onBeforeUnmount(() => stopFlushListener?.());
+
+async function openImage() {
+    if (!scenario.value) {
+        return;
+    }
+    busy.value = true;
+    error.value = "";
+    try {
+        if (!window.images) {
+            throw new Error("Open images in the Nova desktop app.");
+        }
+        const opened = await window.images.open();
+        if (opened) {
+            workspace.value?.add(opened);
+        }
+    } catch (cause) {
+        error.value =
+            cause instanceof Error ? cause.message : "Unable to open image.";
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function showScenario(opened: ScenarioInfo) {
+    workspaceSession.value++;
+    scenario.value = opened;
+    await nextTick();
+    workspace.value?.hydrate(opened.workspace ?? []);
+}
+
+async function newScenario() {
+    busy.value = true;
+    error.value = "";
+    try {
+        if (!window.scenario) {
+            throw new Error("Use the Nova desktop app to create scenarios.");
+        }
+        await flushLayout();
+        const created = await window.scenario.create();
+        if (created) {
+            await showScenario(created);
+        }
+    } catch (cause) {
+        error.value =
+            cause instanceof Error
+                ? cause.message
+                : "Unable to create scenario.";
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function openScenario() {
+    busy.value = true;
+    error.value = "";
+    try {
+        if (!window.scenario) {
+            throw new Error("Open scenarios in the Nova desktop app.");
+        }
+        await flushLayout();
+        const opened = await window.scenario.open();
+        if (opened) {
+            await showScenario(opened);
+        }
+    } catch (cause) {
+        error.value =
+            cause instanceof Error ? cause.message : "Unable to open scenario.";
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function closeScenario() {
+    busy.value = true;
+    try {
+        await flushLayout();
+        await window.scenario.close();
+        scenario.value = null;
+        workspaceSession.value++;
+        error.value = "";
+    } catch (cause) {
+        error.value =
+            cause instanceof Error
+                ? cause.message
+                : "Unable to close scenario.";
+    } finally {
+        busy.value = false;
+    }
+}
 </script>
+
+<style scoped>
+.scenario-page {
+    background: #f5f7fa;
+    height: calc(100dvh - 36px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.ribbon {
+    flex-shrink: 0;
+    background: white;
+    border-bottom: 1px solid #d8dfe8;
+    position: relative;
+    z-index: 5;
+}
+.ribbon-tabs {
+    min-height: 40px;
+    color: #234c78;
+}
+.ribbon-content {
+    display: flex;
+    gap: 12px;
+    border-top: 1px solid #e7ecf2;
+    padding: 8px 16px 4px;
+    overflow-x: auto;
+}
+.ribbon-group {
+    flex-shrink: 0;
+    display: inline-flex;
+    flex-direction: column;
+    border-right: 1px solid #d8dfe8;
+    padding-right: 12px;
+}
+.ribbon-actions {
+    display: flex;
+    min-height: 72px;
+}
+.ribbon-actions :deep(.q-btn) {
+    min-width: 68px;
+    color: #234c78;
+}
+.ribbon-group-label {
+    text-align: center;
+    font-size: 12px;
+    color: #66758a;
+    padding-top: 4px;
+}
+.ribbon-progress {
+    position: absolute;
+    bottom: 0;
+}
+.scenario-content {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.image-path {
+    overflow-wrap: anywhere;
+}
+.workspace-info {
+    max-height: 35%;
+    flex-shrink: 0;
+    overflow: auto;
+    padding: 12px 20px;
+}
+</style>

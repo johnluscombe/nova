@@ -1,0 +1,539 @@
+<template>
+    <section class="image-workspace" aria-label="Image workspace">
+        <div ref="canvas" class="image-canvas">
+            <div v-if="!windows.length" class="canvas-empty">
+                <q-icon
+                    :name="activeScenario ? 'image' : 'description'"
+                    size="48px"
+                />
+                <p v-if="!activeScenario"
+                    >Create or open a scenario from the File group to begin.</p
+                >
+                <p v-else>Open an image from the ribbon to begin.</p>
+            </div>
+            <article
+                v-for="widget in windows"
+                v-show="!widget.minimized"
+                :key="widget.id"
+                class="image-window"
+                :class="{ active: activeId === widget.id }"
+                :style="windowStyle(widget)"
+                :aria-label="widget.image.name"
+                @pointerdown="activate(widget)"
+                @focusin="activate(widget)"
+            >
+                <div
+                    class="widget-titlebar"
+                    tabindex="0"
+                    :aria-label="`${widget.image.name} window title. Use arrow keys to move.`"
+                    @pointerdown="startGesture($event, widget, 'move')"
+                    @pointermove="moveGesture"
+                    @pointerup="endGesture"
+                    @pointercancel="endGesture"
+                    @lostpointercapture="endGesture"
+                    @dblclick="toggleMaximize(widget)"
+                    @keydown="moveWithKeyboard($event, widget)"
+                >
+                    <q-icon name="image" size="16px" />
+                    <span class="widget-title" :title="widget.image.path">{{
+                        widget.image.name
+                    }}</span>
+                    <div
+                        class="widget-controls"
+                        @pointerdown.stop
+                        @dblclick.stop
+                        @keydown.stop
+                    >
+                        <q-btn
+                            flat
+                            dense
+                            icon="remove"
+                            :aria-label="`Minimize ${widget.image.name}`"
+                            title="Minimize"
+                            @click="widget.minimized = true"
+                        />
+                        <q-btn
+                            flat
+                            dense
+                            :icon="
+                                widget.maximized ? 'filter_none' : 'crop_square'
+                            "
+                            :aria-label="`${widget.maximized ? 'Restore' : 'Maximize'} ${widget.image.name}`"
+                            :title="widget.maximized ? 'Restore' : 'Maximize'"
+                            @click="toggleMaximize(widget)"
+                        />
+                        <q-btn
+                            flat
+                            dense
+                            icon="close"
+                            class="widget-close"
+                            :aria-label="`Close ${widget.image.name}`"
+                            title="Close"
+                            @click="close(widget)"
+                        />
+                    </div>
+                </div>
+                <div class="widget-content">
+                    <img
+                        v-if="widget.image.previewDataUrl"
+                        :src="widget.image.previewDataUrl"
+                        :alt="widget.image.name"
+                        draggable="false"
+                    />
+                    <p v-else>{{
+                        widget.error ??
+                        "This plugin did not provide an image preview."
+                    }}</p>
+                </div>
+                <div class="widget-status" :title="widget.image.path"
+                    >{{ widget.image.pluginName
+                    }}<span v-if="widget.image.width && widget.image.height">
+                        · {{ widget.image.width }} ×
+                        {{ widget.image.height }}</span
+                    ></div
+                >
+                <template v-if="!widget.maximized">
+                    <div
+                        v-for="edge in edges"
+                        :key="edge"
+                        class="resize-handle"
+                        :class="`resize-${edge}`"
+                        @pointerdown.stop="startGesture($event, widget, edge)"
+                        @pointermove="moveGesture"
+                        @pointerup="endGesture"
+                        @pointercancel="endGesture"
+                        @lostpointercapture="endGesture"
+                    />
+                    <button
+                        class="resize-keyboard"
+                        :aria-label="`Resize ${widget.image.name} with arrow keys`"
+                        @keydown="resizeWithKeyboard($event, widget)"
+                        >⌟</button
+                    >
+                </template>
+            </article>
+        </div>
+        <div class="window-tray" aria-label="Minimized image windows">
+            <q-btn
+                v-for="widget in windows.filter(item => item.minimized)"
+                :key="widget.id"
+                flat
+                dense
+                no-caps
+                icon="image"
+                :label="widget.image.name"
+                :title="`Restore ${widget.image.name}`"
+                @click="restore(widget)"
+            />
+        </div>
+    </section>
+</template>
+
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, reactive, watch } from "vue";
+import type { RestoredImageWindow, SavedImageWindow } from "@/types/workspace";
+import type { ImageInfo } from "@/types/image";
+import { activeScenario } from "@/composables/useScenario";
+import {
+    fitWindow,
+    resizeWindow,
+    type WindowRect
+} from "../utils/window-geometry.ts";
+interface ImageWindow {
+    id: number;
+    image: ImageInfo;
+    rect: WindowRect;
+    minimized: boolean;
+    maximized: boolean;
+    z: number;
+    error?: string;
+}
+const canvas = ref<HTMLDivElement>();
+const windows = ref<ImageWindow[]>([]);
+const bounds = reactive({ width: 0, height: 0 });
+const activeId = ref<number>();
+const edges = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+let sequence = 0;
+let zIndex = 0;
+let observer: ResizeObserver | undefined;
+let gesture:
+    | {
+          widget: ImageWindow;
+          pointerId: number;
+          x: number;
+          y: number;
+          rect: WindowRect;
+          action: string;
+      }
+    | undefined;
+function activate(widget: ImageWindow) {
+    if (activeId.value !== widget.id) {
+        widget.z = ++zIndex;
+        activeId.value = widget.id;
+    }
+}
+function add(image: ImageInfo) {
+    const position = (windows.value.length % 8) * 28 + 16;
+    const widget: ImageWindow = {
+        id: ++sequence,
+        image,
+        rect: fitWindow(
+            { x: position, y: position, width: 520, height: 360 },
+            bounds
+        ),
+        minimized: false,
+        maximized: false,
+        z: ++zIndex
+    };
+    windows.value.push(widget);
+    activeId.value = widget.id;
+}
+function snapshot(): SavedImageWindow[] {
+    return windows.value.map(widget => ({
+        id: widget.id,
+        path: widget.image.path,
+        pluginId: widget.image.pluginId,
+        rect: { ...widget.rect },
+        minimized: widget.minimized,
+        maximized: widget.maximized,
+        z: widget.z
+    }));
+}
+function hydrate(saved: RestoredImageWindow[]) {
+    windows.value = saved.map(widget => ({
+        id: widget.id,
+        image: widget.image,
+        rect: fitWindow(widget.rect, bounds),
+        minimized: widget.minimized,
+        maximized: widget.maximized,
+        z: widget.z,
+        ...(widget.error ? { error: widget.error } : {})
+    }));
+    sequence = Math.max(0, ...saved.map(widget => widget.id));
+    zIndex = Math.max(0, ...saved.map(widget => widget.z));
+    activeId.value = windows.value.find(widget => widget.z === zIndex)?.id;
+}
+const emit = defineEmits<{ change: [windows: SavedImageWindow[]] }>();
+watch(
+    snapshot,
+    value => {
+        if (!gesture) {
+            emit("change", value);
+        }
+    },
+    { deep: true }
+);
+defineExpose({ add, hydrate, snapshot });
+function windowStyle(widget: ImageWindow) {
+    const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;
+    return {
+        left: `${rect.x}px`,
+        top: `${rect.y}px`,
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+        zIndex: widget.z
+    };
+}
+function toggleMaximize(widget: ImageWindow) {
+    widget.maximized = !widget.maximized;
+    activate(widget);
+}
+function restore(widget: ImageWindow) {
+    widget.minimized = false;
+    activate(widget);
+}
+function close(widget: ImageWindow) {
+    windows.value = windows.value.filter(item => item.id !== widget.id);
+}
+function startGesture(
+    event: PointerEvent,
+    widget: ImageWindow,
+    action: string
+) {
+    if (event.button !== 0 || widget.maximized) {
+        return;
+    }
+    event.preventDefault();
+    activate(widget);
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    gesture = {
+        widget,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        rect: { ...widget.rect },
+        action
+    };
+}
+function moveGesture(event: PointerEvent) {
+    if (!gesture || event.pointerId !== gesture.pointerId) {
+        return;
+    }
+    const { widget, rect, action, x, y } = gesture;
+    const dx = event.clientX - x;
+    const dy = event.clientY - y;
+    widget.rect =
+        action === "move"
+            ? fitWindow({ ...rect, x: rect.x + dx, y: rect.y + dy }, bounds)
+            : resizeWindow(rect, action, dx, dy, bounds);
+}
+function endGesture() {
+    if (gesture) {
+        gesture = undefined;
+        emit("change", snapshot());
+    }
+}
+function keyboardDelta(event: KeyboardEvent) {
+    const step = event.shiftKey ? 40 : 10;
+    return {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step]
+    }[event.key];
+}
+function moveWithKeyboard(event: KeyboardEvent, widget: ImageWindow) {
+    const delta = keyboardDelta(event);
+    if (!delta || widget.maximized) {
+        return;
+    }
+    event.preventDefault();
+    widget.rect = fitWindow(
+        {
+            ...widget.rect,
+            x: widget.rect.x + delta[0]!,
+            y: widget.rect.y + delta[1]!
+        },
+        bounds
+    );
+}
+function resizeWithKeyboard(event: KeyboardEvent, widget: ImageWindow) {
+    const delta = keyboardDelta(event);
+    if (!delta) {
+        return;
+    }
+    event.preventDefault();
+    widget.rect = resizeWindow(widget.rect, "se", delta[0]!, delta[1]!, bounds);
+}
+onMounted(() => {
+    observer = new ResizeObserver(entries => {
+        const size = entries[0]?.contentRect;
+        if (!size) {
+            return;
+        }
+        bounds.width = size.width;
+        bounds.height = size.height;
+        endGesture();
+        for (const widget of windows.value) {
+            widget.rect = fitWindow(widget.rect, bounds);
+        }
+    });
+    if (canvas.value) {
+        bounds.width = canvas.value.clientWidth;
+        bounds.height = canvas.value.clientHeight;
+        observer.observe(canvas.value);
+    }
+});
+onBeforeUnmount(() => {
+    observer?.disconnect();
+    endGesture();
+});
+</script>
+
+<style scoped>
+.image-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+}
+.image-canvas {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    isolation: isolate;
+    background: #e9eef4;
+}
+.canvas-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: #748398;
+    pointer-events: none;
+}
+.image-window {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #a9b7c7;
+    border-radius: 6px;
+    background: white;
+    box-shadow: 0 3px 12px #20375426;
+}
+.image-window.active {
+    border-color: #3979b9;
+    box-shadow: 0 4px 18px #20375440;
+}
+.widget-titlebar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    height: 32px;
+    flex-shrink: 0;
+    padding-left: 10px;
+    background: #e2e9f1;
+    color: #284663;
+    cursor: move;
+    touch-action: none;
+    user-select: none;
+}
+.active .widget-titlebar {
+    background: #234c78;
+    color: white;
+}
+.widget-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.widget-controls {
+    display: flex;
+    height: 100%;
+    cursor: default;
+}
+.widget-controls :deep(.q-btn) {
+    width: 32px;
+    min-height: 0;
+    border-radius: 0;
+}
+.widget-controls :deep(.q-icon) {
+    font-size: 16px;
+}
+.widget-close:hover {
+    background: #c42b1c;
+    color: white;
+}
+.widget-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    background: #111b27;
+    color: #c8d3df;
+}
+.widget-content img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.widget-content p {
+    padding: 16px;
+}
+.widget-status {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 3px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.window-tray {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    height: 36px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    background: #dce4ee;
+    padding: 0 8px;
+}
+.window-tray :deep(.q-btn) {
+    max-width: 200px;
+    flex-shrink: 0;
+}
+.window-tray :deep(.q-btn__content) {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.resize-handle {
+    position: absolute;
+    touch-action: none;
+}
+.resize-n,
+.resize-s {
+    height: 5px;
+    left: 8px;
+    right: 8px;
+    cursor: ns-resize;
+}
+.resize-n {
+    top: 0;
+}
+.resize-s {
+    bottom: 0;
+}
+.resize-e,
+.resize-w {
+    width: 5px;
+    top: 8px;
+    bottom: 8px;
+    cursor: ew-resize;
+}
+.resize-e {
+    right: 0;
+}
+.resize-w {
+    left: 0;
+}
+.resize-ne,
+.resize-nw,
+.resize-se,
+.resize-sw {
+    width: 9px;
+    height: 9px;
+}
+.resize-ne {
+    top: 0;
+    right: 0;
+    cursor: nesw-resize;
+}
+.resize-nw {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
+}
+.resize-se {
+    bottom: 0;
+    right: 0;
+    cursor: nwse-resize;
+}
+.resize-sw {
+    bottom: 0;
+    left: 0;
+    cursor: nesw-resize;
+}
+.resize-keyboard {
+    position: absolute;
+    bottom: 2px;
+    right: 6px;
+    padding: 0;
+    line-height: 12px;
+    border: 0;
+    background: transparent;
+    color: #647891;
+    cursor: nwse-resize;
+}
+</style>
