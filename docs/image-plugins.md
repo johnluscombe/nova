@@ -205,3 +205,19 @@ active widget's image. File details and dimensions are always available; plugin
 fields appear when decoding finishes, including when restoring saved widgets.
 Metadata is displayed as text. Results allow up to 200 fields, labels up to 200
 characters, and string values up to 10,000 characters. Nested objects are rejected.
+
+## Image statistics
+
+The global View group's Statistics button toggles a panel below the active
+widget's image, independently of Metadata. Plugins may return a `statistics`
+object using the same scalar values and size limits as `metadata`, for example
+`{ statistics: { "Mean amplitude": 2.5, Basis: "Sampled source amplitude" } }`.
+Plugins without statistics display an unavailable message.
+
+SICD reports sample counts, minimum, maximum, mean, median, population standard
+deviation, and RMS amplitude. These use finite source magnitudes before the
+display stretch, including zeros. Large images use the preview's sampling stride,
+which is shown in the panel; these are sampled statistics, not full-image results.
+Invalid values are counted and excluded; amplitude metrics are unavailable if no
+finite samples exist. Statistics are returned during decoding and scenario
+restoration without an additional file read.

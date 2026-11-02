@@ -65,6 +65,19 @@ class SicdPreviewTests(unittest.TestCase):
             self.assertEqual((result["width"], result["height"]), (3201, 4))
             self.assertEqual(struct.unpack(">II", png[16:24]), (1067, 2))
 
+    def test_statistics(self):
+        result = reader.image_statistics(np.array([0, 2, 4, np.nan, np.inf]), 3)
+        self.assertEqual(result["Sampling stride (rows / columns)"], 3)
+        self.assertEqual(result["Sample count"], 5)
+        self.assertEqual(result["Invalid samples"], 2)
+        self.assertEqual(result["Minimum amplitude"], 0)
+        self.assertEqual(result["Maximum amplitude"], 4)
+        self.assertEqual(result["Mean amplitude"], 2)
+        self.assertEqual(result["Median amplitude"], 2)
+        self.assertAlmostEqual(result["Standard deviation"], np.std([0, 2, 4]))
+        self.assertAlmostEqual(result["RMS amplitude"], np.sqrt(20 / 3))
+        self.assertIsNone(reader.image_statistics(np.array([np.nan]), 1)["Mean amplitude"])
+
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "invalid.nitf"

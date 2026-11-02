@@ -288,24 +288,26 @@ export class ImagePlugins {
                 if (!result || typeof result !== "object") {
                     throw new Error("Invalid image result.");
                 }
-                if (
-                    result.metadata !== undefined &&
-                    (!result.metadata ||
-                        typeof result.metadata !== "object" ||
-                        Array.isArray(result.metadata) ||
-                        Object.keys(result.metadata).length > 200 ||
-                        !Object.entries(result.metadata).every(
-                            ([key, value]) =>
-                                key.length <= 200 &&
-                                (value === null ||
-                                    typeof value === "boolean" ||
-                                    (typeof value === "number" &&
-                                        Number.isFinite(value)) ||
-                                    (typeof value === "string" &&
-                                        value.length <= 10000))
-                        ))
-                ) {
-                    throw new Error("Invalid image metadata.");
+                for (const field of ["metadata", "statistics"] as const) {
+                    if (
+                        result[field] !== undefined &&
+                        (!result[field] ||
+                            typeof result[field] !== "object" ||
+                            Array.isArray(result[field]) ||
+                            Object.keys(result[field]).length > 200 ||
+                            !Object.entries(result[field]).every(
+                                ([key, value]) =>
+                                    key.length <= 200 &&
+                                    (value === null ||
+                                        typeof value === "boolean" ||
+                                        (typeof value === "number" &&
+                                            Number.isFinite(value)) ||
+                                        (typeof value === "string" &&
+                                            value.length <= 10000))
+                            ))
+                    ) {
+                        throw new Error(`Invalid image ${field}.`);
+                    }
                 }
                 for (const dimension of [result.width, result.height]) {
                     if (
@@ -328,6 +330,9 @@ export class ImagePlugins {
                     );
                 }
                 return {
+                    ...(result.statistics !== undefined
+                        ? { statistics: result.statistics }
+                        : {}),
                     ...(result.metadata !== undefined
                         ? { metadata: result.metadata }
                         : {}),

@@ -426,3 +426,27 @@ void test("preserves scalar metadata and rejects invalid plugin metadata", () =>
             /Invalid image metadata/
         );
     }));
+
+void test("preserves statistics and rejects nested statistics", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "stats",
+            `export default { open() { return { statistics: { Mean: 2, Basis: 'Sampled amplitude' } }; } };`
+        );
+        await host.reload();
+        assert.deepEqual((await host.open("file.test")).statistics, {
+            Mean: 2,
+            Basis: "Sampled amplitude"
+        });
+        await plugin(
+            directory,
+            "bad-stats",
+            `export default { open() { return { statistics: { Mean: [] } }; } };`
+        );
+        await host.reload();
+        await assert.rejects(
+            host.open("file.test", "bad-stats"),
+            /Invalid image statistics/
+        );
+    }));

@@ -74,26 +74,70 @@
                     </div>
                 </div>
                 <div class="widget-body">
-                    <div class="widget-content">
-                        <div
-                            v-if="widget.loading"
-                            class="column items-center q-gutter-md"
-                            role="status"
-                            aria-live="polite"
-                        >
-                            <q-spinner color="primary" size="40px" />
-                            <span>Loading image…</span>
+                    <div class="image-area">
+                        <div class="widget-content">
+                            <div
+                                v-if="widget.loading"
+                                class="column items-center q-gutter-md"
+                                role="status"
+                                aria-live="polite"
+                            >
+                                <q-spinner color="primary" size="40px" />
+                                <span>Loading image…</span>
+                            </div>
+                            <img
+                                v-else-if="widget.image.previewDataUrl"
+                                :src="widget.image.previewDataUrl"
+                                :alt="widget.image.name"
+                                draggable="false"
+                            />
+                            <p v-else>{{
+                                widget.error ??
+                                "This plugin did not provide an image preview."
+                            }}</p>
                         </div>
-                        <img
-                            v-else-if="widget.image.previewDataUrl"
-                            :src="widget.image.previewDataUrl"
-                            :alt="widget.image.name"
-                            draggable="false"
-                        />
-                        <p v-else>{{
-                            widget.error ??
-                            "This plugin did not provide an image preview."
-                        }}</p>
+                        <section
+                            v-if="widget.statisticsOpen"
+                            class="statistics-panel"
+                            aria-label="Image statistics"
+                        >
+                            <div class="row items-center justify-between">
+                                <strong>Statistics</strong>
+                                <q-btn
+                                    flat
+                                    dense
+                                    round
+                                    icon="close"
+                                    aria-label="Close statistics"
+                                    @click="widget.statisticsOpen = false"
+                                />
+                            </div>
+                            <p v-if="widget.loading" role="status"
+                                >Loading statistics…</p
+                            >
+                            <template v-else>
+                                <dl
+                                    v-if="
+                                        widget.image.statistics &&
+                                        Object.keys(widget.image.statistics)
+                                            .length
+                                    "
+                                >
+                                    <div
+                                        v-for="(value, label) in widget.image
+                                            .statistics"
+                                        :key="label"
+                                    >
+                                        <dt>{{ label }}</dt
+                                        ><dd>{{ value ?? "Not available" }}</dd>
+                                    </div>
+                                </dl>
+                                <p v-else>{{
+                                    widget.error ??
+                                    "This plugin does not provide image statistics."
+                                }}</p>
+                            </template>
+                        </section>
                     </div>
                     <aside
                         v-if="widget.metadataOpen"
@@ -198,6 +242,7 @@ interface ImageWindow {
     error?: string;
     loading?: boolean;
     metadataOpen?: boolean;
+    statisticsOpen?: boolean;
 }
 const activeWidget = computed(() =>
     windows.value.find(
@@ -207,6 +252,11 @@ const activeWidget = computed(() =>
 function toggleMetadata() {
     if (activeWidget.value) {
         activeWidget.value.metadataOpen = !activeWidget.value.metadataOpen;
+    }
+}
+function toggleStatistics() {
+    if (activeWidget.value && hasStatistics.value) {
+        activeWidget.value.statisticsOpen = !activeWidget.value.statisticsOpen;
     }
 }
 function metadataEntries(widget: ImageWindow) {
@@ -309,7 +359,20 @@ function hydrate(saved: RestoredImageWindow[]) {
 const emit = defineEmits<{
     change: [windows: SavedImageWindow[]];
     activeChange: [available: boolean];
+    statisticsChange: [available: boolean];
 }>();
+const hasStatistics = computed(() => {
+    const widget = activeWidget.value;
+    return (
+        !!widget &&
+        !widget.loading &&
+        !!widget.image.statistics &&
+        Object.keys(widget.image.statistics).length > 0
+    );
+});
+watch(hasStatistics, available => emit("statisticsChange", available), {
+    immediate: true
+});
 watch(activeWidget, widget => emit("activeChange", !!widget), {
     immediate: true
 });
@@ -322,7 +385,15 @@ watch(
     },
     { deep: true }
 );
-defineExpose({ add, complete, fail, hydrate, snapshot, toggleMetadata });
+defineExpose({
+    add,
+    complete,
+    fail,
+    hydrate,
+    snapshot,
+    toggleMetadata,
+    toggleStatistics
+});
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;
     return {
@@ -520,6 +591,36 @@ onBeforeUnmount(() => {
 .widget-close:hover {
     background: #c42b1c;
     color: white;
+}
+.image-area {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+.statistics-panel {
+    flex-shrink: 0;
+    max-height: 45%;
+    overflow: auto;
+    padding: 8px 12px;
+    background: #f6f8fa;
+    color: #243447;
+    border-top: 1px solid #ccd4de;
+    font-size: 12px;
+}
+.statistics-panel dl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    margin: 4px 0;
+}
+.statistics-panel dt {
+    font-weight: 600;
+}
+.statistics-panel dd {
+    margin: 2px 0 0;
+    overflow-wrap: anywhere;
 }
 .widget-body {
     display: flex;

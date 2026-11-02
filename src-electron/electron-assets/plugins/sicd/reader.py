@@ -43,6 +43,30 @@ def image_metadata(metadata):
     return result
 
 
+def image_statistics(magnitude, step):
+    import numpy as np
+    values = magnitude[np.isfinite(magnitude)].astype(np.float64)
+    result = {
+        "Basis": "Sampled source amplitude (before display stretch)",
+        "Sampling stride (rows / columns)": step,
+        "Sample count": int(magnitude.size),
+        "Finite samples": int(values.size),
+        "Invalid samples": int(magnitude.size - values.size),
+    }
+    for label in ["Minimum amplitude", "Maximum amplitude", "Mean amplitude", "Median amplitude", "Standard deviation", "RMS amplitude"]:
+        result[label] = None
+    if values.size:
+        result.update({
+            "Minimum amplitude": float(values.min()),
+            "Maximum amplitude": float(values.max()),
+            "Mean amplitude": float(values.mean()),
+            "Median amplitude": float(np.median(values)),
+            "Standard deviation": float(values.std()),
+            "RMS amplitude": float(np.sqrt(np.mean(values * values))),
+        })
+    return result
+
+
 def render(file_path):
     import numpy as np
     from sarpy.io.complex.sicd import SICDReader
@@ -74,7 +98,7 @@ def render(file_path):
                 pixels[~positive] = 0
             else:
                 pixels[positive] = 127
-        return {"metadata": image_metadata(metadata), "width": width, "height": height, "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
+        return {"statistics": image_statistics(magnitude, step), "metadata": image_metadata(metadata), "width": width, "height": height, "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
     finally:
         reader.close()
 

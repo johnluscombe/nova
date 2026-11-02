@@ -130,6 +130,15 @@
                             :disable="!hasActiveWidget"
                             @click="workspace?.toggleMetadata()"
                         />
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
+                            icon="bar_chart"
+                            label="Statistics"
+                            :disable="!hasActiveStatistics"
+                            @click="workspace?.toggleStatistics()"
+                        />
                     </div>
                     <div id="view-group-label" class="ribbon-group-label"
                         >View</div
@@ -222,6 +231,7 @@
             </div>
             <ImageWorkspace
                 @active-change="hasActiveWidget = $event"
+                @statistics-change="hasActiveStatistics = $event"
                 :key="workspaceSession"
                 ref="workspace"
                 @change="saveLayout"
@@ -241,6 +251,7 @@ const busy = ref(false);
 const error = ref("");
 const workspace = ref<InstanceType<typeof ImageWorkspace>>();
 const hasActiveWidget = ref(false);
+const hasActiveStatistics = ref(false);
 const workspaceSession = ref(0);
 
 const pluginStatus = ref<ImagePluginStatus | null>(null);
