@@ -24,7 +24,9 @@
                     top: `${rect.top}px`,
                     height: `${rect.height}px`
                 }"></span>
-            <span class="strip-label">Row</span>
+            <span class="strip-label">
+                {{ image.axes?.row.label ?? "Row" }}
+            </span>
         </button>
         <div
             ref="viewport"
@@ -45,8 +47,15 @@
                 v-if="enabled && selection"
                 class="slice-index"
                 aria-live="polite">
-                {{ selection.orientation === "horizontal" ? "Row" : "Column" }}
-                {{ selection.index }}
+                {{
+                    image.axes
+                        ? slicePosition(
+                              image,
+                              selection.orientation,
+                              selection.index
+                          )
+                        : `${selection.orientation === "horizontal" ? "Row" : "Column"} ${selection.index}`
+                }}
             </span>
             <div
                 v-if="inspect && pixelPosition"
@@ -105,12 +114,15 @@
                     left: `${rect.left}px`,
                     width: `${rect.width}px`
                 }"></span>
-            <span class="strip-label">Column</span>
+            <span class="strip-label">
+                {{ image.axes?.column.label ?? "Column" }}
+            </span>
         </button>
     </div>
 </template>
 
 <script setup lang="ts">
+import { slicePosition } from "@/utils/slice-axes";
 import ImageAxes from "./ImageAxes.vue";
 import { axisCoordinate } from "@/types/axes";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";

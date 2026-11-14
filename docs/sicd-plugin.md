@@ -108,3 +108,9 @@ ground distances. See [SICD grid definitions](https://sarpy.readthedocs.io/en/st
 Missing or invalid spacing/scene-center metadata falls back to pixel coordinates.
 When Axes and Pixel Values are both enabled, the hover readout also includes the
 physical coordinates. Axes can be toggled independently for each image window.
+
+Slice selection strips, selection previews, and graph titles use the same physical
+labels. Horizontal slice graphs plot cross-range; vertical slice graphs plot
+down-range on range grids. The graph's coordinate axis uses scene-center meters,
+with original row/column indices retained in the window title. Without physical
+axis metadata, slicing continues to use pixel coordinates.

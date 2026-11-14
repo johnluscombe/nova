@@ -321,3 +321,12 @@ passing them to the renderer.
 contained image preview. Without axis metadata, Nova displays zero-based pixel
 coordinates. The toggle is independent per window and temporary, like Slice and
 Pixel Values. See [SICD axes](sicd-plugin.md#image-axes) for physical conventions.
+
+Slice selectors and graph titles also use the image's axis names and coordinates,
+while retaining the source row/column index. A horizontal slice varies along the
+column axis (cross-range on range grids); a vertical slice varies along the row
+axis (down-range). Graph positions use the same scene-center origin and meters as
+the image axes, even when the image Axes toggle is off. Plugins continue returning
+source pixel indices from `readSlice`; Nova converts those positions for display
+using the `axes` returned by `open`. Do not preconvert them in the plugin. Graph
+scaling changes preserve the physical coordinate labels and positions.

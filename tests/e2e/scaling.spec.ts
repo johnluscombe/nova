@@ -82,18 +82,18 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     await strip.focus();
     await strip.press("Enter");
     const graph = page.getByRole("article", {
-        name: "Vertical slice: radar.complex · column 20",
+        name: "Vertical slice: radar.complex · Cross-range 0 m (column 20)",
         exact: true
     });
     await expect(
-        graph.getByRole("img", { name: "real by Column (pixel)", exact: true })
+        graph.getByRole("img", { name: "real by Down-range (m)", exact: true })
     ).toBeVisible();
     await scaling.click();
     await page
         .getByRole("menuitemradio", { name: "Linear power", exact: true })
         .click();
     await expect(
-        graph.getByRole("img", { name: "power by Column (pixel)", exact: true })
+        graph.getByRole("img", { name: "power by Down-range (m)", exact: true })
     ).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await chooseFile(application, scenarioPath);
@@ -254,6 +254,31 @@ test("image axes display source distances and remain aligned with slicing and ho
     await expect(source.getByRole("status")).toContainText(
         "Source amplitude: 125"
     );
+    const rowStrip = source.getByRole("button", {
+        name: "Horizontal slice selector for axes.complex",
+        exact: true
+    });
+    await expect(rowStrip).toContainText("Down-range");
+    await rowStrip.focus();
+    await expect(source.locator(".slice-index")).toHaveText(
+        "Down-range 0 m (row 10)"
+    );
+    await rowStrip.press("Enter");
+    const title = "Horizontal slice: axes.complex · Down-range 0 m (row 10)";
+    const graph = page.getByRole("article", { name: title, exact: true });
+    await expect(
+        graph.getByRole("img", {
+            name: "amplitude by Cross-range (m)",
+            exact: true
+        })
+    ).toBeVisible();
+    await expect(graph.locator("svg text")).toContainText(["-10"]);
+    await graph
+        .getByRole("button", { name: `Close ${title}`, exact: true })
+        .click();
+    await source
+        .getByLabel("axes.complex window title. Use arrow keys to move.")
+        .click();
     await toggle.click();
     await expect(source.locator(".image-axis")).toHaveCount(0);
     const svg = path.join(profile, "axes.svg");

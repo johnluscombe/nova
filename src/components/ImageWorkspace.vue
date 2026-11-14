@@ -240,6 +240,7 @@ import type {
 } from "@/types/workspace";
 import ImageSliceView from "./ImageSliceView.vue";
 import LineGraph from "./LineGraph.vue";
+import { sliceAxes, slicePosition } from "@/utils/slice-axes";
 import { previewSlice } from "@/utils/image-slice";
 import type { Scaling, ScalingState } from "@/types/scaling";
 import type { SliceData, SliceSelection } from "@/types/slice";
@@ -309,7 +310,7 @@ async function createSliceGraph(
     source: ImageInfo,
     { orientation, index }: SliceSelection
 ) {
-    const title = `${orientation === "horizontal" ? "Horizontal" : "Vertical"} slice: ${source.name} · ${orientation === "horizontal" ? "row" : "column"} ${index}`;
+    const title = `${orientation === "horizontal" ? "Horizontal" : "Vertical"} slice: ${source.name} · ${slicePosition(source, orientation, index)}`;
     const id = add(
         {
             name: title,
@@ -341,7 +342,7 @@ async function createSliceGraph(
             : await previewSlice(source, orientation, index);
         const widget = windows.value.find(widget => widget.id === id);
         if (widget?.graph) {
-            widget.graph.data = data;
+            widget.graph.data = sliceAxes(data, source, orientation);
             widget.loading = false;
         }
     } catch (cause) {
@@ -375,7 +376,7 @@ async function setScaling(scaling: Scaling) {
                 selection.index,
                 scaling
             );
-            widget.graph.data = data;
+            widget.graph.data = sliceAxes(data, source, selection.orientation);
             widget.image.scaling = scaling;
         } else {
             const image = await window.images!.rescale(
