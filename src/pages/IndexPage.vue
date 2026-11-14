@@ -283,21 +283,34 @@
                 v-if="
                     error ||
                     (pluginStatus &&
-                        (!hasImageDecoders || pluginStatus.errors.length))
+                        (!hasImageDecoders || pluginStatus.errors.length) &&
+                        !pluginNoticeDismissed)
                 "
                 class="workspace-info">
                 <q-banner
                     v-if="error"
-                    class="bg-red-1 text-negative q-mb-md"
+                    class="bg-red-1 text-negative q-mb-sm shadow-3"
+                    inline-actions
                     role="alert">
                     {{ error }}
+                    <template #action>
+                        <q-btn
+                            flat
+                            dense
+                            round
+                            icon="close"
+                            aria-label="Dismiss error"
+                            @click="error = ''" />
+                    </template>
                 </q-banner>
                 <q-banner
                     v-if="
                         pluginStatus &&
-                        (!hasImageDecoders || pluginStatus.errors.length)
+                        (!hasImageDecoders || pluginStatus.errors.length) &&
+                        !pluginNoticeDismissed
                     "
-                    class="bg-blue-1 q-mb-md">
+                    class="bg-blue-1 shadow-3"
+                    inline-actions>
                     <div v-if="!hasImageDecoders">
                         Install an image plugin to enable Add Image.
                     </div>
@@ -313,6 +326,15 @@
                     <div class="text-caption">
                         Restart Nova after installing or changing a plugin.
                     </div>
+                    <template #action>
+                        <q-btn
+                            flat
+                            dense
+                            round
+                            icon="close"
+                            aria-label="Dismiss plugin notice"
+                            @click="pluginNoticeDismissed = true" />
+                    </template>
                 </q-banner>
             </div>
             <ImageWorkspace
@@ -357,6 +379,7 @@ const hasActiveWidget = ref(false);
 const hasActiveStatistics = ref(false);
 const workspaceSession = ref(0);
 
+const pluginNoticeDismissed = ref(false);
 const pluginStatus = ref<ImagePluginStatus | null>(null);
 
 const activeTab = ref("home");
@@ -755,9 +778,13 @@ async function closeScenario() {
     overflow-wrap: anywhere;
 }
 .workspace-info {
-    max-height: 35%;
-    flex-shrink: 0;
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 100000;
+    width: min(560px, calc(100% - 32px));
+    max-height: calc(100% - 24px);
     overflow: auto;
-    padding: 12px 20px;
+    overflow-wrap: anywhere;
 }
 </style>

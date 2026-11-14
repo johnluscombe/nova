@@ -234,11 +234,22 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     await page.getByRole("button", { name: "Open", exact: true }).click();
     await page.getByRole("button", { name: "Add Image", exact: true }).click();
     await expect(page.getByRole("article")).toHaveCount(0);
+    const canvas = page.getByRole("region", {
+        name: "Image workspace",
+        exact: true
+    });
+    const canvasBeforeError = await canvas.boundingBox();
     const invalid = path.join(profile, "invalid.scenario");
     await writeFile(invalid, "not sqlite");
     await chooseFile(application, invalid);
     await page.getByRole("button", { name: "Open", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();
+    expect(await canvas.boundingBox()).toEqual(canvasBeforeError);
+    await page
+        .getByRole("button", { name: "Dismiss error", exact: true })
+        .click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    expect(await canvas.boundingBox()).toEqual(canvasBeforeError);
     await expect(
         page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
