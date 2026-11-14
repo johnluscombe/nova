@@ -47,3 +47,8 @@ The Settings dialog configures the amplitude percentiles displayed in Statistics
 Application and test sources use TypeScript. Plugins use Electron's native type
 stripping and must use erasable TypeScript syntax. Scenario schema definitions
 live in `src-electron/scenario-schema.ts`.
+
+Enable Slice in the View ribbon group to reveal selection strips on the left and
+bottom of the image. Hover over the left strip to preview a horizontal slice, or
+the bottom strip for a vertical slice; click to open its graph. SICD plots source amplitude; other formats plot preview luminance.
+Graphs open as independent temporary widgets and are not saved to scenarios.

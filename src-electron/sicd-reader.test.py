@@ -84,6 +84,29 @@ class SicdPreviewTests(unittest.TestCase):
             self.assertEqual(reader.image_statistics(np.full((2, 3), value)),
                              dict.fromkeys(result, value))
 
+    def test_source_slices(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "slice.nitf"
+            data = np.arange(12, dtype=np.float32).reshape(3, 4) + 1j
+            self.fixture(file, data)
+            horizontal = reader.slice_image(str(file), "horizontal", 1)
+            vertical = reader.slice_image(str(file), "vertical", 2)
+            self.assertEqual([p["position"] for p in horizontal["points"]], [0, 1, 2, 3])
+            np.testing.assert_allclose([p["value"] for p in horizontal["points"]], np.abs(data[1]))
+            np.testing.assert_allclose([p["value"] for p in vertical["points"]], np.abs(data[:, 2]))
+            self.assertEqual(horizontal["valueLabel"], "Source amplitude")
+            for orientation, index in [("horizontal", -1), ("horizontal", 3), ("vertical", 4), ("diagonal", 0)]:
+                with self.assertRaises(ValueError):
+                    reader.slice_image(str(file), orientation, index)
+
+    def test_long_slice_is_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "long.nitf"
+            self.fixture(file, np.ones((2, 8193), dtype="complex64"))
+            result = reader.slice_image(str(file), "horizontal", 0)
+            self.assertLessEqual(len(result["points"]), 4096)
+            self.assertEqual(result["points"][1]["position"], 3)
+
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "invalid.nitf"

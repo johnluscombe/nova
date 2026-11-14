@@ -1,3 +1,4 @@
+import type { SliceData, SliceOrientation } from "../src/types/slice";
 import {
     validateRibbon,
     type RibbonActionContext,
@@ -15,6 +16,12 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
+    readSlice?(
+        filePath: string,
+        orientation: SliceOrientation,
+        index: number,
+        parameters: PluginParameters
+    ): SliceData | Promise<SliceData>;
     canOpen?(
         filePath: string,
         parameters: PluginParameters
@@ -36,6 +43,10 @@ type LoadedPlugin = {
 };
 
 export class ImagePlugins {
+    private readonly openedImages = new Map<
+        string,
+        { width: number | undefined; height: number | undefined }
+    >();
     private plugins: LoadedPlugin[] = [];
     private errors: string[] = [];
 
@@ -181,6 +192,8 @@ export class ImagePlugins {
                     ) &&
                         typeof module.default.executeRibbonAction !==
                             "function") ||
+                    (module.default.readSlice !== undefined &&
+                        typeof module.default.readSlice !== "function") ||
                     (module.default.canOpen !== undefined &&
                         typeof module.default.canOpen !== "function")
                 ) {
@@ -259,6 +272,64 @@ export class ImagePlugins {
         return result.message === undefined ? {} : { message: result.message };
     }
 
+    async readSlice(
+        filePath: string,
+        pluginId: string,
+        orientation: SliceOrientation,
+        index: number
+    ): Promise<SliceData> {
+        const image = this.openedImages.get(
+            JSON.stringify([filePath, pluginId])
+        );
+        const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+        if (!image || !plugin?.implementation.readSlice) {
+            throw new Error("Open an image with source slice support first.");
+        }
+        const limit = orientation === "horizontal" ? image.height : image.width;
+        if (
+            !["horizontal", "vertical"].includes(orientation) ||
+            !Number.isSafeInteger(index) ||
+            index < 0 ||
+            limit === undefined ||
+            index >= limit
+        ) {
+            throw new Error("Slice index is outside the image.");
+        }
+        const result = await plugin.implementation.readSlice(
+            filePath,
+            orientation,
+            index,
+            plugin.manifest.parameters ?? {}
+        );
+        const length =
+            orientation === "horizontal" ? image.width : image.height;
+        if (
+            !result ||
+            !Array.isArray(result.points) ||
+            !result.points.length ||
+            result.points.length > 4096 ||
+            typeof result.positionLabel !== "string" ||
+            result.positionLabel.length > 100 ||
+            typeof result.valueLabel !== "string" ||
+            result.valueLabel.length > 100 ||
+            !result.points.every(
+                (point, i) =>
+                    point &&
+                    Number.isSafeInteger(point.position) &&
+                    point.position >= 0 &&
+                    point.position < (length ?? 0) &&
+                    (i === 0 ||
+                        point.position > result.points[i - 1]!.position) &&
+                    (point.value === null ||
+                        (typeof point.value === "number" &&
+                            Number.isFinite(point.value)))
+            )
+        ) {
+            throw new Error("Plugin returned invalid slice data.");
+        }
+        return result;
+    }
+
     async open(filePath: string, pluginId?: string): Promise<ImageInfo> {
         if (!this.plugins.length) {
             throw new Error("Install an image plugin before opening images.");
@@ -329,7 +400,10 @@ export class ImagePlugins {
                         "Preview must be a PNG, JPEG, WebP, or SVG data URL under 32 MB."
                     );
                 }
-                return {
+                const info: ImageInfo = {
+                    ...(implementation.readSlice
+                        ? { supportsSourceSlices: true }
+                        : {}),
                     ...(result.statistics !== undefined
                         ? { statistics: result.statistics }
                         : {}),
@@ -350,6 +424,11 @@ export class ImagePlugins {
                         ? { previewDataUrl: result.previewDataUrl }
                         : {})
                 };
+                this.openedImages.set(JSON.stringify([filePath, manifest.id]), {
+                    width: info.width,
+                    height: info.height
+                });
+                return info;
             } catch (cause) {
                 failures.push(
                     `${manifest.name}: ${cause instanceof Error ? cause.message : String(cause)}`

@@ -92,11 +92,43 @@ def render(file_path):
         reader.close()
 
 
+def slice_image(file_path, orientation, index):
+    import numpy as np
+    from sarpy.io.complex.sicd import SICDReader
+    if orientation not in ("horizontal", "vertical"):
+        raise ValueError("Invalid slice orientation")
+    reader = SICDReader(file_path)
+    try:
+        metadata = reader.get_sicds_as_tuple()[0]
+        height, width = int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols)
+        limit, length = (height, width) if orientation == "horizontal" else (width, height)
+        if index < 0 or index >= limit:
+            raise ValueError("Slice index is outside the image")
+        step = max(1, math.ceil(length / 4096))
+        rows, columns = ((slice(index, index + 1), slice(0, width, step))
+                         if orientation == "horizontal" else
+                         (slice(0, height, step), slice(index, index + 1)))
+        values = np.abs(reader.read(rows, columns, index=0, squeeze=False)).reshape(-1)
+        return {
+            "points": [{"position": int(position), "value": float(value) if np.isfinite(value) else None}
+                       for position, value in zip(range(0, length, step), values)],
+            "positionLabel": "Column (pixel)" if orientation == "horizontal" else "Row (pixel)",
+            "valueLabel": "Source amplitude",
+        }
+    finally:
+        reader.close()
+
+
 def main():
     try:
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            result = render(sys.argv[1])
+            if len(sys.argv) == 5 and sys.argv[2] == "--slice":
+                result = slice_image(sys.argv[1], sys.argv[3], int(sys.argv[4]))
+            elif len(sys.argv) == 2:
+                result = render(sys.argv[1])
+            else:
+                raise ValueError("Expected a file or a file with --slice orientation index")
         print(json.dumps(result, allow_nan=False))
         return 0
     except ImportError as error:

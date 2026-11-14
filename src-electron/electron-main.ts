@@ -1,3 +1,4 @@
+import type { SliceOrientation } from "../src/types/slice";
 import { BrowserWindow, app, dialog } from "electron";
 import { ImagePlugins } from "./image-plugins";
 import { ScenarioDatabase } from "./scenario-database";
@@ -245,6 +246,27 @@ async function createWindow() {
                 return imagePlugins.executeRibbonAction(pluginId, actionId, {
                     scenarioPath: scenario.current?.path ?? null
                 });
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:slice",
+        (
+            _event,
+            filePath: string,
+            pluginId: string,
+            orientation: SliceOrientation,
+            index: number
+        ) =>
+            documentAction(() => {
+                if (!scenario.current) {
+                    throw new Error("Open a scenario before slicing images.");
+                }
+                return imagePlugins.readSlice(
+                    filePath,
+                    pluginId,
+                    orientation,
+                    index
+                );
             })
     );
     mainWindow.webContents.ipc.handle("image:open", () =>

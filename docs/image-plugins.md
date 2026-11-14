@@ -225,3 +225,40 @@ Large images use the preview's sampled data, so these are sampled percentiles.
 Nonfinite values are excluded. Percentiles are unavailable if no finite samples
 exist. Statistics are returned during decoding and scenario restoration without
 an additional file read.
+
+## Image slices
+
+The View ribbon group's Slice toggle reveals selection strips at the left and
+bottom of the active image widget. Hover on the left strip to preview a horizontal
+line; hover on the bottom strip for a vertical line. Click to open a graph of that
+line. Letterboxed margins are excluded, so the line tracks the actual image even
+when the widget is resized or its side panels are open. Keyboard users can focus
+a strip, use arrow keys (Shift for larger steps), and press Enter or Space.
+The result appears in a separate movable, resizable, minimizable widget. Graphs
+are temporary analysis windows and are not saved in the scenario layout.
+
+Plugins may implement:
+
+```ts
+async readSlice(filePath, orientation, index, parameters) {
+    return {
+        points: [{ position: 0, value: 5 }, { position: 1, value: null }],
+        positionLabel: "Column (pixel)",
+        valueLabel: "Source amplitude"
+    };
+}
+```
+
+`orientation` is `horizontal` or `vertical`. Samples use increasing, zero-based
+positions along the other axis; `null` values create gaps. The host permits slices
+only for images previously opened through that plugin, validates indices against
+source dimensions, and accepts at most 4,096 finite-or-null samples. Plugins that
+provide source slices must return source width and height from `open`.
+
+SICD uses SarPy to read the chosen source row/column and graphs its complex-sample
+magnitude before display stretching. Long lines are uniformly sampled to at most
+4,096 points; the x-axis retains the original pixel positions. Other plugins use
+preview luminance (Rec. 709 RGB weights, 0–255), clearly labeled on the graph.
+Preview sampling is limited to 1,600 pixels per dimension, so it represents the
+displayed preview rather than full-resolution source intensities. Transparent
+preview pixels and nonfinite SICD amplitudes produce gaps.

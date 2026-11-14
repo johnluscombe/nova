@@ -66,6 +66,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        slice: vi.fn(),
         plugins: vi.fn<ImageAPI["plugins"]>(async () => ({
             directory: "/plugins",
             plugins: [

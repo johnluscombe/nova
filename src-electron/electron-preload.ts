@@ -14,6 +14,14 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    slice: (filePath, pluginId, orientation, index) =>
+        ipcRenderer.invoke(
+            "image:slice",
+            filePath,
+            pluginId,
+            orientation,
+            index
+        ),
     open: async (onLoading?: (image: ImageInfo) => void) => {
         const listener = (
             _event: Electron.IpcRendererEvent,

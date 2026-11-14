@@ -59,4 +59,5 @@ export interface ImageWorkspaceAPI {
     hydrate(saved: RestoredImageWindow[]): void;
     toggleMetadata(): void;
     toggleStatistics(): void;
+    toggleSlice(): void;
 }

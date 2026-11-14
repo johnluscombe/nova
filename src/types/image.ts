@@ -1,3 +1,4 @@
+import type { SliceData, SliceOrientation } from "./slice";
 import type { PluginRibbon, RibbonActionResult } from "./ribbon";
 export type PluginParameters = Readonly<
     Record<string, string | number | boolean | null>
@@ -26,6 +27,7 @@ export interface ImageInfo extends ImagePluginResult {
     path: string;
     pluginId: string;
     pluginName: string;
+    supportsSourceSlices?: boolean;
 }
 
 export interface ImagePluginStatus {
@@ -35,6 +37,12 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    slice(
+        filePath: string,
+        pluginId: string,
+        orientation: SliceOrientation,
+        index: number
+    ): Promise<SliceData>;
     open(onLoading?: (image: ImageInfo) => void): Promise<ImageInfo | null>;
     plugins(): Promise<ImagePluginStatus>;
     executeRibbonAction(

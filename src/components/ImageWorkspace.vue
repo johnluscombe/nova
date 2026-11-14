@@ -75,13 +75,24 @@
                                 role="status"
                                 aria-live="polite">
                                 <q-spinner color="primary" size="40px" />
-                                <span>Loading image…</span>
+                                <span>
+                                    {{
+                                        widget.graph
+                                            ? "Loading slice…"
+                                            : "Loading image…"
+                                    }}
+                                </span>
                             </div>
-                            <img
+                            <LineGraph
+                                v-else-if="widget.graph?.data"
+                                :data="widget.graph.data" />
+                            <ImageSliceView
                                 v-else-if="widget.image.previewDataUrl"
-                                :src="widget.image.previewDataUrl"
-                                :alt="widget.image.name"
-                                draggable="false" />
+                                :image="widget.image"
+                                :enabled="!!widget.sliceEnabled"
+                                @slice="
+                                    createSliceGraph(widget.image, $event)
+                                " />
                             <p v-else>
                                 {{
                                     widget.error ??
@@ -222,6 +233,10 @@ import type {
     RestoredImageWindow,
     SavedImageWindow
 } from "@/types/workspace";
+import ImageSliceView from "./ImageSliceView.vue";
+import LineGraph from "./LineGraph.vue";
+import { previewSlice } from "@/utils/image-slice";
+import type { SliceData, SliceSelection } from "@/types/slice";
 import type { ImageInfo } from "@/types/image";
 import { visibleStatistics } from "@/composables/useSettings";
 import { activeScenario } from "@/composables/useScenario";
@@ -241,6 +256,8 @@ interface ImageWindow {
     loading?: boolean;
     metadataOpen?: boolean;
     statisticsOpen?: boolean;
+    sliceEnabled?: boolean;
+    graph?: { data?: SliceData };
 }
 const activeWidget = computed(() =>
     windows.value.find(
@@ -248,7 +265,7 @@ const activeWidget = computed(() =>
     )
 );
 function toggleMetadata() {
-    if (activeWidget.value) {
+    if (activeWidget.value && !activeWidget.value.graph) {
         activeWidget.value.metadataOpen = !activeWidget.value.metadataOpen;
     }
 }
@@ -257,6 +274,57 @@ function toggleStatistics() {
         activeWidget.value.statisticsOpen = !activeWidget.value.statisticsOpen;
     }
 }
+const canSlice = computed(
+    () =>
+        !!activeWidget.value &&
+        !activeWidget.value.loading &&
+        !activeWidget.value.graph &&
+        !!activeWidget.value.image.previewDataUrl
+);
+function toggleSlice() {
+    if (canSlice.value && activeWidget.value) {
+        activeWidget.value.sliceEnabled = !activeWidget.value.sliceEnabled;
+    }
+}
+async function createSliceGraph(
+    source: ImageInfo,
+    { orientation, index }: SliceSelection
+) {
+    const title = `${orientation === "horizontal" ? "Horizontal" : "Vertical"} slice: ${source.name} · ${orientation === "horizontal" ? "row" : "column"} ${index}`;
+    const id = add(
+        {
+            name: title,
+            path: source.path,
+            pluginId: "",
+            pluginName: "Slice graph"
+        },
+        true
+    );
+    windows.value.find(widget => widget.id === id)!.graph = {};
+    try {
+        const data = source.supportsSourceSlices
+            ? await window.images!.slice(
+                  source.path,
+                  source.pluginId,
+                  orientation,
+                  index
+              )
+            : await previewSlice(source, orientation, index);
+        const widget = windows.value.find(widget => widget.id === id);
+        if (widget?.graph) {
+            widget.graph.data = data;
+            widget.loading = false;
+        }
+    } catch (cause) {
+        fail(
+            id,
+            cause instanceof Error
+                ? cause.message
+                : "Unable to read image slice."
+        );
+    }
+}
+
 function metadataEntries(widget: ImageWindow) {
     return [
         ["Name", widget.image.name],
@@ -328,7 +396,7 @@ function fail(id: number, message: string) {
 }
 function snapshot(): SavedImageWindow[] {
     return windows.value
-        .filter(widget => widget.image.pluginId)
+        .filter(widget => widget.image.pluginId && !widget.graph)
         .map(widget => ({
             id: widget.id,
             path: widget.image.path,
@@ -358,11 +426,22 @@ const emit = defineEmits<{
     change: [windows: SavedImageWindow[]];
     activeChange: [available: boolean];
     statisticsChange: [available: boolean];
+    sliceChange: [available: boolean];
+    sliceModeChange: [enabled: boolean];
 }>();
+watch(
+    () => !!activeWidget.value?.sliceEnabled,
+    enabled => emit("sliceModeChange", enabled),
+    { immediate: true }
+);
+watch(canSlice, available => emit("sliceChange", available), {
+    immediate: true
+});
 const hasStatistics = computed(() => {
     const widget = activeWidget.value;
     return (
         !!widget &&
+        !widget.graph &&
         !widget.loading &&
         !!widget.image.statistics &&
         Object.keys(widget.image.statistics).length > 0
@@ -371,9 +450,13 @@ const hasStatistics = computed(() => {
 watch(hasStatistics, available => emit("statisticsChange", available), {
     immediate: true
 });
-watch(activeWidget, widget => emit("activeChange", !!widget), {
-    immediate: true
-});
+watch(
+    () => !!activeWidget.value && !activeWidget.value.graph,
+    available => emit("activeChange", available),
+    {
+        immediate: true
+    }
+);
 watch(
     snapshot,
     value => {
@@ -390,7 +473,8 @@ defineExpose({
     hydrate,
     snapshot,
     toggleMetadata,
-    toggleStatistics
+    toggleStatistics,
+    toggleSlice
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;

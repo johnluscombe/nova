@@ -69,6 +69,9 @@ test.use({
                 if (file.includes('broken')) throw new Error('Intentional decoder failure');
                 return { width: 40, height: 20, metadata: { Collector: 'Test radar' }, statistics: { '25th percentile': 1.25, '50th percentile': 2.5, '90th percentile': 9, '99th percentile': 9.9 }, previewDataUrl: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="blue"/></svg>').toString('base64') };
             },
+            readSlice(file: string, orientation: string, index: number) {
+                return { points: [{ position: 0, value: index }, { position: orientation === 'horizontal' ? 39 : 19, value: index + 1 }], positionLabel: orientation === 'horizontal' ? 'Column (pixel)' : 'Row (pixel)', valueLabel: 'Source amplitude' };
+            },
             executeRibbonAction(id: string, context: { scenarioPath: string | null }) {
                 if (id === 'fail') throw new Error('Intentional action failure');
                 return { message: id === 'inspect' ? 'Inspected ' + context.scenarioPath : 'Action ' + id };
@@ -449,4 +452,136 @@ test("percentile settings validate, update open images, and persist after reload
         "99"
     ]);
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
+});
+
+test("visual slice strips preview the selected source line and open independent graphs", async ({
+    application,
+    profile
+}) => {
+    const page = await application.firstWindow();
+    const toggle = page.getByRole("button", { name: "Slice", exact: true });
+    await expect(toggle).toBeDisabled();
+    await createScenario(application, page, profile);
+    const file = path.join(profile, "slice.test");
+    await writeFile(file, "fixture");
+    await chooseFile(application, file);
+    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    const source = page.getByRole("article", {
+        name: "slice.test",
+        exact: true
+    });
+    await expect(
+        source.getByRole("img", { name: "slice.test", exact: true })
+    ).toBeVisible();
+    // Metadata narrows the image, creating letterboxing that must not affect row mapping.
+    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const left = source.getByRole("button", {
+        name: "Horizontal slice selector for slice.test",
+        exact: true
+    });
+    const bottom = source.getByRole("button", {
+        name: "Vertical slice selector for slice.test",
+        exact: true
+    });
+    await expect(left).toBeVisible();
+    await expect(bottom).toBeVisible();
+    const viewport = (await source.locator(".slice-viewport").boundingBox())!;
+    const strip = (await left.boundingBox())!;
+    const scale = Math.min(viewport.width / 40, viewport.height / 20);
+    const top = (viewport.height - 20 * scale) / 2;
+    expect(top).toBeGreaterThan(5);
+    await page.mouse.move(strip.x + strip.width / 2, strip.y + 1);
+    await expect(source.locator(".slice-line")).toHaveCount(0);
+    const rowY = viewport.y + top + 3.5 * scale;
+    await page.mouse.move(strip.x + strip.width / 2, rowY);
+    await expect(source.locator(".slice-line")).toBeVisible();
+    await expect(source.getByText("Row 3", { exact: true })).toBeVisible();
+    const line = (await source.locator(".slice-line").boundingBox())!;
+    expect(Math.abs(line.y - rowY)).toBeLessThan(2);
+    await page.mouse.click(strip.x + strip.width / 2, rowY);
+    const horizontal = page.getByRole("article", {
+        name: "Horizontal slice: slice.test · row 3",
+        exact: true
+    });
+    await expect(
+        horizontal.getByRole("img", {
+            name: "Source amplitude by Column (pixel)",
+            exact: true
+        })
+    ).toBeVisible();
+    await expect(toggle).toBeDisabled();
+    await source
+        .getByLabel("slice.test window title. Use arrow keys to move.")
+        .click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await toggle.click();
+    await expect(left).toHaveCount(0);
+    await toggle.click();
+    const area = (await source.locator(".slice-viewport").boundingBox())!;
+    const below = (await bottom.boundingBox())!;
+    const fitted = Math.min(area.width / 40, area.height / 20);
+    const colX = area.x + (area.width - fitted * 40) / 2 + 2.5 * fitted;
+    await page.mouse.move(colX, below.y + below.height / 2);
+    await expect(source.getByText("Column 2", { exact: true })).toBeVisible();
+    await page.mouse.click(colX, below.y + below.height / 2);
+    const vertical = page.getByRole("article", {
+        name: "Vertical slice: slice.test · column 2",
+        exact: true
+    });
+    await expect(
+        vertical.getByRole("img", {
+            name: "Source amplitude by Row (pixel)",
+            exact: true
+        })
+    ).toBeVisible();
+    await vertical
+        .getByRole("button", {
+            name: "Close Vertical slice: slice.test · column 2",
+            exact: true
+        })
+        .click();
+    await expect(horizontal).toBeVisible();
+});
+
+test("SVG preview slices support keyboard selection and clearly label luminance", async ({
+    application,
+    profile
+}) => {
+    const page = await application.firstWindow();
+    await createScenario(application, page, profile);
+    const file = path.join(profile, "preview.svg");
+    await writeFile(
+        file,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="white"/></svg>'
+    );
+    await chooseFile(application, file);
+    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    const source = page.getByRole("article", {
+        name: "preview.svg",
+        exact: true
+    });
+    await expect(
+        source.getByRole("img", { name: "preview.svg", exact: true })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Slice", exact: true }).click();
+    const selector = source.getByRole("button", {
+        name: "Vertical slice selector for preview.svg",
+        exact: true
+    });
+    await selector.focus();
+    await expect(source.getByText("Column 8", { exact: true })).toBeVisible();
+    await selector.press("Enter");
+    const graph = page.getByRole("article", {
+        name: "Vertical slice: preview.svg · column 8",
+        exact: true
+    });
+    await expect(
+        graph.getByRole("img", {
+            name: "Preview luminance (0–255) by Row (pixel)",
+            exact: true
+        })
+    ).toBeVisible();
+    await expect(graph).toContainText("8 samples");
 });

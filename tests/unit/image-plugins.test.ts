@@ -523,3 +523,46 @@ test("ignores loose files, rejects plugins with no contribution, and permits sil
             {}
         );
     }));
+
+test("source slices validate the opened image, orientation, index and returned samples", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "slices",
+            `export default {
+            open() { return { width: 4, height: 3 }; },
+            readSlice(file, orientation, index) {
+                if (index === 2) return { positionLabel: 'Column', valueLabel: 'Amplitude', points: [{ position: 0, value: Infinity }] };
+                return { positionLabel: 'Column', valueLabel: 'Amplitude', points: [{ position: 0, value: 5 }, { position: 3, value: null }] };
+            }
+        };`
+        );
+        await host.reload();
+        await assert.rejects(
+            host.readSlice("file.test", "slices", "horizontal", 0),
+            /Open an image/
+        );
+        assert.equal((await host.open("file.test")).supportsSourceSlices, true);
+        assert.deepEqual(
+            (await host.readSlice("file.test", "slices", "horizontal", 1))
+                .points,
+            [
+                { position: 0, value: 5 },
+                { position: 3, value: null }
+            ]
+        );
+        for (const index of [-1, 0.5, 3]) {
+            await assert.rejects(
+                host.readSlice("file.test", "slices", "horizontal", index),
+                /outside/
+            );
+        }
+        await assert.rejects(
+            host.readSlice("file.test", "slices", "diagonal" as never, 0),
+            /outside/
+        );
+        await assert.rejects(
+            host.readSlice("file.test", "slices", "horizontal", 2),
+            /invalid slice data/
+        );
+    }));

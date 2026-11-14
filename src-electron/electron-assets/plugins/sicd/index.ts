@@ -1,3 +1,7 @@
+import type {
+    SliceData,
+    SliceOrientation
+} from "../../../../src/types/slice.ts";
 import type { ImagePlugin } from "../../../image-plugins.ts";
 import type {
     PluginParameters,
@@ -16,11 +20,12 @@ type Runner = (
     args: string[],
     options: ExecFileOptionsWithStringEncoding
 ) => Promise<{ stdout: string }>;
-export async function openSicd(
+async function executeReader(
     filePath: string,
     parameters: PluginParameters = {},
-    run: Runner = execute
-): Promise<ImagePluginResult> {
+    run: Runner = execute,
+    extraArgs: string[] = []
+): Promise<unknown> {
     const configuredPython =
         parameters.python ??
         (process.platform === "win32" ? "python" : "python3");
@@ -37,7 +42,11 @@ export async function openSicd(
     try {
         ({ stdout } = await run(
             python,
-            [fileURLToPath(new URL("./reader.py", import.meta.url)), filePath],
+            [
+                fileURLToPath(new URL("./reader.py", import.meta.url)),
+                filePath,
+                ...extraArgs
+            ],
             {
                 encoding: "utf8",
                 timeout: 120_000,
@@ -80,12 +89,24 @@ export async function openSicd(
     } catch {
         throw new Error("SICD reader returned invalid output.");
     }
+    return result;
+}
+export async function openSicd(
+    filePath: string,
+    parameters: PluginParameters = {},
+    run: Runner = execute
+): Promise<ImagePluginResult> {
+    const result = (await executeReader(
+        filePath,
+        parameters,
+        run
+    )) as ImagePluginResult;
     if (
         !result ||
         !Number.isSafeInteger(result.width) ||
-        result.width <= 0 ||
+        (result.width ?? 0) <= 0 ||
         !Number.isSafeInteger(result.height) ||
-        result.height <= 0 ||
+        (result.height ?? 0) <= 0 ||
         typeof result.previewDataUrl !== "string" ||
         !result.previewDataUrl.startsWith("data:image/png;base64,")
     ) {
@@ -93,6 +114,21 @@ export async function openSicd(
     }
     return result;
 }
+export async function readSicdSlice(
+    filePath: string,
+    orientation: SliceOrientation,
+    index: number,
+    parameters: PluginParameters = {},
+    run: Runner = execute
+): Promise<SliceData> {
+    return (await executeReader(filePath, parameters, run, [
+        "--slice",
+        orientation,
+        String(index)
+    ])) as SliceData;
+}
 export default {
+    readSlice: (filePath, orientation, index, parameters) =>
+        readSicdSlice(filePath, orientation, index, parameters),
     open: (filePath, parameters) => openSicd(filePath, parameters)
 } satisfies ImagePlugin;

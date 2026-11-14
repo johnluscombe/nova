@@ -126,6 +126,16 @@
                             label="Statistics"
                             :disable="!hasActiveStatistics"
                             @click="workspace?.toggleStatistics()" />
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
+                            icon="content_cut"
+                            label="Slice"
+                            :disable="!hasSliceImage"
+                            :aria-pressed="sliceModeActive"
+                            :color="sliceModeActive ? 'primary' : undefined"
+                            @click="workspace?.toggleSlice()" />
                     </div>
                     <div id="view-group-label" class="ribbon-group-label">
                         View
@@ -230,6 +240,8 @@
             <ImageWorkspace
                 @active-change="hasActiveWidget = $event"
                 @statistics-change="hasActiveStatistics = $event"
+                @slice-change="hasSliceImage = $event"
+                @slice-mode-change="sliceModeActive = $event"
                 :key="workspaceSession"
                 ref="workspace"
                 @change="saveLayout" />
@@ -249,6 +261,8 @@ const settingsOpen = ref(false);
 const busy = ref(false);
 const error = ref("");
 const workspace = ref<ImageWorkspaceAPI>();
+const sliceModeActive = ref(false);
+const hasSliceImage = ref(false);
 const hasActiveWidget = ref(false);
 const hasActiveStatistics = ref(false);
 const workspaceSession = ref(0);

@@ -107,3 +107,30 @@ test("default SICD export forwards configured interpreter parameters", async () 
         /python parameter/
     );
 });
+
+test("SICD source slices pass orientation and index to the Python worker", async () => {
+    const { readSicdSlice } =
+        await import("../../src-electron/electron-assets/plugins/sicd/index.ts");
+    const expected = {
+        points: [{ position: 0, value: 5 }],
+        positionLabel: "Column (pixel)",
+        valueLabel: "Source amplitude"
+    };
+    const result = await readSicdSlice(
+        "image.nitf",
+        "horizontal",
+        7,
+        { python: "/venv/python" },
+        async (python, args) => {
+            assert.equal(python, "/venv/python");
+            assert.deepEqual(args.slice(1), [
+                "image.nitf",
+                "--slice",
+                "horizontal",
+                "7"
+            ]);
+            return { stdout: JSON.stringify(expected) };
+        }
+    );
+    assert.deepEqual(result, expected);
+});
