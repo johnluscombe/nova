@@ -4,6 +4,10 @@
 
 An Electron workspace for radar imagery, built with Vue, Quasar, and SQLite.
 
+![Nova workspace displaying a synthetic radar image with metadata and percentile statistics](docs/images/nova-workspace.png)
+
+_Nova displaying synthetic SICD radar data with the Metadata and Statistics panels open._
+
 ## Development
 
 ```sh
