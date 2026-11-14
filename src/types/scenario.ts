@@ -28,7 +28,7 @@ export interface ScenarioAPI {
     onFlushRequested(callback: () => void): () => void;
     confirmClose(): Promise<void>;
     create(): Promise<ScenarioInfo | null>;
-    open(): Promise<ScenarioInfo | null>;
+    open(filePath?: string): Promise<ScenarioInfo | null>;
     readTable(table: string, offset: number): Promise<ScenarioRows>;
     close(): Promise<void>;
 }

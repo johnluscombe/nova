@@ -585,3 +585,44 @@ test("SVG preview slices support keyboard selection and clearly label luminance"
     ).toBeVisible();
     await expect(graph).toContainText("8 samples");
 });
+
+test("dropping native files opens a scenario and images without an open dialog", async ({
+    application,
+    profile
+}) => {
+    const page = await application.firstWindow();
+    const scenarioPath = await createScenario(application, page, profile);
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    const imagePath = path.join(profile, "dropped.test");
+    await writeFile(imagePath, "test image");
+    // File inputs supply native-backed File objects, so this exercises Electron's
+    // webUtils path resolution as well as the renderer drop handler and IPC.
+    await page.evaluate(() => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.id = "drop-test-files";
+        document.body.append(input);
+    });
+    await page
+        .locator("#drop-test-files")
+        .setInputFiles([imagePath, scenarioPath]);
+    await page.evaluate(() => {
+        const input =
+            document.querySelector<HTMLInputElement>("#drop-test-files")!;
+        const dataTransfer = new DataTransfer();
+        for (const file of input.files!) {
+            dataTransfer.items.add(file);
+        }
+        window.dispatchEvent(
+            new DragEvent("drop", { dataTransfer, cancelable: true })
+        );
+        input.remove();
+    });
+    await expect(
+        page.getByRole("button", { name: "Open image", exact: true })
+    ).toBeEnabled();
+    await expect(
+        page.getByRole("img", { name: "dropped.test", exact: true })
+    ).toBeVisible();
+});

@@ -40,6 +40,10 @@ autosave their file references, positions, sizes, and window states. Nova restor
 the last scenario on startup; explicitly closing it clears that preference.
 Source images remain separate from the scenario file.
 
+Drag a `.scenario` file into Nova to open it, or drop images into an open scenario
+to create image widgets. Multiple images can be dropped together. When dropping
+a scenario and images together, Nova opens the scenario first.
+
 Bundled plugins support raster images, SVG, and SICD-in-NITF radar imagery.
 See [image plugins](docs/image-plugins.md) and [SICD setup](docs/sicd-plugin.md).
 The Settings dialog configures the amplitude percentiles displayed in Statistics.

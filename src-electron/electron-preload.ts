@@ -1,5 +1,5 @@
 import type { RestoredImageUpdate } from "../src/types/scenario";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { quasarRuntime } from "#q-app/electron/preload";
 import type { SavedImageWindow } from "../src/types/workspace";
 import type { ImageAPI, ImageInfo } from "../src/types/image";
@@ -14,6 +14,7 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    pathForFile: (file: File) => webUtils.getPathForFile(file),
     slice: (filePath, pluginId, orientation, index) =>
         ipcRenderer.invoke(
             "image:slice",
@@ -22,14 +23,14 @@ contextBridge.exposeInMainWorld("images", {
             orientation,
             index
         ),
-    open: async (onLoading?: (image: ImageInfo) => void) => {
+    open: async (onLoading?: (image: ImageInfo) => void, filePath?: string) => {
         const listener = (
             _event: Electron.IpcRendererEvent,
             image: ImageInfo
         ) => onLoading?.(image);
         ipcRenderer.on("image:loading", listener);
         try {
-            return await ipcRenderer.invoke("image:open");
+            return await ipcRenderer.invoke("image:open", filePath);
         } finally {
             ipcRenderer.removeListener("image:loading", listener);
         }
@@ -79,7 +80,7 @@ contextBridge.exposeInMainWorld("scenario", {
     },
     confirmClose: () => ipcRenderer.invoke("scenario:confirm-close"),
     create: () => ipcRenderer.invoke("scenario:new"),
-    open: () => ipcRenderer.invoke("scenario:open"),
+    open: (filePath?: string) => ipcRenderer.invoke("scenario:open", filePath),
     readTable: (table: string, offset: number) =>
         ipcRenderer.invoke("scenario:read", table, offset),
     close: () => ipcRenderer.invoke("scenario:close")

@@ -66,6 +66,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        pathForFile: vi.fn(file => file.name),
         slice: vi.fn(),
         plugins: vi.fn<ImageAPI["plugins"]>(async () => ({
             directory: "/plugins",
@@ -217,4 +218,64 @@ test("failed saves keep work open and prevent confirming application shutdown", 
     await click("Close");
     expect(scenarioMock.close).not.toHaveBeenCalled();
     expect(activeScenario.value).toEqual(scenario);
+});
+
+async function drop(...names: string[]) {
+    const event = new Event("drop", { cancelable: true });
+    Object.defineProperty(event, "dataTransfer", {
+        value: { files: names.map(name => new File([""], name)) }
+    });
+    window.dispatchEvent(event);
+    await flushPromises();
+    expect(event.defaultPrevented).toBe(true);
+}
+
+test("file drops open the scenario first and then each image without dialogs", async () => {
+    await page();
+    await drop("first.test", "workspace.SCENARIO", "second.test");
+    expect(scenarioMock.open).toHaveBeenCalledWith("workspace.SCENARIO");
+    expect(imagesMock.open).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Function),
+        "first.test"
+    );
+    expect(imagesMock.open).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Function),
+        "second.test"
+    );
+    expect(workspace.add).toHaveBeenCalledTimes(2);
+});
+
+test("drops explain the missing scenario and reject multiple scenarios", async () => {
+    await page();
+    await drop("image.test");
+    expect(wrapper!.text()).toContain(
+        "Open or create a scenario before opening images."
+    );
+    expect(imagesMock.open).not.toHaveBeenCalled();
+    await drop("a.scenario", "b.scenario");
+    expect(wrapper!.text()).toContain("Drop one scenario at a time.");
+    expect(scenarioMock.open).not.toHaveBeenCalled();
+    await drop("a.scenario");
+    expect(scenarioMock.open).toHaveBeenCalledWith("a.scenario");
+});
+
+test("image drops keep the existing loading and failure behavior", async () => {
+    scenarioMock.restoreLast.mockResolvedValue(scenario);
+    imagesMock.open.mockImplementation(async onLoading => {
+        onLoading?.(image);
+        throw new Error("Unable to decode dropped image");
+    });
+    await page();
+    await drop("broken.test");
+    expect(workspace.add).toHaveBeenCalledWith(image, true);
+    expect(workspace.fail).toHaveBeenCalledWith(
+        1,
+        "Unable to decode dropped image"
+    );
+    wrapper!.unmount();
+    wrapper = undefined;
+    window.dispatchEvent(new Event("drop"));
+    expect(scenarioMock.open).not.toHaveBeenCalled();
 });

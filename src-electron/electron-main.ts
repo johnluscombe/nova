@@ -269,53 +269,66 @@ async function createWindow() {
                 );
             })
     );
-    mainWindow.webContents.ipc.handle("image:open", () =>
-        documentAction(async () => {
-            if (!scenario.current) {
-                throw new Error(
-                    "Open or create a scenario before opening images."
-                );
-            }
-            if (!imagePlugins.filters.length) {
-                throw new Error(
-                    "Install an image plugin before opening images."
-                );
-            }
-            const result = await dialog.showOpenDialog(mainWindow, {
-                title: "Open image",
-                filters: imagePlugins.filters,
-                properties: ["openFile"]
-            });
-            const filePath = result.filePaths[0];
-            if (result.canceled || !filePath) {
-                return null;
-            }
-            mainWindow.webContents.send("image:loading", {
-                name: path.basename(filePath),
-                path: filePath,
-                pluginId: "",
-                pluginName: "Loading…"
-            });
-            return imagePlugins.open(filePath);
-        })
+    mainWindow.webContents.ipc.handle(
+        "image:open",
+        (_event, droppedPath?: string) =>
+            documentAction(async () => {
+                if (!scenario.current) {
+                    throw new Error(
+                        "Open or create a scenario before opening images."
+                    );
+                }
+                if (!imagePlugins.filters.length) {
+                    throw new Error(
+                        "Install an image plugin before opening images."
+                    );
+                }
+                const result =
+                    droppedPath === undefined
+                        ? await dialog.showOpenDialog(mainWindow, {
+                              title: "Open image",
+                              filters: imagePlugins.filters,
+                              properties: ["openFile"]
+                          })
+                        : { canceled: false, filePaths: [droppedPath] };
+                const filePath = result.filePaths[0];
+                if (result.canceled || !filePath) {
+                    return null;
+                }
+                mainWindow.webContents.send("image:loading", {
+                    name: path.basename(filePath),
+                    path: filePath,
+                    pluginId: "",
+                    pluginName: "Loading…"
+                });
+                return imagePlugins.open(filePath);
+            })
     );
-    mainWindow.webContents.ipc.handle("scenario:open", () =>
-        documentAction(async () => {
-            const result = await dialog.showOpenDialog(mainWindow, {
-                title: "Open scenario",
-                filters: [
-                    { name: "Scenario database", extensions: ["scenario"] }
-                ],
-                properties: ["openFile"]
-            });
-            const filePath = result.filePaths[0];
-            if (result.canceled || !filePath) {
-                return null;
-            }
-            const opened = await scenario.open(filePath);
-            await rememberScenario(filePath);
-            return restoreWorkspace(opened);
-        })
+    mainWindow.webContents.ipc.handle(
+        "scenario:open",
+        (_event, droppedPath?: string) =>
+            documentAction(async () => {
+                const result =
+                    droppedPath === undefined
+                        ? await dialog.showOpenDialog(mainWindow, {
+                              title: "Open scenario",
+                              filters: [
+                                  {
+                                      name: "Scenario database",
+                                      extensions: ["scenario"]
+                                  }
+                              ],
+                              properties: ["openFile"]
+                          })
+                        : { canceled: false, filePaths: [droppedPath] };
+                const filePath = result.filePaths[0];
+                if (result.canceled || !filePath) {
+                    return null;
+                }
+                const opened = await scenario.open(filePath);
+                await rememberScenario(filePath);
+                return restoreWorkspace(opened);
+            })
     );
     mainWindow.webContents.ipc.handle(
         "scenario:read",

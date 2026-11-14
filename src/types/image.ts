@@ -37,13 +37,17 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    pathForFile(file: File): string;
     slice(
         filePath: string,
         pluginId: string,
         orientation: SliceOrientation,
         index: number
     ): Promise<SliceData>;
-    open(onLoading?: (image: ImageInfo) => void): Promise<ImageInfo | null>;
+    open(
+        onLoading?: (image: ImageInfo) => void,
+        filePath?: string
+    ): Promise<ImageInfo | null>;
     plugins(): Promise<ImagePluginStatus>;
     executeRibbonAction(
         pluginId: string,

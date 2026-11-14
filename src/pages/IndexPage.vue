@@ -38,7 +38,7 @@
                                 icon="folder_open"
                                 label="Open"
                                 :disable="busy"
-                                @click="openScenario" />
+                                @click="openScenario()" />
                             <q-separator vertical inset class="q-mx-sm" />
                             <q-btn
                                 flat
@@ -83,7 +83,7 @@
                                 :disable="
                                     busy || !scenario || !hasImageDecoders
                                 "
-                                @click="openImage" />
+                                @click="openImage()" />
                             <q-btn
                                 v-for="button in homeButtons('image')"
                                 :key="button.key"
@@ -415,7 +415,64 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => stopFlushListener?.());
 
-async function openImage() {
+function allowFileDrop(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = busy.value ? "none" : "copy";
+    }
+}
+async function dropFiles(event: DragEvent) {
+    event.preventDefault();
+    if (busy.value || !event.dataTransfer?.files.length) {
+        return;
+    }
+    error.value = "";
+    try {
+        const paths = Array.from(
+            event.dataTransfer.files,
+            file => window.images?.pathForFile(file) ?? ""
+        );
+        if (paths.some(file => !file)) {
+            throw new Error("Unable to read dropped file paths.");
+        }
+        const scenarios = paths.filter(file => /\.scenario$/i.test(file));
+        if (scenarios.length > 1) {
+            throw new Error("Drop one scenario at a time.");
+        }
+        if (scenarios[0]) {
+            await openScenario(scenarios[0]);
+        }
+        if (error.value) {
+            return;
+        }
+        for (const file of paths.filter(file => !/\.scenario$/i.test(file))) {
+            if (!scenario.value) {
+                throw new Error(
+                    "Open or create a scenario before opening images."
+                );
+            }
+            await openImage(file);
+            if (error.value) {
+                break;
+            }
+        }
+    } catch (cause) {
+        error.value =
+            cause instanceof Error
+                ? cause.message
+                : "Unable to open dropped files.";
+    }
+}
+onMounted(() => {
+    window.addEventListener("dragover", allowFileDrop);
+    window.addEventListener("drop", dropFiles);
+});
+onBeforeUnmount(() => {
+    window.removeEventListener("dragover", allowFileDrop);
+    window.removeEventListener("drop", dropFiles);
+});
+
+async function openImage(filePath?: string) {
     if (!scenario.value || busy.value) {
         return;
     }
@@ -428,7 +485,7 @@ async function openImage() {
         }
         const opened = await window.images.open(image => {
             loadingId = workspace.value?.add(image, true);
-        });
+        }, filePath);
         if (opened) {
             if (loadingId !== undefined) {
                 workspace.value?.complete(loadingId, opened);
@@ -488,7 +545,7 @@ async function newScenario() {
     }
 }
 
-async function openScenario() {
+async function openScenario(filePath?: string) {
     busy.value = true;
     error.value = "";
     try {
@@ -496,7 +553,7 @@ async function openScenario() {
             throw new Error("Open scenarios in the Nova desktop app.");
         }
         await flushLayout();
-        const opened = await window.scenario.open();
+        const opened = await window.scenario.open(filePath);
         if (opened) {
             await showScenario(opened);
         }
