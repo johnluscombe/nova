@@ -1,3 +1,5 @@
+<img src="public/icons/nova-128.png" alt="Nova icon" width="96" height="96" />
+
 # Nova
 
 An Electron workspace for radar imagery, built with Vue, Quasar, and SQLite.
