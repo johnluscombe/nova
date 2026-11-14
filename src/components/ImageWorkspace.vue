@@ -4,11 +4,10 @@
             <div v-if="!windows.length" class="canvas-empty">
                 <q-icon
                     :name="activeScenario ? 'image' : 'description'"
-                    size="48px"
-                />
-                <p v-if="!activeScenario"
-                    >Create or open a scenario from the File group to begin.</p
-                >
+                    size="48px" />
+                <p v-if="!activeScenario">
+                    Create or open a scenario from the File group to begin.
+                </p>
                 <p v-else>Open an image from the ribbon to begin.</p>
             </div>
             <article
@@ -20,8 +19,7 @@
                 :style="windowStyle(widget)"
                 :aria-label="widget.image.name"
                 @pointerdown="activate(widget)"
-                @focusin="activate(widget)"
-            >
+                @focusin="activate(widget)">
                 <div
                     class="widget-titlebar"
                     tabindex="0"
@@ -32,26 +30,23 @@
                     @pointercancel="endGesture"
                     @lostpointercapture="endGesture"
                     @dblclick="toggleMaximize(widget)"
-                    @keydown="moveWithKeyboard($event, widget)"
-                >
+                    @keydown="moveWithKeyboard($event, widget)">
                     <q-icon name="image" size="16px" />
-                    <span class="widget-title" :title="widget.image.path">{{
-                        widget.image.name
-                    }}</span>
+                    <span class="widget-title" :title="widget.image.path">
+                        {{ widget.image.name }}
+                    </span>
                     <div
                         class="widget-controls"
                         @pointerdown.stop
                         @dblclick.stop
-                        @keydown.stop
-                    >
+                        @keydown.stop>
                         <q-btn
                             flat
                             dense
                             icon="remove"
                             :aria-label="`Minimize ${widget.image.name}`"
                             title="Minimize"
-                            @click="widget.minimized = true"
-                        />
+                            @click="widget.minimized = true" />
                         <q-btn
                             flat
                             dense
@@ -60,8 +55,7 @@
                             "
                             :aria-label="`${widget.maximized ? 'Restore' : 'Maximize'} ${widget.image.name}`"
                             :title="widget.maximized ? 'Restore' : 'Maximize'"
-                            @click="toggleMaximize(widget)"
-                        />
+                            @click="toggleMaximize(widget)" />
                         <q-btn
                             flat
                             dense
@@ -69,8 +63,7 @@
                             class="widget-close"
                             :aria-label="`Close ${widget.image.name}`"
                             title="Close"
-                            @click="close(widget)"
-                        />
+                            @click="close(widget)" />
                     </div>
                 </div>
                 <div class="widget-body">
@@ -80,8 +73,7 @@
                                 v-if="widget.loading"
                                 class="column items-center q-gutter-md"
                                 role="status"
-                                aria-live="polite"
-                            >
+                                aria-live="polite">
                                 <q-spinner color="primary" size="40px" />
                                 <span>Loading image…</span>
                             </div>
@@ -89,18 +81,18 @@
                                 v-else-if="widget.image.previewDataUrl"
                                 :src="widget.image.previewDataUrl"
                                 :alt="widget.image.name"
-                                draggable="false"
-                            />
-                            <p v-else>{{
-                                widget.error ??
-                                "This plugin did not provide an image preview."
-                            }}</p>
+                                draggable="false" />
+                            <p v-else>
+                                {{
+                                    widget.error ??
+                                    "This plugin did not provide an image preview."
+                                }}
+                            </p>
                         </div>
                         <section
                             v-if="widget.statisticsOpen"
                             class="statistics-panel"
-                            aria-label="Image statistics"
-                        >
+                            aria-label="Image statistics">
                             <div class="row items-center justify-between">
                                 <strong>Statistics</strong>
                                 <q-btn
@@ -109,12 +101,11 @@
                                     round
                                     icon="close"
                                     aria-label="Close statistics"
-                                    @click="widget.statisticsOpen = false"
-                                />
+                                    @click="widget.statisticsOpen = false" />
                             </div>
-                            <p v-if="widget.loading" role="status"
-                                >Loading statistics…</p
-                            >
+                            <p v-if="widget.loading" role="status">
+                                Loading statistics…
+                            </p>
                             <template v-else>
                                 <dl
                                     v-if="
@@ -124,34 +115,33 @@
                                                 widget.image.statistics
                                             )
                                         ).length
-                                    "
-                                >
+                                    ">
                                     <div
                                         v-for="(
                                             value, label
                                         ) in visibleStatistics(
                                             widget.image.statistics
                                         )"
-                                        :key="label"
-                                    >
-                                        <dt>{{ label }}</dt
-                                        ><dd>{{ value ?? "Not available" }}</dd>
+                                        :key="label">
+                                        <dt>{{ label }}</dt>
+                                        <dd>{{ value ?? "Not available" }}</dd>
                                     </div>
                                 </dl>
-                                <p v-else>{{
-                                    widget.error ??
-                                    (widget.image.statistics
-                                        ? "The selected percentiles are not available for this image."
-                                        : "This plugin does not provide image statistics.")
-                                }}</p>
+                                <p v-else>
+                                    {{
+                                        widget.error ??
+                                        (widget.image.statistics
+                                            ? "The selected percentiles are not available for this image."
+                                            : "This plugin does not provide image statistics.")
+                                    }}
+                                </p>
                             </template>
                         </section>
                     </div>
                     <aside
                         v-if="widget.metadataOpen"
                         class="metadata-panel"
-                        aria-label="Image metadata"
-                    >
+                        aria-label="Image metadata">
                         <div class="row items-center justify-between">
                             <strong>Metadata</strong>
                             <q-btn
@@ -160,32 +150,29 @@
                                 round
                                 icon="close"
                                 aria-label="Close metadata"
-                                @click="widget.metadataOpen = false"
-                            />
+                                @click="widget.metadataOpen = false" />
                         </div>
-                        <p v-if="widget.loading" role="status"
-                            >Loading metadata…</p
-                        >
+                        <p v-if="widget.loading" role="status">
+                            Loading metadata…
+                        </p>
                         <dl>
                             <template
                                 v-for="(
                                     [label, value], index
                                 ) in metadataEntries(widget)"
-                                :key="index"
-                            >
-                                <dt>{{ label }}</dt
-                                ><dd>{{ value ?? "Not available" }}</dd>
+                                :key="index">
+                                <dt>{{ label }}</dt>
+                                <dd>{{ value ?? "Not available" }}</dd>
                             </template>
                         </dl>
                     </aside>
                 </div>
-                <div class="widget-status" :title="widget.image.path"
-                    >{{ widget.image.pluginName
-                    }}<span v-if="widget.image.width && widget.image.height">
-                        · {{ widget.image.width }} ×
-                        {{ widget.image.height }}</span
-                    ></div
-                >
+                <div class="widget-status" :title="widget.image.path">
+                    {{ widget.image.pluginName }}
+                    <span v-if="widget.image.width && widget.image.height">
+                        · {{ widget.image.width }} × {{ widget.image.height }}
+                    </span>
+                </div>
                 <template v-if="!widget.maximized">
                     <div
                         v-for="edge in edges"
@@ -196,14 +183,13 @@
                         @pointermove="moveGesture"
                         @pointerup="endGesture"
                         @pointercancel="endGesture"
-                        @lostpointercapture="endGesture"
-                    />
+                        @lostpointercapture="endGesture" />
                     <button
                         class="resize-keyboard"
                         :aria-label="`Resize ${widget.image.name} with arrow keys`"
-                        @keydown="resizeWithKeyboard($event, widget)"
-                        >⌟</button
-                    >
+                        @keydown="resizeWithKeyboard($event, widget)">
+                        ⌟
+                    </button>
                 </template>
             </article>
         </div>
@@ -217,8 +203,7 @@
                 icon="image"
                 :label="widget.image.name"
                 :title="`Restore ${widget.image.name}`"
-                @click="restore(widget)"
-            />
+                @click="restore(widget)" />
         </div>
     </section>
 </template>

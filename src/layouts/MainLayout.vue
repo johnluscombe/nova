@@ -3,21 +3,19 @@
         <q-header class="nova-titlebar">
             <q-toolbar
                 class="nova-toolbar"
-                :class="{ 'nova-toolbar-mac': isMac }"
-            >
+                :class="{ 'nova-toolbar-mac': isMac }">
                 <span
                     v-if="activeScenario"
                     class="text-caption scenario-name"
-                    :title="activeScenario.name"
-                    >{{ activeScenario.name }}</span
-                >
+                    :title="activeScenario.name">
+                    {{ activeScenario.name }}
+                </span>
                 <q-space />
                 <div
                     v-if="controls && !isMac"
                     class="window-controls"
                     role="group"
-                    aria-label="Window controls"
-                >
+                    aria-label="Window controls">
                     <q-btn
                         flat
                         square
@@ -25,8 +23,7 @@
                         icon="remove"
                         aria-label="Minimize window"
                         title="Minimize"
-                        @click="runWindowAction(() => controls!.minimize())"
-                    />
+                        @click="runWindowAction(() => controls!.minimize())" />
                     <q-btn
                         flat
                         square
@@ -38,8 +35,7 @@
                         :title="maximized ? 'Restore' : 'Maximize'"
                         @click="
                             runWindowAction(() => controls!.toggleMaximize())
-                        "
-                    />
+                        " />
                     <q-btn
                         flat
                         square
@@ -48,8 +44,7 @@
                         class="window-close"
                         aria-label="Close window"
                         title="Close"
-                        @click="runWindowAction(() => controls!.close())"
-                    />
+                        @click="runWindowAction(() => controls!.close())" />
                 </div>
             </q-toolbar>
         </q-header>
@@ -57,9 +52,9 @@
             <q-banner
                 v-if="windowError"
                 class="bg-red-1 text-negative"
-                role="alert"
-                >{{ windowError }}</q-banner
-            >
+                role="alert">
+                {{ windowError }}
+            </q-banner>
             <router-view />
         </q-page-container>
     </q-layout>

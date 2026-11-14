@@ -8,23 +8,20 @@
                 align="left"
                 class="ribbon-tabs"
                 active-color="primary"
-                indicator-color="primary"
-            >
+                indicator-color="primary">
                 <q-tab name="home" label="Home" />
                 <q-tab
                     v-for="tab in pluginTabs"
                     :key="tab.key"
                     :name="tab.key"
-                    :label="tab.label"
-                />
+                    :label="tab.label" />
             </q-tabs>
             <div class="ribbon-content">
                 <template v-if="activeTab === 'home'">
                     <div
                         class="ribbon-group"
                         role="group"
-                        aria-labelledby="file-group-label"
-                    >
+                        aria-labelledby="file-group-label">
                         <div class="ribbon-actions">
                             <q-btn
                                 flat
@@ -33,8 +30,7 @@
                                 icon="note_add"
                                 label="New"
                                 :disable="busy"
-                                @click="newScenario"
-                            />
+                                @click="newScenario" />
                             <q-btn
                                 flat
                                 stack
@@ -42,8 +38,7 @@
                                 icon="folder_open"
                                 label="Open"
                                 :disable="busy"
-                                @click="openScenario"
-                            />
+                                @click="openScenario" />
                             <q-separator vertical inset class="q-mx-sm" />
                             <q-btn
                                 flat
@@ -52,8 +47,7 @@
                                 icon="close"
                                 label="Close"
                                 :disable="busy || !scenario"
-                                @click="closeScenario"
-                            />
+                                @click="closeScenario" />
                             <q-btn
                                 v-for="button in homeButtons('file')"
                                 :key="button.key"
@@ -68,18 +62,16 @@
                                 "
                                 @click="
                                     runPluginAction(button.pluginId, button.id)
-                                "
-                            />
+                                " />
                         </div>
-                        <div id="file-group-label" class="ribbon-group-label"
-                            >File</div
-                        >
+                        <div id="file-group-label" class="ribbon-group-label">
+                            File
+                        </div>
                     </div>
                     <div
                         class="ribbon-group"
                         role="group"
-                        aria-labelledby="image-group-label"
-                    >
+                        aria-labelledby="image-group-label">
                         <div class="ribbon-actions">
                             <q-btn
                                 flat
@@ -91,8 +83,7 @@
                                 :disable="
                                     busy || !scenario || !hasImageDecoders
                                 "
-                                @click="openImage"
-                            />
+                                @click="openImage" />
                             <q-btn
                                 v-for="button in homeButtons('image')"
                                 :key="button.key"
@@ -107,19 +98,17 @@
                                 "
                                 @click="
                                     runPluginAction(button.pluginId, button.id)
-                                "
-                            />
+                                " />
                         </div>
-                        <div id="image-group-label" class="ribbon-group-label"
-                            >Image</div
-                        >
+                        <div id="image-group-label" class="ribbon-group-label">
+                            Image
+                        </div>
                     </div>
                 </template>
                 <div
                     class="ribbon-group"
                     role="group"
-                    aria-labelledby="view-group-label"
-                >
+                    aria-labelledby="view-group-label">
                     <div class="ribbon-actions">
                         <q-btn
                             flat
@@ -128,8 +117,7 @@
                             icon="info"
                             label="Metadata"
                             :disable="!hasActiveWidget"
-                            @click="workspace?.toggleMetadata()"
-                        />
+                            @click="workspace?.toggleMetadata()" />
                         <q-btn
                             flat
                             stack
@@ -137,18 +125,16 @@
                             icon="bar_chart"
                             label="Statistics"
                             :disable="!hasActiveStatistics"
-                            @click="workspace?.toggleStatistics()"
-                        />
+                            @click="workspace?.toggleStatistics()" />
                     </div>
-                    <div id="view-group-label" class="ribbon-group-label"
-                        >View</div
-                    >
+                    <div id="view-group-label" class="ribbon-group-label">
+                        View
+                    </div>
                 </div>
                 <div
                     class="ribbon-group"
                     role="group"
-                    aria-labelledby="settings-group-label"
-                >
+                    aria-labelledby="settings-group-label">
                     <div class="ribbon-actions">
                         <q-btn
                             flat
@@ -156,20 +142,18 @@
                             no-caps
                             icon="settings"
                             label="Settings"
-                            @click="settingsOpen = true"
-                        />
+                            @click="settingsOpen = true" />
                     </div>
-                    <div id="settings-group-label" class="ribbon-group-label"
-                        >Settings</div
-                    >
+                    <div id="settings-group-label" class="ribbon-group-label">
+                        Settings
+                    </div>
                 </div>
                 <div
                     v-for="group in extraGroups"
                     :key="group.key"
                     class="ribbon-group"
                     role="group"
-                    :aria-label="group.label"
-                >
+                    :aria-label="group.label">
                     <div class="ribbon-actions">
                         <q-btn
                             v-for="button in group.buttons"
@@ -182,8 +166,9 @@
                             :disable="
                                 busy || (button.requiresScenario && !scenario)
                             "
-                            @click="runPluginAction(button.pluginId, button.id)"
-                        />
+                            @click="
+                                runPluginAction(button.pluginId, button.id)
+                            " />
                     </div>
                     <div class="ribbon-group-label">{{ group.label }}</div>
                 </div>
@@ -192,22 +177,18 @@
                 v-if="busy"
                 indeterminate
                 color="primary"
-                class="ribbon-progress"
-            />
+                class="ribbon-progress" />
         </section>
         <SettingsDialog v-model="settingsOpen" />
         <q-dialog
             :model-value="!!actionMessage"
-            @update:model-value="actionMessage = ''"
-        >
-            <q-card
-                ><q-card-section>{{ actionMessage }}</q-card-section
-                ><q-card-actions align="right"
-                    ><q-btn
-                        flat
-                        label="OK"
-                        @click="actionMessage = ''" /></q-card-actions
-            ></q-card>
+            @update:model-value="actionMessage = ''">
+            <q-card>
+                <q-card-section>{{ actionMessage }}</q-card-section>
+                <q-card-actions align="right">
+                    <q-btn flat label="OK" @click="actionMessage = ''" />
+                </q-card-actions>
+            </q-card>
         </q-dialog>
         <main class="scenario-content" :aria-busy="busy">
             <div
@@ -216,37 +197,34 @@
                     (pluginStatus &&
                         (!hasImageDecoders || pluginStatus.errors.length))
                 "
-                class="workspace-info"
-            >
+                class="workspace-info">
                 <q-banner
                     v-if="error"
                     class="bg-red-1 text-negative q-mb-md"
-                    role="alert"
-                    >{{ error }}</q-banner
-                >
+                    role="alert">
+                    {{ error }}
+                </q-banner>
                 <q-banner
                     v-if="
                         pluginStatus &&
                         (!hasImageDecoders || pluginStatus.errors.length)
                     "
-                    class="bg-blue-1 q-mb-md"
-                >
-                    <div v-if="!hasImageDecoders"
-                        >Install an image plugin to enable Open Image.</div
-                    >
-                    <div class="text-caption image-path"
-                        >Plugin folder: {{ pluginStatus.directory }}</div
-                    >
+                    class="bg-blue-1 q-mb-md">
+                    <div v-if="!hasImageDecoders">
+                        Install an image plugin to enable Open Image.
+                    </div>
+                    <div class="text-caption image-path">
+                        Plugin folder: {{ pluginStatus.directory }}
+                    </div>
                     <div
                         v-for="issue in pluginStatus.errors"
                         :key="issue"
-                        class="text-negative"
-                        >{{ issue }}</div
-                    >
-                    <div class="text-caption"
-                        >Restart Nova after installing or changing a
-                        plugin.</div
-                    >
+                        class="text-negative">
+                        {{ issue }}
+                    </div>
+                    <div class="text-caption">
+                        Restart Nova after installing or changing a plugin.
+                    </div>
                 </q-banner>
             </div>
             <ImageWorkspace
@@ -254,8 +232,7 @@
                 @statistics-change="hasActiveStatistics = $event"
                 :key="workspaceSession"
                 ref="workspace"
-                @change="saveLayout"
-            />
+                @change="saveLayout" />
         </main>
     </q-page>
 </template>

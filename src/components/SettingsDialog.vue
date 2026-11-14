@@ -17,12 +17,11 @@
                     hint="Select one or more percentiles"
                     :error="!!error"
                     :error-message="error"
-                    @update:model-value="error = ''"
-                />
-                <p class="text-caption q-mt-md"
-                    >Applies immediately to all open images. Large images use
-                    sampled amplitude data.</p
-                >
+                    @update:model-value="error = ''" />
+                <p class="text-caption q-mt-md">
+                    Applies immediately to all open images. Large images use
+                    sampled amplitude data.
+                </p>
             </q-card-section>
             <q-card-actions align="right">
                 <q-btn
@@ -32,8 +31,7 @@
                     @click="
                         percentiles = [...defaultPercentiles];
                         error = '';
-                    "
-                />
+                    " />
                 <q-btn flat no-caps label="Cancel" @click="open = false" />
                 <q-btn color="primary" no-caps label="Save" @click="save" />
             </q-card-actions>
