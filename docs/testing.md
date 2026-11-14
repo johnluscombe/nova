@@ -99,3 +99,28 @@ Vite's combined source map directly to Istanbul, preserving original Vue SFC
 locations. A regression test verifies that generated line 1 remaps to original
 line 5 before merging. Avoid replacing those maps with identity maps: that makes
 unit and e2e coverage refer to different lines in the same Vue source file.
+
+## GitHub Actions
+
+`.github/workflows/ci.yml` runs on pushes and pull requests to `main`, and supports
+manual dispatch. The macOS job installs both npm lockfiles, checks types and lint,
+runs Python/SarPy tests, and runs the combined Vitest/Playwright coverage command.
+It then builds and uploads an unsigned macOS app archive. Download `Nova-macos`
+from a successful Actions run; the archive preserves app permissions and symlinks.
+
+The Actions summary displays coverage percentages. The `combined-coverage`
+artifact contains the HTML, LCOV, JSON, and summary reports; failed runs also
+upload available Playwright traces. Artifacts expire after 14 days (failure
+traces after 7 days).
+
+After all checks and packaging succeed on `main`, a separate job uses the built-in
+`GITHUB_TOKEN` to create/update the `coverage` branch with a Shields-compatible
+`coverage.json` and `coverage-summary.json`. The README badge uses combined
+**line coverage**, including unit and renderer e2e results. No personal token,
+external coverage account, or GitHub Pages setup is needed. The first successful
+main-branch run initializes the badge. Fork PRs never publish badge data; test
+jobs have read-only repository permissions. Repository/org policy must allow
+the publishing job's `contents: write` permission.
+
+The macOS package is unsigned; this workflow does not sign, notarize, or publish a
+release. Windows and Linux installers are not produced by this workflow.

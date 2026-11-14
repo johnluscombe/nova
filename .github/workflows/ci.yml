@@ -1,0 +1,160 @@
+name: Build, test, and coverage
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build-and-test:
+        name: macOS build and tests
+        runs-on: macos-latest
+        timeout-minutes: 30
+        env:
+            CI: "true"
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: "24"
+                  cache: npm
+                  cache-dependency-path: |
+                      package-lock.json
+                      src-electron/package-lock.json
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: "3.12"
+                  cache: pip
+                  cache-dependency-path: src-electron/electron-assets/plugins/sicd/requirements.txt
+            - name: Install dependencies
+              run: |
+                  npm ci
+                  npm ci --prefix src-electron
+                  python -m pip install -r src-electron/electron-assets/plugins/sicd/requirements.txt
+            - name: Check types and formatting
+              run: |
+                  npm run typecheck
+                  npm run lint:check
+            - name: Test the SICD reader
+              run: python src-electron/sicd-reader.test.py
+            - name: Run unit and Electron tests with combined coverage
+              run: npm run test:coverage:all
+            - name: Summarize coverage and prepare badge
+              uses: actions/github-script@v8
+              with:
+                  script: |
+                      const fs = require('node:fs');
+                      const summary = JSON.parse(fs.readFileSync('coverage/combined/coverage-summary.json', 'utf8'));
+                      const lines = summary.total.lines;
+                      if (!Number.isFinite(lines.pct) || lines.pct < 0 || lines.pct > 100 || lines.total === 0) {
+                          throw new Error('Missing or invalid combined line coverage');
+                      }
+                      const badge = {
+                          schemaVersion: 1,
+                          label: 'coverage',
+                          message: `${lines.pct.toFixed(2)}%`,
+                          color: lines.pct >= 90 ? 'brightgreen' : lines.pct >= 80 ? 'green' : lines.pct >= 70 ? 'yellow' : 'red'
+                      };
+                      fs.writeFileSync('coverage/combined/badge.json', JSON.stringify(badge, null, 2) + '\n');
+                      await core.summary.addHeading('Combined Istanbul coverage')
+                          .addTable([
+                              [{ data: 'Metric', header: true }, { data: 'Coverage', header: true }],
+                              ...['lines', 'statements', 'functions', 'branches'].map(metric => [metric, `${summary.total[metric].pct}%`])
+                          ])
+                          .addRaw(`\nLines covered: ${lines.covered}/${lines.total}. Download the combined-coverage artifact for the HTML report.\n`)
+                          .write();
+            - name: Upload coverage reports
+              if: always()
+              uses: actions/upload-artifact@v6
+              with:
+                  name: combined-coverage
+                  path: coverage/combined/
+                  if-no-files-found: warn
+                  retention-days: 14
+            - name: Upload Playwright failure artifacts
+              if: failure()
+              uses: actions/upload-artifact@v6
+              with:
+                  name: playwright-results
+                  path: test-results/
+                  if-no-files-found: ignore
+                  retention-days: 7
+            - name: Package the application
+              run: npm run build
+            - name: Archive macOS application
+              run: tar -czf Nova-macos.tar.gz -C dist/electron/Packaged .
+            - name: Upload application
+              uses: actions/upload-artifact@v6
+              with:
+                  name: Nova-macos
+                  path: Nova-macos.tar.gz
+                  if-no-files-found: error
+                  retention-days: 14
+
+    publish-coverage:
+        name: Publish coverage badge
+        needs: build-and-test
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@v7
+              with:
+                  name: combined-coverage
+                  path: coverage
+            - name: Update badge data on the coverage branch
+              uses: actions/github-script@v8
+              with:
+                  script: |
+                      const fs = require('node:fs');
+                      const repo = context.repo;
+                      const main = await github.rest.git.getRef({ ...repo, ref: 'heads/main' });
+                      if (main.data.object.sha !== context.sha) {
+                          core.info('A newer commit is on main; leaving its badge unchanged.');
+                          return;
+                      }
+                      let previous;
+                      try {
+                          previous = (await github.rest.git.getRef({ ...repo, ref: 'heads/coverage' })).data.object.sha;
+                      } catch (error) {
+                          if (error.status !== 404) throw error;
+                      }
+                      const previousCommit = previous
+                          ? (await github.rest.git.getCommit({ ...repo, commit_sha: previous })).data
+                          : undefined;
+                      const tree = await github.rest.git.createTree({
+                          ...repo,
+                          ...(previousCommit ? { base_tree: previousCommit.tree.sha } : {}),
+                          tree: [
+                              { path: 'coverage.json', mode: '100644', type: 'blob', content: fs.readFileSync('coverage/badge.json', 'utf8') },
+                              { path: 'coverage-summary.json', mode: '100644', type: 'blob', content: fs.readFileSync('coverage/coverage-summary.json', 'utf8') }
+                          ]
+                      });
+                      if (tree.data.sha === previousCommit?.tree.sha) {
+                          core.info('Coverage is unchanged.');
+                          return;
+                      }
+                      const commit = await github.rest.git.createCommit({
+                          ...repo,
+                          message: `Coverage for ${context.sha}`,
+                          tree: tree.data.sha,
+                          parents: previous ? [previous] : []
+                      });
+                      if (previous) {
+                          await github.rest.git.updateRef({ ...repo, ref: 'heads/coverage', sha: commit.data.sha, force: false });
+                      } else {
+                          await github.rest.git.createRef({ ...repo, ref: 'refs/heads/coverage', sha: commit.data.sha });
+                      }

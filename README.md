@@ -2,6 +2,9 @@
 
 # Nova
 
+[![Build and tests](https://github.com/johnluscombe/nova/actions/workflows/ci.yml/badge.svg)](https://github.com/johnluscombe/nova/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjohnluscombe%2Fnova%2Fcoverage%2Fcoverage.json)](https://github.com/johnluscombe/nova/actions/workflows/ci.yml)
+
 An Electron workspace for radar imagery, built with Vue, Quasar, and SQLite.
 
 ![Nova workspace displaying a synthetic radar image with metadata and percentile statistics](docs/images/nova-workspace.png)
