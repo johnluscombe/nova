@@ -20,6 +20,9 @@ test.use({
                     previewDataUrl: 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'),
                     metadata: {Scaling: scaling}, statistics: {'50th percentile': scaling === 'real' ? -3 : 5}};
             },
+            readPixel(file, row, column, parameters, scaling = 'amplitude') {
+                return {value: scaling === 'real' ? -3 : row * 40 + column, valueLabel: scaling === 'real' ? 'Real component' : 'Source amplitude'};
+            },
             readSlice(file, orientation, index, parameters, scaling = 'amplitude') {
                 return {points: [{position: 0, value: scaling === 'real' ? -3 : 25}, {position: 1, value: 4}], positionLabel: 'Column (pixel)', valueLabel: scaling};
             }
@@ -101,4 +104,86 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     await expect(
         page.getByRole("menuitemradio", { name: "Real", exact: true })
     ).toHaveAttribute("aria-checked", "true");
+});
+
+test("pixel inspection follows fitted coordinates, selected scaling and preview fallback", async ({
+    application,
+    profile
+}) => {
+    const page = await application.firstWindow();
+    const toggle = page.getByRole("button", {
+        name: "Pixel Values",
+        exact: true
+    });
+    await expect(toggle).toBeDisabled();
+    await createScenario(application, page, profile);
+    const file = path.join(profile, "hover.complex");
+    await writeFile(file, "complex fixture");
+    await chooseFile(application, file);
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    const source = page.getByRole("article", {
+        name: "hover.complex",
+        exact: true
+    });
+    await expect(
+        source.getByRole("img", { name: "hover.complex", exact: true })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const viewport = (await source.locator(".slice-viewport").boundingBox())!;
+    const scale = Math.min(viewport.width / 40, viewport.height / 20);
+    const top = (viewport.height - 20 * scale) / 2;
+    const left = (viewport.width - 40 * scale) / 2;
+    await page.mouse.move(
+        viewport.x + left + 5.5 * scale,
+        viewport.y + top + 3.5 * scale
+    );
+    await expect(source.getByRole("status")).toContainText("Row 3 · Column 5");
+    await expect(source.getByRole("status")).toContainText(
+        "Source amplitude: 125"
+    );
+    await page.mouse.move(viewport.x + 1, viewport.y + 1);
+    await expect(source.locator(".pixel-readout")).toHaveCount(0);
+    await page.getByRole("button", { name: "Scaling", exact: true }).click();
+    await page
+        .getByRole("menuitemradio", { name: "Real", exact: true })
+        .click();
+    await expect(
+        page.getByRole("menuitemradio", { name: "Real", exact: true })
+    ).toBeHidden();
+    await expect(
+        source.getByRole("img", { name: "hover.complex", exact: true })
+    ).toBeVisible();
+    await page.mouse.move(
+        viewport.x + left + 5.5 * scale,
+        viewport.y + top + 3.5 * scale
+    );
+    await expect(source.getByRole("status")).toContainText(
+        "Real component: -3"
+    );
+    await toggle.click();
+    await expect(source.locator(".pixel-readout")).toHaveCount(0);
+    const svg = path.join(profile, "red.svg");
+    await writeFile(
+        svg,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="red"/></svg>'
+    );
+    await chooseFile(application, svg);
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    const raster = page.getByRole("article", { name: "red.svg", exact: true });
+    await expect(
+        raster.getByRole("img", { name: "red.svg", exact: true })
+    ).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await toggle.click();
+    const bounds = (await raster.locator(".slice-viewport").boundingBox())!;
+    await page.mouse.move(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2
+    );
+    await expect(raster.getByRole("status")).toContainText("Row 4 · Column 8");
+    await expect(raster.getByRole("status")).toContainText(
+        "Preview luminance (0–255): 54.213"
+    );
 });

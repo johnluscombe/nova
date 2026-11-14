@@ -154,7 +154,10 @@ def render(file_path, scaling="amplitude"):
         info = image_metadata(metadata)
         info["Scaling"] = SCALING_LABELS[scaling]
         info["Preview"] = ("Log amplitude" if scaling == "amplitude" else SCALING_LABELS[scaling]) + ", 1st–99th percentile stretch"
-        return {"scalingOptions": scaling_options(metadata), "scaling": scaling,
+        power = np.abs(complex_samples.astype(np.complex128)) ** 2
+        finite_power = power[np.isfinite(power)]
+        return {"peakPower": float(finite_power.max()) if finite_power.size else 0,
+                "scalingOptions": scaling_options(metadata), "scaling": scaling,
                 "statistics": image_statistics(values), "metadata": info, "width": width, "height": height,
                 "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
 
@@ -190,11 +193,32 @@ def slice_image(file_path, orientation, index, scaling="amplitude"):
         reader.close()
 
 
+def pixel_image(file_path, row, column, scaling="amplitude", peak_power=None):
+    import numpy as np
+    from sarpy.io.complex.sicd import SICDReader
+    reader = SICDReader(file_path)
+    try:
+        metadata = reader.get_sicds_as_tuple()[0]
+        if not (0 <= row < metadata.ImageData.NumRows and 0 <= column < metadata.ImageData.NumCols):
+            raise ValueError("Pixel is outside the image")
+        samples = reader.read(slice(row, row + 1), slice(column, column + 1), index=0, squeeze=False)
+        if scaling == "relative-power":
+            power = float(np.abs(samples.astype(np.complex128)[0, 0]) ** 2)
+            value = 10 * math.log10(power / peak_power) if peak_power is not None and peak_power > 0 and power > 0 else float("nan")
+        else:
+            value = float(scale_samples(samples, metadata, [row], [column], scaling)[0, 0])
+        return {"value": value if math.isfinite(value) else None, "valueLabel": SCALING_LABELS[scaling]}
+    finally:
+        reader.close()
+
+
 def main():
     try:
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(sys.argv) in (5, 6) and sys.argv[2] == "--slice":
+            if len(sys.argv) == 7 and sys.argv[2] == "--pixel":
+                result = pixel_image(sys.argv[1], int(sys.argv[3]), int(sys.argv[4]), sys.argv[5], float(sys.argv[6]))
+            elif len(sys.argv) in (5, 6) and sys.argv[2] == "--slice":
                 result = slice_image(sys.argv[1], sys.argv[3], int(sys.argv[4]), sys.argv[5] if len(sys.argv) == 6 else "amplitude")
             elif len(sys.argv) == 4 and sys.argv[2] == "--scaling":
                 result = render(sys.argv[1], sys.argv[3])

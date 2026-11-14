@@ -83,3 +83,9 @@ viewer. Samples can alias during subsampling. The worker is terminated after two
 minutes and limits captured output to 16 MB. Original image bytes are never modified.
 
 See [SarPy's SICD reader documentation](https://sarpy.readthedocs.io/en/latest/io/complex/sicd.html).
+
+Enable **View → Pixel Values** to inspect exact source samples by hovering over
+the image. Values use the selected scaling mode and are accompanied by zero-based
+row/column coordinates. Relative power uses the sampled image preview's peak as
+its reference. Undefined phase, zero logarithmic power, and invalid samples are
+shown as unavailable.

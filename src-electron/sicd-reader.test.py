@@ -168,6 +168,28 @@ class SicdPreviewTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 reader.render(str(file), "rcs")
 
+    def test_exact_pixel_values_and_relative_reference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "pixels.nitf"
+            data = np.array([[0, 3 + 4j, -3 - 4j], [1j, 10j, 2j]], dtype="complex64")
+            self.fixture(file, data)
+            expected = {"amplitude": 5, "real": -3, "imaginary": -4, "power": 25,
+                        "log-power": 10 * np.log10(25), "phase": -126.86989764584402}
+            for mode, value in expected.items():
+                result = reader.pixel_image(str(file), 0, 2, mode)
+                self.assertAlmostEqual(result["value"], value)
+                self.assertEqual(result["valueLabel"], reader.SCALING_LABELS[mode])
+            peak = reader.render(str(file))["peakPower"]
+            self.assertEqual(peak, 100)
+            relative = reader.pixel_image(str(file), 0, 1, "relative-power", peak)
+            self.assertAlmostEqual(relative["value"], 10 * np.log10(0.25))
+            for mode in ["log-power", "phase", "relative-power"]:
+                self.assertIsNone(reader.pixel_image(str(file), 0, 0, mode, peak)["value"])
+            self.assertIsNone(reader.pixel_image(str(file), 0, 1, "relative-power", 0)["value"])
+            for row, column in [(-1, 0), (0, -1), (2, 0), (0, 3)]:
+                with self.assertRaises(ValueError):
+                    reader.pixel_image(str(file), row, column)
+
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "invalid.nitf"

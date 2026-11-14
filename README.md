@@ -60,3 +60,7 @@ Graphs open as independent temporary widgets and are not saved to scenarios.
 Use **View → Scaling** on SICD images or their slice graphs to select amplitude,
 complex components, phase, power, or calibrated radar quantities when available.
 Image scaling is saved with the scenario. See [SICD scaling](docs/sicd-plugin.md#scaling).
+
+Enable **View → Pixel Values** to see pixel coordinates and values while hovering
+over an image. SICD reads exact source values in the selected scaling mode;
+other formats report preview luminance.

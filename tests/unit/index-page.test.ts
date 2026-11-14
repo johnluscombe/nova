@@ -66,6 +66,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        pixel: vi.fn(),
         rescale: vi.fn(),
         pathForFile: vi.fn(file => file.name),
         slice: vi.fn(),

@@ -281,3 +281,29 @@ unless capabilities are advertised. The host accepts scaling requests only for
 previously opened images and their advertised modes.
 
 See [SICD scaling](sicd-plugin.md#scaling) for the built-in implementation.
+
+## Pixel inspection
+
+**View → Pixel Values** toggles hover inspection for the active image widget.
+The readout shows zero-based source row/column coordinates and the current
+scaling quantity. Letterboxed margins are excluded. Graph widgets do not support
+pixel inspection. The toggle is temporary and independent for each image window.
+
+Plugins may implement
+`readPixel(filePath, row, column, parameters, scaling?, peakPower?)`, returning
+`{ value: number | null, valueLabel: string }`. Provide source `width` and `height`
+from `open`; the host validates coordinates and restricts requests to previously
+opened images and supported scaling modes. `null` indicates an invalid or
+undefined value. Use `valueLabel` to name the quantity and its units.
+
+The SICD reader fetches one exact source sample, before preview stretching.
+Its `open` result includes `peakPower`, the finite maximum uncalibrated power of
+the sampled preview. The host retains this reference and passes it to pixel reads
+so relative power uses the same reference as the image, rather than normalizing
+each individual pixel to zero dB. Slices retain their own sampled peak reference.
+
+Without a `readPixel` handler, Nova samples the displayed preview and explicitly
+labels the value as preview luminance (Rec. 709 weights, 0–255). Fully transparent
+pixels have no value. Source coordinates may map to a reduced-resolution preview
+pixel. Requests are debounced and serialized per widget, and late results are
+ignored after the pointer moves, leaves, or the image changes.

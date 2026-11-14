@@ -1,3 +1,4 @@
+import type { PixelData } from "../src/types/pixel";
 import { isScaling, type Scaling } from "../src/types/scaling";
 import type { SliceData, SliceOrientation } from "../src/types/slice";
 import {
@@ -17,6 +18,14 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
+    readPixel?(
+        filePath: string,
+        row: number,
+        column: number,
+        parameters: PluginParameters,
+        scaling?: Scaling,
+        peakPower?: number
+    ): PixelData | Promise<PixelData>;
     readSlice?(
         filePath: string,
         orientation: SliceOrientation,
@@ -52,6 +61,7 @@ export class ImagePlugins {
             width: number | undefined;
             height: number | undefined;
             scalingOptions?: Scaling[];
+            peakPower?: number;
         }
     >();
     private plugins: LoadedPlugin[] = [];
@@ -199,6 +209,8 @@ export class ImagePlugins {
                     ) &&
                         typeof module.default.executeRibbonAction !==
                             "function") ||
+                    (module.default.readPixel !== undefined &&
+                        typeof module.default.readPixel !== "function") ||
                     (module.default.readSlice !== undefined &&
                         typeof module.default.readSlice !== "function") ||
                     (module.default.canOpen !== undefined &&
@@ -277,6 +289,60 @@ export class ImagePlugins {
             throw new Error("Invalid plugin action result.");
         }
         return result.message === undefined ? {} : { message: result.message };
+    }
+
+    async readPixel(
+        filePath: string,
+        pluginId: string,
+        row: number,
+        column: number,
+        scaling?: Scaling
+    ): Promise<PixelData> {
+        const image = this.openedImages.get(
+            JSON.stringify([filePath, pluginId])
+        );
+        const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+        if (!image || !plugin?.implementation.readPixel) {
+            throw new Error("Open an image with source pixel support first.");
+        }
+        if (
+            !Number.isSafeInteger(row) ||
+            !Number.isSafeInteger(column) ||
+            row < 0 ||
+            column < 0 ||
+            row >= (image.height ?? 0) ||
+            column >= (image.width ?? 0)
+        ) {
+            throw new Error("Pixel is outside the image.");
+        }
+        if (
+            scaling !== undefined &&
+            (!isScaling(scaling) || !image.scalingOptions?.includes(scaling))
+        ) {
+            throw new Error("Scaling is unavailable for this image.");
+        }
+        const result = await plugin.implementation.readPixel(
+            filePath,
+            row,
+            column,
+            plugin.manifest.parameters ?? {},
+            scaling,
+            image.peakPower
+        );
+        if (
+            !result ||
+            typeof result.valueLabel !== "string" ||
+            !result.valueLabel.length ||
+            result.valueLabel.length > 100 ||
+            !(
+                result.value === null ||
+                (typeof result.value === "number" &&
+                    Number.isFinite(result.value))
+            )
+        ) {
+            throw new Error("Plugin returned invalid pixel data.");
+        }
+        return { value: result.value, valueLabel: result.valueLabel };
     }
 
     async readSlice(
@@ -450,7 +516,18 @@ export class ImagePlugins {
                 ) {
                     throw new Error("Invalid image scaling options.");
                 }
+                if (
+                    result.peakPower !== undefined &&
+                    (typeof result.peakPower !== "number" ||
+                        !Number.isFinite(result.peakPower) ||
+                        result.peakPower < 0)
+                ) {
+                    throw new Error("Invalid image peak power.");
+                }
                 const info: ImageInfo = {
+                    ...(implementation.readPixel
+                        ? { supportsSourcePixels: true }
+                        : {}),
                     ...(result.scalingOptions
                         ? {
                               scalingOptions: result.scalingOptions,
@@ -481,6 +558,9 @@ export class ImagePlugins {
                         : {})
                 };
                 this.openedImages.set(JSON.stringify([filePath, manifest.id]), {
+                    ...(result.peakPower !== undefined
+                        ? { peakPower: result.peakPower }
+                        : {}),
                     width: info.width,
                     height: info.height,
                     ...(info.scalingOptions

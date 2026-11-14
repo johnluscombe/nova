@@ -251,6 +251,31 @@ async function createWindow() {
             })
     );
     mainWindow.webContents.ipc.handle(
+        "image:pixel",
+        (
+            _event,
+            filePath: string,
+            pluginId: string,
+            row: number,
+            column: number,
+            scaling?: Scaling
+        ) =>
+            documentAction(() => {
+                if (!scenario.current) {
+                    throw new Error(
+                        "Open a scenario before inspecting pixels."
+                    );
+                }
+                return imagePlugins.readPixel(
+                    filePath,
+                    pluginId,
+                    row,
+                    column,
+                    scaling
+                );
+            })
+    );
+    mainWindow.webContents.ipc.handle(
         "image:scaling",
         (_event, filePath: string, pluginId: string, scaling: Scaling) =>
             documentAction(() => {

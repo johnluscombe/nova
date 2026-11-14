@@ -1,3 +1,4 @@
+import type { PixelData } from "./pixel";
 import type { Scaling } from "./scaling";
 import type { SliceData, SliceOrientation } from "./slice";
 import type { PluginRibbon, RibbonActionResult } from "./ribbon";
@@ -16,6 +17,7 @@ export interface ImagePluginManifest {
 }
 
 export interface ImagePluginResult {
+    peakPower?: number;
     scalingOptions?: Scaling[];
     scaling?: Scaling;
     statistics?: Record<string, string | number | boolean | null>;
@@ -31,6 +33,7 @@ export interface ImageInfo extends ImagePluginResult {
     pluginId: string;
     pluginName: string;
     supportsSourceSlices?: boolean;
+    supportsSourcePixels?: boolean;
 }
 
 export interface ImagePluginStatus {
@@ -40,6 +43,13 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    pixel(
+        filePath: string,
+        pluginId: string,
+        row: number,
+        column: number,
+        scaling?: Scaling
+    ): Promise<PixelData>;
     rescale(
         filePath: string,
         pluginId: string,

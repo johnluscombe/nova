@@ -14,6 +14,15 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    pixel: (filePath, pluginId, row, column, scaling) =>
+        ipcRenderer.invoke(
+            "image:pixel",
+            filePath,
+            pluginId,
+            row,
+            column,
+            scaling
+        ),
     pathForFile: (file: File) => webUtils.getPathForFile(file),
     rescale: (filePath, pluginId, scaling) =>
         ipcRenderer.invoke("image:scaling", filePath, pluginId, scaling),

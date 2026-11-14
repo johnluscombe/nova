@@ -90,6 +90,7 @@
                                 v-else-if="widget.image.previewDataUrl"
                                 :image="widget.image"
                                 :enabled="!!widget.sliceEnabled"
+                                :inspect="!!widget.pixelValuesEnabled"
                                 @slice="
                                     createSliceGraph(widget.image, $event)
                                 " />
@@ -261,6 +262,7 @@ interface ImageWindow {
     metadataOpen?: boolean;
     statisticsOpen?: boolean;
     sliceEnabled?: boolean;
+    pixelValuesEnabled?: boolean;
     graph?: { data?: SliceData; source: ImageInfo; selection: SliceSelection };
 }
 const activeWidget = computed(() =>
@@ -288,6 +290,12 @@ const canSlice = computed(
 function toggleSlice() {
     if (canSlice.value && activeWidget.value) {
         activeWidget.value.sliceEnabled = !activeWidget.value.sliceEnabled;
+    }
+}
+function togglePixelValues() {
+    if (canSlice.value && activeWidget.value) {
+        activeWidget.value.pixelValuesEnabled =
+            !activeWidget.value.pixelValuesEnabled;
     }
 }
 async function createSliceGraph(
@@ -485,6 +493,7 @@ const emit = defineEmits<{
     statisticsChange: [available: boolean];
     sliceChange: [available: boolean];
     sliceModeChange: [enabled: boolean];
+    pixelValuesChange: [enabled: boolean];
     scalingChange: [state: ScalingState];
     scalingError: [message: string];
 }>();
@@ -497,6 +506,11 @@ watch(
         }) as ScalingState,
     state => emit("scalingChange", state),
     { immediate: true, deep: true }
+);
+watch(
+    () => !!activeWidget.value?.pixelValuesEnabled,
+    enabled => emit("pixelValuesChange", enabled),
+    { immediate: true }
 );
 watch(
     () => !!activeWidget.value?.sliceEnabled,
@@ -544,6 +558,7 @@ defineExpose({
     toggleMetadata,
     toggleStatistics,
     toggleSlice,
+    togglePixelValues,
     setScaling
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {

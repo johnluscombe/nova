@@ -1,3 +1,4 @@
+import type { PixelData } from "../../../../src/types/pixel.ts";
 import type { Scaling } from "../../../../src/types/scaling.ts";
 import type {
     SliceData,
@@ -132,7 +133,34 @@ export async function readSicdSlice(
         ...(scaling ? [scaling] : [])
     ])) as SliceData;
 }
+export async function readSicdPixel(
+    filePath: string,
+    row: number,
+    column: number,
+    parameters: PluginParameters = {},
+    run: Runner = execute,
+    scaling: Scaling = "amplitude",
+    peakPower = 0
+): Promise<PixelData> {
+    return (await executeReader(filePath, parameters, run, [
+        "--pixel",
+        String(row),
+        String(column),
+        scaling,
+        String(peakPower)
+    ])) as PixelData;
+}
 export default {
+    readPixel: (filePath, row, column, parameters, scaling, peakPower) =>
+        readSicdPixel(
+            filePath,
+            row,
+            column,
+            parameters,
+            execute,
+            scaling,
+            peakPower
+        ),
     readSlice: (filePath, orientation, index, parameters, scaling) =>
         readSicdSlice(
             filePath,

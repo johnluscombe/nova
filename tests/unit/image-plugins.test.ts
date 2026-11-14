@@ -623,3 +623,66 @@ test("invalid scaling capabilities are rejected", () =>
             /Invalid image scaling options/
         );
     }));
+
+test("source pixel reads validate coordinates, capabilities, scaling and numeric results", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "pixels",
+            `export default {
+            open() { return {width: 8, height: 4, scaling: 'amplitude', scalingOptions: ['amplitude', 'relative-power'], peakPower: 100}; },
+            readPixel(file, row, column, parameters, scaling, peakPower) {
+                if (column === 6) return {value: Infinity, valueLabel: 'bad'};
+                if (column === 7) return {value: null, valueLabel: 'Source amplitude'};
+                return {value: scaling === 'relative-power' ? peakPower : row * 8 + column, valueLabel: 'Source amplitude'};
+            }
+        };`
+        );
+        await host.reload();
+        await assert.rejects(
+            host.readPixel("file.test", "pixels", 0, 0),
+            /Open an image/
+        );
+        assert.equal((await host.open("file.test")).supportsSourcePixels, true);
+        assert.equal(
+            (await host.readPixel("file.test", "pixels", 2, 3)).value,
+            19
+        );
+        assert.equal(
+            (
+                await host.readPixel(
+                    "file.test",
+                    "pixels",
+                    0,
+                    0,
+                    "relative-power"
+                )
+            ).value,
+            100
+        );
+        assert.equal(
+            (await host.readPixel("file.test", "pixels", 0, 7)).value,
+            null
+        );
+        for (const [row, column] of [
+            [-1, 0],
+            [0, -1],
+            [4, 0],
+            [0, 8],
+            [0.5, 1],
+            [NaN, 0]
+        ]) {
+            await assert.rejects(
+                host.readPixel("file.test", "pixels", row!, column!),
+                /outside/
+            );
+        }
+        await assert.rejects(
+            host.readPixel("file.test", "pixels", 0, 0, "rcs"),
+            /unavailable/
+        );
+        await assert.rejects(
+            host.readPixel("file.test", "pixels", 0, 6),
+            /invalid pixel data/
+        );
+    }));

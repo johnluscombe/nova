@@ -20,7 +20,12 @@
                 }"></span>
             <span class="strip-label">Row</span>
         </button>
-        <div ref="viewport" class="slice-viewport">
+        <div
+            ref="viewport"
+            class="slice-viewport"
+            :class="{ inspecting: inspect }"
+            @pointermove="inspectPixel"
+            @pointerleave="leavePixel">
             <img
                 :src="image.previewDataUrl"
                 :alt="image.name"
@@ -37,6 +42,26 @@
                 {{ selection.orientation === "horizontal" ? "Row" : "Column" }}
                 {{ selection.index }}
             </span>
+            <div
+                v-if="inspect && pixelPosition"
+                class="pixel-readout"
+                role="status"
+                aria-live="polite">
+                <div>
+                    Row {{ pixelPosition.row }} · Column
+                    {{ pixelPosition.column }} (zero-based)
+                </div>
+                <div v-if="pixelError">{{ pixelError }}</div>
+                <div v-else-if="pixelData">
+                    {{ pixelData.valueLabel }}:
+                    {{
+                        pixelData.value === null
+                            ? "Not available"
+                            : Number(pixelData.value.toPrecision(7))
+                    }}
+                </div>
+                <div v-else>Reading pixel…</div>
+            </div>
         </div>
         <button
             v-if="enabled"
@@ -66,7 +91,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { ImageInfo } from "@/types/image";
 import type { SliceOrientation, SliceSelection } from "@/types/slice";
 import { sliceAtOffset } from "@/utils/image-slice";
-const props = defineProps<{ image: ImageInfo; enabled: boolean }>();
+import { previewPixel } from "@/utils/image-pixel";
+import type { PixelData, PixelPosition } from "@/types/pixel";
+const props = defineProps<{
+    image: ImageInfo;
+    enabled: boolean;
+    inspect?: boolean;
+}>();
 const emit = defineEmits<{ slice: [selection: SliceSelection] }>();
 const viewport = ref<HTMLDivElement>();
 const width = ref(0);
@@ -74,6 +105,114 @@ const height = ref(0);
 const naturalWidth = ref(0);
 const naturalHeight = ref(0);
 const selection = ref<SliceSelection>();
+const pixelPosition = ref<PixelPosition>();
+const pixelData = ref<PixelData>();
+const pixelError = ref("");
+let pixelTimer: ReturnType<typeof setTimeout> | undefined;
+let pixelVersion = 0;
+let pixelRunning = false;
+let lastPointer: { clientX: number; clientY: number } | undefined;
+let pendingPixel:
+    | { image: ImageInfo; position: PixelPosition; version: number }
+    | undefined;
+function clearPixel() {
+    clearTimeout(pixelTimer);
+    pendingPixel = undefined;
+    pixelVersion++;
+    pixelPosition.value = undefined;
+    pixelData.value = undefined;
+    pixelError.value = "";
+}
+function leavePixel() {
+    lastPointer = undefined;
+    clearPixel();
+}
+function inspectPixel(event: PointerEvent) {
+    lastPointer = { clientX: event.clientX, clientY: event.clientY };
+    refreshPixel();
+}
+function refreshPixel() {
+    if (!props.inspect || !viewport.value || !lastPointer) {
+        return;
+    }
+    const event = lastPointer;
+    const bounds = viewport.value.getBoundingClientRect();
+    // Pointer events can arrive before ResizeObserver delivers the new size.
+    if (bounds.width > 0 && bounds.height > 0) {
+        width.value = bounds.width;
+        height.value = bounds.height;
+    }
+    const column = sliceAtOffset(
+        event.clientX - bounds.left,
+        rect.value.left,
+        rect.value.width,
+        sourceWidth.value
+    );
+    const row = sliceAtOffset(
+        event.clientY - bounds.top,
+        rect.value.top,
+        rect.value.height,
+        sourceHeight.value
+    );
+    if (row === null || column === null) {
+        clearPixel();
+        return;
+    }
+    if (
+        pixelPosition.value?.row === row &&
+        pixelPosition.value?.column === column
+    ) {
+        return;
+    }
+    clearPixel();
+    pixelPosition.value = { row, column };
+    const request = {
+        image: props.image,
+        position: { row, column },
+        version: pixelVersion
+    };
+    // Coalesce pointer movement and allow only one source read at a time.
+    pixelTimer = setTimeout(() => {
+        pendingPixel = request;
+        void readPixel();
+    }, 150);
+}
+async function readPixel() {
+    if (pixelRunning || !pendingPixel) {
+        return;
+    }
+    const request = pendingPixel;
+    pendingPixel = undefined;
+    pixelRunning = true;
+    try {
+        const { image, position } = request;
+        const data = image.supportsSourcePixels
+            ? await window.images!.pixel(
+                  image.path,
+                  image.pluginId,
+                  position.row,
+                  position.column,
+                  image.scaling
+              )
+            : await previewPixel(image, position.row, position.column);
+        if (request.version === pixelVersion) {
+            pixelData.value = data;
+        }
+    } catch (cause) {
+        if (request.version === pixelVersion) {
+            pixelError.value =
+                cause instanceof Error
+                    ? cause.message
+                    : "Unable to read pixel.";
+        }
+    } finally {
+        pixelRunning = false;
+        if (pendingPixel) {
+            void readPixel();
+        }
+    }
+}
+watch(() => [props.inspect, props.image], leavePixel);
 let observer: ResizeObserver | undefined;
 const sourceWidth = computed(() => props.image.width ?? naturalWidth.value);
 const sourceHeight = computed(() => props.image.height ?? naturalHeight.value);
@@ -114,6 +253,7 @@ function loaded(event: Event) {
     const image = event.target as HTMLImageElement;
     naturalWidth.value = image.naturalWidth;
     naturalHeight.value = image.naturalHeight;
+    refreshPixel();
 }
 function preview(event: MouseEvent, orientation: SliceOrientation) {
     const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -178,16 +318,25 @@ watch(
 onMounted(() => {
     observer = new ResizeObserver(entries => {
         const size = entries[0]?.contentRect;
-        if (size) {
+        if (
+            size &&
+            (size.width !== width.value || size.height !== height.value)
+        ) {
             width.value = size.width;
             height.value = size.height;
+            if (lastPointer) {
+                refreshPixel();
+            }
         }
     });
     if (viewport.value) {
         observer.observe(viewport.value);
     }
 });
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+    leavePixel();
+    observer?.disconnect();
+});
 </script>
 
 <style scoped>
@@ -270,5 +419,22 @@ onBeforeUnmount(() => observer?.disconnect());
     padding: 3px 6px;
     font-size: 11px;
     pointer-events: none;
+}
+
+.slice-viewport.inspecting {
+    cursor: crosshair;
+}
+.pixel-readout {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    max-width: calc(100% - 16px);
+    padding: 5px 8px;
+    border-radius: 3px;
+    background: #162330ed;
+    color: white;
+    font-size: 11px;
+    pointer-events: none;
+    overflow-wrap: anywhere;
 }
 </style>

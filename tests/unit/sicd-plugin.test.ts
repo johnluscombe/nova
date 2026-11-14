@@ -185,3 +185,34 @@ test("SICD forwards scaling for previews and source slices", async () => {
         expected
     );
 });
+
+test("SICD pixel requests forward exact coordinates, scaling and the preview power reference", async () => {
+    const { readSicdPixel } =
+        await import("../../src-electron/electron-assets/plugins/sicd/index.ts");
+    const expected = {
+        value: -6.0206,
+        valueLabel: "Relative power (dB, sampled peak = 0)"
+    };
+    assert.deepEqual(
+        await readSicdPixel(
+            "image.nitf",
+            2,
+            7,
+            {},
+            async (_python, args) => {
+                assert.deepEqual(args.slice(1), [
+                    "image.nitf",
+                    "--pixel",
+                    "2",
+                    "7",
+                    "relative-power",
+                    "100"
+                ]);
+                return { stdout: JSON.stringify(expected) };
+            },
+            "relative-power",
+            100
+        ),
+        expected
+    );
+});
