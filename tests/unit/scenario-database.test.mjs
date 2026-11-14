@@ -1,14 +1,14 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sqliteTable, blob, text } from "drizzle-orm/sqlite-core";
-import { schema } from "./scenario-schema.ts";
-import { ScenarioDatabase } from "./scenario-database.ts";
+import { schema } from "../../src-electron/scenario-schema.ts";
+import { ScenarioDatabase } from "../../src-electron/scenario-database.ts";
 
-void test("opens scenarios, pages records, preserves large integers, and rejects invalid files", async () => {
+test("opens scenarios, pages records, preserves large integers, and rejects invalid files", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-scenario-"));
     const file = path.join(directory, "test.scenario");
     const scenario = new ScenarioDatabase();
@@ -64,7 +64,7 @@ void test("opens scenarios, pages records, preserves large integers, and rejects
     }
 });
 
-void test("opens an empty scenario with an empty predefined schema", async () => {
+test("opens an empty scenario with an empty predefined schema", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-empty-scenario-"));
     const file = path.join(directory, "empty.scenario");
     const scenario = new ScenarioDatabase();
@@ -82,7 +82,7 @@ void test("opens an empty scenario with an empty predefined schema", async () =>
     }
 });
 
-void test("creates, saves, overwrites, and reopens an empty scenario", async () => {
+test("creates, saves, overwrites, and reopens an empty scenario", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-save-"));
     const file = path.join(directory, "new.scenario");
     const scenario = new ScenarioDatabase();
@@ -111,7 +111,7 @@ void test("creates, saves, overwrites, and reopens an empty scenario", async () 
     }
 });
 
-void test("saving an opened scenario preserves undeclared tables", async () => {
+test("saving an opened scenario preserves undeclared tables", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-copy-"));
     const source = path.join(directory, "source.scenario");
     const destination = path.join(directory, "copy.scenario");
@@ -140,7 +140,7 @@ void test("saving an opened scenario preserves undeclared tables", async () => {
     }
 });
 
-void test("file-backed creation opens only after persistence and preserves the current scenario on failure", async () => {
+test("file-backed creation opens only after persistence and preserves the current scenario on failure", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-create-"));
     const scenario = new ScenarioDatabase();
     try {
@@ -169,7 +169,7 @@ void test("file-backed creation opens only after persistence and preserves the c
     }
 });
 
-void test("autosaved workspace round-trips all window states and removes closed windows", async () => {
+test("autosaved workspace round-trips all window states and removes closed windows", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-workspace-"));
     const scenario = new ScenarioDatabase();
     const file = path.join(directory, "layout.scenario");
@@ -219,7 +219,7 @@ void test("autosaved workspace round-trips all window states and removes closed 
     }
 });
 
-void test("corrupt saved layout does not replace an already open scenario", async () => {
+test("corrupt saved layout does not replace an already open scenario", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-corrupt-layout-"));
     const scenario = new ScenarioDatabase();
     try {
@@ -238,4 +238,11 @@ void test("corrupt saved layout does not replace an already open scenario", asyn
         scenario.close();
         rmSync(directory, { recursive: true, force: true });
     }
+});
+
+test("workspace operations require an open persisted scenario", async () => {
+    const scenario = new ScenarioDatabase();
+    assert.throws(() => scenario.readWorkspace(), /Open a scenario first/);
+    await assert.rejects(scenario.saveWorkspace([]), /Open a scenario first/);
+    scenario.close();
 });

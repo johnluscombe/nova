@@ -2,6 +2,7 @@
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
 import { defineConfig } from "#q-app";
+import { coverageInstrumentation } from "./tests/coverage/instrumentation";
 
 export default defineConfig((/* ctx */) => {
     return {
@@ -31,6 +32,14 @@ export default defineConfig((/* ctx */) => {
 
         // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
         build: {
+            extendViteConf(config) {
+                if (process.env.NOVA_COVERAGE === "1") {
+                    config.plugins ??= [];
+                    config.plugins.push(coverageInstrumentation());
+                    config.build ??= {};
+                    config.build.sourcemap = true;
+                }
+            },
             target: {
                 // browser: 'baseline-widely-available',
                 // node: 'node22'

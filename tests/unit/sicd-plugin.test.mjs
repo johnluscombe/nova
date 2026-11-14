@@ -1,10 +1,10 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { homedir } from "node:os";
 import path from "node:path";
-import { openSicd } from "./electron-assets/plugins/sicd/index.mjs";
+import { openSicd } from "../../src-electron/electron-assets/plugins/sicd/index.mjs";
 
-void test("SICD uses an argument array and returns the worker preview", async () => {
+test("SICD uses an argument array and returns the worker preview", async () => {
     const result = {
         width: 4096,
         height: 2048,
@@ -26,7 +26,7 @@ void test("SICD uses an argument array and returns the worker preview", async ()
     );
     assert.deepEqual(actual, result);
 });
-void test("SICD reports setup, timeout, decoding, and protocol failures", async () => {
+test("SICD reports setup, timeout, decoding, and protocol failures", async () => {
     await assert.rejects(
         openSicd("file.nitf", {}, async () => {
             throw Object.assign(new Error("not found"), { code: "ENOENT" });
@@ -57,7 +57,7 @@ void test("SICD reports setup, timeout, decoding, and protocol failures", async 
     );
 });
 
-void test("SICD expands a home-relative interpreter without a shell", async () => {
+test("SICD expands a home-relative interpreter without a shell", async () => {
     await openSicd(
         "file.nitf",
         { python: "~/.nova/bin/python3" },
@@ -87,7 +87,7 @@ void test("SICD expands a home-relative interpreter without a shell", async () =
     );
 });
 
-void test("SICD rejects invalid interpreter parameters", async () => {
+test("SICD rejects invalid interpreter parameters", async () => {
     for (const python of ["", "   ", 42, false]) {
         await assert.rejects(
             openSicd("file.nitf", { python }, async () => {
@@ -96,4 +96,14 @@ void test("SICD rejects invalid interpreter parameters", async () => {
             /python parameter/
         );
     }
+});
+
+test("default SICD export forwards configured interpreter parameters", async () => {
+    const plugin = (
+        await import("../../src-electron/electron-assets/plugins/sicd/index.mjs")
+    ).default;
+    await assert.rejects(
+        plugin.open("missing.nitf", { python: "" }),
+        /python parameter/
+    );
 });

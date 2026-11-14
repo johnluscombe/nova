@@ -1,9 +1,9 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ImagePlugins } from "./image-plugins.ts";
+import { ImagePlugins } from "../../src-electron/image-plugins.ts";
 
 async function fixture(run) {
     const directory = await mkdtemp(path.join(tmpdir(), "nova-plugin-test-"));
@@ -31,7 +31,7 @@ async function plugin(directory, name, code, overrides = {}) {
     await writeFile(path.join(folder, "index.mjs"), code);
 }
 
-void test("no plugins means no supported filters or image opening", () =>
+test("no plugins means no supported filters or image opening", () =>
     fixture(async (directory, host) => {
         const state = await host.reload();
         assert.equal(state.directory, directory);
@@ -43,7 +43,7 @@ void test("no plugins means no supported filters or image opening", () =>
         );
     }));
 
-void test("discovers plugins, isolates failures, invokes plugin-owned file I/O, and reloads additions", () =>
+test("discovers plugins, isolates failures, invokes plugin-owned file I/O, and reloads additions", () =>
     fixture(async (directory, host) => {
         await host.reload();
         await plugin(directory, "a-broken", "export default {};");
@@ -80,7 +80,7 @@ void test("discovers plugins, isolates failures, invokes plugin-owned file I/O, 
         assert.equal((await host.reload()).plugins.length, 0);
     }));
 
-void test("tries subsequent matching decoders after decline, failure, or invalid output", () =>
+test("tries subsequent matching decoders after decline, failure, or invalid output", () =>
     fixture(async (directory, host) => {
         await plugin(
             directory,
@@ -109,7 +109,7 @@ void test("tries subsequent matching decoders after decline, failure, or invalid
         await assert.rejects(host.open("file.test"), /bad decode/);
     }));
 
-void test("rejects escaping entry paths and duplicate IDs", () =>
+test("rejects escaping entry paths and duplicate IDs", () =>
     fixture(async (directory, host) => {
         await writeFile(
             path.join(directory, "outside.mjs"),
@@ -133,7 +133,7 @@ void test("rejects escaping entry paths and duplicate IDs", () =>
         assert.equal(state.errors.length, 2);
     }));
 
-void test("bundled plugins load without user installation and user overrides take priority", () =>
+test("bundled plugins load without user installation and user overrides take priority", () =>
     fixture(async directory => {
         const bundled = path.join(directory, "bundled");
         const user = path.join(directory, "user");
@@ -164,10 +164,10 @@ void test("bundled plugins load without user installation and user overrides tak
         assert.equal((await host.open("file.test")).width, 10);
     }));
 
-void test("vector plugin reads SVG and host accepts a vector preview", () =>
+test("vector plugin reads SVG and host accepts a vector preview", () =>
     fixture(async directory => {
         const { default: vector } =
-            await import("./electron-assets/plugins/vector/index.mjs");
+            await import("../../src-electron/electron-assets/plugins/vector/index.mjs");
         const file = path.join(directory, "sample.svg");
         const svg =
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/></svg>';
@@ -196,7 +196,7 @@ void test("vector plugin reads SVG and host accepts a vector preview", () =>
         await assert.rejects(vector.open(file), /does not contain an SVG/);
     }));
 
-void test("ribbon-only plugins contribute controls and dispatch only declared actions", () =>
+test("ribbon-only plugins contribute controls and dispatch only declared actions", () =>
     fixture(async (directory, host) => {
         const ribbon = {
             tabs: [
@@ -252,7 +252,7 @@ void test("ribbon-only plugins contribute controls and dispatch only declared ac
         );
     }));
 
-void test("invalid ribbon declarations and missing action handlers are isolated", () =>
+test("invalid ribbon declarations and missing action handlers are isolated", () =>
     fixture(async (directory, host) => {
         const button = { id: "run", label: "Run" };
         const ribbon = {
@@ -320,7 +320,7 @@ void test("invalid ribbon declarations and missing action handlers are isolated"
         assert.equal(state.errors.length, 3);
     }));
 
-void test("plugin action exceptions and invalid results are reported", () =>
+test("plugin action exceptions and invalid results are reported", () =>
     fixture(async (directory, host) => {
         const ribbon = {
             tabs: [
@@ -359,7 +359,7 @@ void test("plugin action exceptions and invalid results are reported", () =>
         );
     }));
 
-void test("passes plugin parameters to image handlers and rejects malformed parameters", () =>
+test("passes plugin parameters to image handlers and rejects malformed parameters", () =>
     fixture(async directory => {
         await plugin(
             directory,
@@ -401,7 +401,7 @@ void test("passes plugin parameters to image handlers and rejects malformed para
         }
     }));
 
-void test("preserves scalar metadata and rejects invalid plugin metadata", () =>
+test("preserves scalar metadata and rejects invalid plugin metadata", () =>
     fixture(async (directory, host) => {
         await plugin(
             directory,
@@ -427,7 +427,7 @@ void test("preserves scalar metadata and rejects invalid plugin metadata", () =>
         );
     }));
 
-void test("preserves statistics and rejects nested statistics", () =>
+test("preserves statistics and rejects nested statistics", () =>
     fixture(async (directory, host) => {
         await plugin(
             directory,
@@ -448,5 +448,71 @@ void test("preserves statistics and rejects nested statistics", () =>
         await assert.rejects(
             host.open("file.test", "bad-stats"),
             /Invalid image statistics/
+        );
+    }));
+
+test("rejects malformed dimensions and previews rather than passing them to the renderer", () =>
+    fixture(async (directory, host) => {
+        const results = [
+            "null",
+            "{ width: 0 }",
+            "{ height: 1.5 }",
+            "{ previewDataUrl: 'javascript:alert(1)' }",
+            "{ metadata: { bad: Infinity } }",
+            "{ statistics: { bad: [] } }"
+        ];
+        for (const [index, result] of results.entries()) {
+            await plugin(
+                directory,
+                `bad-${index}`,
+                `export default { open() { return ${result}; } };`
+            );
+        }
+        await host.reload();
+        for (let index = 0; index < 6; index++) {
+            await assert.rejects(
+                host.open("file.test", `bad-${index}`),
+                /Invalid|Preview must/
+            );
+        }
+    }));
+
+test("ignores loose files, rejects plugins with no contribution, and permits silent actions", () =>
+    fixture(async (directory, host) => {
+        await writeFile(path.join(directory, "README.txt"), "not a plugin");
+        await plugin(directory, "empty", "export default {};", {
+            extensions: []
+        });
+        const ribbon = {
+            tabs: [
+                {
+                    id: "home",
+                    label: "Home",
+                    groups: [
+                        {
+                            id: "tools",
+                            label: "Tools",
+                            buttons: [{ id: "run", label: "Run" }]
+                        }
+                    ]
+                }
+            ]
+        };
+        await plugin(
+            directory,
+            "silent",
+            "export default { executeRibbonAction() {} };",
+            { extensions: [], ribbon }
+        );
+        const status = await host.reload();
+        assert.match(
+            status.errors.join(),
+            /must provide image types or ribbon tabs/
+        );
+        assert.deepEqual(
+            await host.executeRibbonAction("silent", "run", {
+                scenarioPath: null
+            }),
+            {}
         );
     }));
