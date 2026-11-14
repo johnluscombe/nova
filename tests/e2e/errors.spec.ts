@@ -21,7 +21,7 @@ test("startup reports plugin discovery and session restoration errors", async ({
     await page.reload();
     await expect(page.getByRole("alert")).toContainText("Session unavailable");
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeDisabled();
 });
 

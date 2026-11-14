@@ -89,7 +89,7 @@ test("widget loading, statistics, keyboard movement, dragging, resizing and wind
     const file = path.join(profile, "slow.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const widget = page.getByRole("article", {
         name: "slow.test",
         exact: true
@@ -162,7 +162,7 @@ test("reopens saved widgets, preserves geometry and reports missing image refere
     const file = path.join(profile, "saved.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const widget = page.getByRole("article", {
         name: "saved.test",
         exact: true
@@ -232,7 +232,7 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     });
     await page.getByRole("button", { name: "New", exact: true }).click();
     await page.getByRole("button", { name: "Open", exact: true }).click();
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     await expect(page.getByRole("article")).toHaveCount(0);
     const invalid = path.join(profile, "invalid.scenario");
     await writeFile(invalid, "not sqlite");
@@ -240,12 +240,12 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     await page.getByRole("button", { name: "Open", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
     const broken = path.join(profile, "slow-broken.test");
     await writeFile(broken, "bad");
     await chooseFile(application, broken);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     await expect(
         page.getByText("Loading image…", { exact: true })
     ).toBeVisible();
@@ -264,7 +264,7 @@ test("closing a loading widget does not recreate it when decoding completes", as
     const file = path.join(profile, "slow-close.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const widget = page.getByRole("article", {
         name: "slow-close.test",
         exact: true
@@ -275,7 +275,7 @@ test("closing a loading widget does not recreate it when decoding completes", as
     await widget.getByRole("button", { name: "Close slow-close.test" }).click();
     await writeFile(file + ".ready", "ready");
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
     await expect(widget).toHaveCount(0);
 });
@@ -289,7 +289,7 @@ test("restores the last session on renderer startup", async ({
     const file = path.join(profile, "startup.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     await expect(
         page
             .getByRole("article", { name: "startup.test", exact: true })
@@ -324,7 +324,7 @@ test("reports scenario creation and close failures without discarding the docume
     await page.getByRole("button", { name: "New", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
     await application.evaluate(({ BrowserWindow }) => {
         const ipc = BrowserWindow.getAllWindows()[0]!.webContents.ipc;
@@ -336,7 +336,7 @@ test("reports scenario creation and close failures without discarding the docume
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Close failed");
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
 });
 
@@ -356,7 +356,7 @@ test("surfaces autosave errors and prevents switching away from unsaved work", a
     const file = path.join(profile, "unsaved.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Disk full");
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(
@@ -399,7 +399,7 @@ test("percentile settings validate, update open images, and persist after reload
     const file = path.join(profile, "percentiles.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const widget = page.getByRole("article", {
         name: "percentiles.test",
         exact: true
@@ -465,7 +465,7 @@ test("visual slice strips preview the selected source line and open independent 
     const file = path.join(profile, "slice.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const source = page.getByRole("article", {
         name: "slice.test",
         exact: true
@@ -557,7 +557,7 @@ test("SVG preview slices support keyboard selection and clearly label luminance"
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="white"/></svg>'
     );
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const source = page.getByRole("article", {
         name: "preview.svg",
         exact: true
@@ -620,7 +620,7 @@ test("dropping native files opens a scenario and images without an open dialog",
         input.remove();
     });
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
     await expect(
         page.getByRole("img", { name: "dropped.test", exact: true })

@@ -38,7 +38,7 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     const file = path.join(profile, "radar.complex");
     await writeFile(file, "complex fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
     const source = page.getByRole("article", {
         name: "radar.complex",
         exact: true

@@ -1,7 +1,7 @@
 # Image plugins
 
 Nova ships with raster (JPG/PNG), vector (SVG), and SICD plugins, enabled by default.
-Open Image is disabled if no valid plugins load. The main process also rejects image opening without plugins.
+Add Image is disabled if no valid plugins load. The main process also rejects image opening without plugins.
 No built-in fallback reads or decodes image files.
 
 Additional user plugins live in their own folders under `<userData>/plugins/`:
@@ -143,7 +143,7 @@ labels, not plugin HTML or renderer scripts.
 - `requiresScenario` defaults to false. When true, the button is disabled without
   a scenario and Electron also rejects the action without one.
 - Empty `extensions` enables ribbon-only plugins, which need no `open` handler
-  and do not enable Open Image. Existing image plugins need no ribbon changes.
+  and do not enable Add Image. Existing image plugins need no ribbon changes.
 
 The module's default export handles declared button IDs:
 

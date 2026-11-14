@@ -13,7 +13,7 @@ test("creates a scenario, opens a raster widget, and shows metadata", async ({
         ribbon.getByRole("button", { name: "Statistics", exact: true })
     ).toBeDisabled();
     await expect(
-        ribbon.getByRole("button", { name: "Open image", exact: true })
+        ribbon.getByRole("button", { name: "Add Image", exact: true })
     ).toBeDisabled();
     const scenarioPath = path.join(profile, "test.scenario");
     await application.evaluate(({ dialog }, filePath) => {
@@ -21,7 +21,7 @@ test("creates a scenario, opens a raster widget, and shows metadata", async ({
     }, scenarioPath);
     await ribbon.getByRole("button", { name: "New", exact: true }).click();
     await expect(
-        ribbon.getByRole("button", { name: "Open image", exact: true })
+        ribbon.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
     const imagePath = path.join(profile, "sample.png");
     const png = await application.evaluate(({ nativeImage }) =>
@@ -38,7 +38,7 @@ test("creates a scenario, opens a raster widget, and shows metadata", async ({
         });
     }, imagePath);
     await ribbon
-        .getByRole("button", { name: "Open image", exact: true })
+        .getByRole("button", { name: "Add Image", exact: true })
         .click();
     const widget = page.getByRole("article", {
         name: "sample.png",

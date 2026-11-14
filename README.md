@@ -35,7 +35,7 @@ See [testing and coverage](docs/testing.md) for setup and reporting details.
 
 ## Scenarios and images
 
-Create or open a `.scenario` SQLite file from the File ribbon group. Image widgets
+Create or open a `.scenario` SQLite file from the Scenario ribbon group. Image widgets
 autosave their file references, positions, sizes, and window states. Nova restores
 the last scenario on startup; explicitly closing it clears that preference.
 Source images remain separate from the scenario file.

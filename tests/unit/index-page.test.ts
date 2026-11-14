@@ -161,22 +161,21 @@ test("image opening handles plugins that return directly or announce loading fir
     await click("New");
     await click("Open");
     expect(scenarioMock.open).toHaveBeenCalledOnce();
-    // Image Open has the same label as scenario Open; select it by aria-label.
-    await wrapper!.get('[aria-label="Open image"]').trigger("click");
+    await wrapper!.get('[aria-label="Add Image"]').trigger("click");
     await flushPromises();
     expect(workspace.add).toHaveBeenCalledWith(image);
     imagesMock.open.mockImplementation(async callback => {
         callback?.(image);
         return image;
     });
-    await wrapper!.get('[aria-label="Open image"]').trigger("click");
+    await wrapper!.get('[aria-label="Add Image"]').trigger("click");
     await flushPromises();
     expect(workspace.complete).toHaveBeenCalledWith(1, image);
     imagesMock.open.mockImplementation(async callback => {
         callback?.(image);
         throw "decode failed";
     });
-    await wrapper!.get('[aria-label="Open image"]').trigger("click");
+    await wrapper!.get('[aria-label="Add Image"]').trigger("click");
     await flushPromises();
     expect(workspace.fail).toHaveBeenCalledWith(1, "Unable to open image.");
     await click("Close");

@@ -21,7 +21,7 @@
                     <div
                         class="ribbon-group"
                         role="group"
-                        aria-labelledby="file-group-label">
+                        aria-labelledby="scenario-group-label">
                         <div class="ribbon-actions">
                             <q-btn
                                 flat
@@ -64,26 +64,36 @@
                                     runPluginAction(button.pluginId, button.id)
                                 " />
                         </div>
-                        <div id="file-group-label" class="ribbon-group-label">
-                            File
+                        <div
+                            id="scenario-group-label"
+                            class="ribbon-group-label">
+                            Scenario
                         </div>
                     </div>
                     <div
                         class="ribbon-group"
                         role="group"
-                        aria-labelledby="image-group-label">
-                        <div class="ribbon-actions">
+                        aria-label="Add image">
+                        <div class="ribbon-actions add-image-action">
                             <q-btn
                                 flat
                                 stack
                                 no-caps
                                 icon="add_photo_alternate"
-                                label="Open"
-                                aria-label="Open image"
+                                label="Add Image"
+                                aria-label="Add Image"
                                 :disable="
                                     busy || !scenario || !hasImageDecoders
                                 "
                                 @click="openImage()" />
+                        </div>
+                    </div>
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="image-group-label"
+                        v-if="homeButtons('image').length">
+                        <div class="ribbon-actions">
                             <q-btn
                                 v-for="button in homeButtons('image')"
                                 :key="button.key"
@@ -269,7 +279,7 @@
                     "
                     class="bg-blue-1 q-mb-md">
                     <div v-if="!hasImageDecoders">
-                        Install an image plugin to enable Open Image.
+                        Install an image plugin to enable Add Image.
                     </div>
                     <div class="text-caption image-path">
                         Plugin folder: {{ pluginStatus.directory }}
@@ -693,6 +703,10 @@ async function closeScenario() {
 }
 .ribbon-actions :deep(.q-btn .q-icon) {
     font-size: 22px;
+}
+.add-image-action {
+    flex-shrink: 0;
+    align-self: flex-start;
 }
 .ribbon-group-label {
     text-align: center;

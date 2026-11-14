@@ -13,7 +13,7 @@ export async function createScenario(
     }, file);
     await page.getByRole("button", { name: "New", exact: true }).click();
     await expect(
-        page.getByRole("button", { name: "Open image", exact: true })
+        page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
     return file;
 }
