@@ -9,6 +9,8 @@ import tempfile
 import unittest
 import warnings
 import zlib
+from types import SimpleNamespace
+from sarpy.io.complex.sicd_elements.blocks import Poly2DType
 import numpy as np
 from sarpy.io.complex.sicd import SICDWriter
 from sarpy.io.complex.sicd_elements.SICD import SICDType
@@ -106,6 +108,65 @@ class SicdPreviewTests(unittest.TestCase):
             result = reader.slice_image(str(file), "horizontal", 0)
             self.assertLessEqual(len(result["points"]), 4096)
             self.assertEqual(result["points"][1]["position"], 3)
+
+    def test_scaling_quantities(self):
+        metadata = SimpleNamespace()
+        samples = np.array([[3 + 4j, -3 - 4j, 0j]])
+        def scale(mode):
+            return reader.scale_samples(samples, metadata, [0], [0, 1, 2], mode)
+        np.testing.assert_allclose(scale("amplitude"), [[5, 5, 0]])
+        np.testing.assert_allclose(scale("real"), [[3, -3, 0]])
+        np.testing.assert_allclose(scale("imaginary"), [[4, -4, 0]])
+        np.testing.assert_allclose(scale("power"), [[25, 25, 0]])
+        np.testing.assert_allclose(scale("log-power")[0, :2], [10 * np.log10(25)] * 2)
+        np.testing.assert_allclose(scale("relative-power")[0, :2], [0, 0])
+        np.testing.assert_allclose(scale("phase")[0, :2], [53.130102354, -126.869897646])
+        for mode in ["log-power", "relative-power", "phase"]:
+            self.assertTrue(np.isnan(scale(mode)[0, 2]))
+        self.assertTrue(np.isnan(reader.scale_samples(np.zeros((1, 1)), metadata, [0], [0], "relative-power")).all())
+        for mode in ["rcs", "sigma-zero", "unknown"]:
+            with self.assertRaises(ValueError):
+                scale(mode)
+
+    def test_radiometric_scaling_uses_scp_coordinates_and_chip_offsets(self):
+        # Coordinates are row=(10 + [0,2] - 9)*2 and col=(20 + [0,3,6] - 18)*0.5.
+        # A nonconstant polynomial catches swapped axes and omitted chip offsets.
+        polynomial = Poly2DType(Coefs=[[1, 3], [2, 0]])
+        metadata = SimpleNamespace(
+            ImageData=SimpleNamespace(FirstRow=10, FirstCol=20, SCPPixel=SimpleNamespace(Row=9, Col=18)),
+            Grid=SimpleNamespace(Row=SimpleNamespace(SS=2), Col=SimpleNamespace(SS=0.5)),
+            Radiometric=SimpleNamespace(**{field: polynomial for field in reader.CALIBRATION_FIELDS.values()}))
+        samples = np.full((2, 3), 3 + 4j)
+        expected = 25 * (1 + 2 * np.array([2, 6])[:, None] + 3 * np.array([1, 2.5, 4])[None, :])
+        self.assertEqual(len(reader.scaling_options(metadata)), 15)
+        for mode in reader.CALIBRATION_FIELDS:
+            np.testing.assert_allclose(reader.scale_samples(samples, metadata, [0, 2], [0, 3, 6], mode), expected)
+            np.testing.assert_allclose(reader.scale_samples(samples, metadata, [0, 2], [0, 3, 6], mode + "-db"), 10 * np.log10(expected))
+        metadata.Radiometric.RCSSFPoly = Poly2DType(Coefs=[[-1]])
+        self.assertTrue(np.isnan(reader.scale_samples(samples, metadata, [0, 2], [0, 3, 6], "rcs")).all())
+        metadata.Grid.Row.SS = float("nan")
+        self.assertNotIn("rcs", reader.scaling_options(metadata))
+
+    def test_scaled_preview_statistics_and_slices(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "scaled.nitf"
+            data = np.array([[3 + 4j, -3 - 4j, 0j], [1j, -1j, 2j]])
+            self.fixture(file, data)
+            for scaling in list(reader.SCALING_LABELS)[:7]:
+                result = reader.render(str(file), scaling)
+                self.assertEqual(result["scaling"], scaling)
+                self.assertEqual(len(result["scalingOptions"]), 7)
+                self.assertEqual(result["metadata"]["Scaling"], reader.SCALING_LABELS[scaling])
+                self.assertTrue(result["previewDataUrl"].startswith("data:image/png;base64,"))
+            real = reader.render(str(file), "real")
+            self.assertEqual(real["statistics"]["0th percentile"], -3)
+            self.assertEqual(real["statistics"]["100th percentile"], 3)
+            power = reader.slice_image(str(file), "horizontal", 0, "power")
+            self.assertEqual([p["value"] for p in power["points"]], [25, 25, 0])
+            log_power = reader.slice_image(str(file), "horizontal", 0, "log-power")
+            self.assertIsNone(log_power["points"][-1]["value"])
+            with self.assertRaises(ValueError):
+                reader.render(str(file), "rcs")
 
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:

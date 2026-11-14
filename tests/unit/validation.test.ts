@@ -57,6 +57,9 @@ const window = {
 };
 test("workspace validation rejects oversized layouts, duplicate IDs and invalid geometry", () => {
     expect(validateWorkspace([window])).toEqual([window]);
+    expect(
+        validateWorkspace([{ ...window, scaling: "real" }])[0]?.scaling
+    ).toBe("real");
     for (const value of [
         null,
         {},
@@ -64,6 +67,7 @@ test("workspace validation rejects oversized layouts, duplicate IDs and invalid 
         [window, window],
         [null],
         [{ ...window, id: 0 }],
+        [{ ...window, scaling: "invalid" }],
         [{ ...window, path: "" }],
         [{ ...window, pluginId: "" }],
         [{ ...window, minimized: 1 }],

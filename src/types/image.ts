@@ -1,3 +1,4 @@
+import type { Scaling } from "./scaling";
 import type { SliceData, SliceOrientation } from "./slice";
 import type { PluginRibbon, RibbonActionResult } from "./ribbon";
 export type PluginParameters = Readonly<
@@ -15,6 +16,8 @@ export interface ImagePluginManifest {
 }
 
 export interface ImagePluginResult {
+    scalingOptions?: Scaling[];
+    scaling?: Scaling;
     statistics?: Record<string, string | number | boolean | null>;
     metadata?: Record<string, string | number | boolean | null>;
     width?: number;
@@ -37,12 +40,18 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    rescale(
+        filePath: string,
+        pluginId: string,
+        scaling: Scaling
+    ): Promise<ImageInfo>;
     pathForFile(file: File): string;
     slice(
         filePath: string,
         pluginId: string,
         orientation: SliceOrientation,
-        index: number
+        index: number,
+        scaling?: Scaling
     ): Promise<SliceData>;
     open(
         onLoading?: (image: ImageInfo) => void,

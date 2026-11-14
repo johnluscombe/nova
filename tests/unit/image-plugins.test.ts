@@ -566,3 +566,60 @@ test("source slices validate the opened image, orientation, index and returned s
             /invalid slice data/
         );
     }));
+
+test("scaling is restricted to opened images and their advertised modes", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "scaling",
+            `export default {
+            open(file, parameters, scaling = 'amplitude') {
+                return { width: 4, height: 3, scaling, scalingOptions: ['amplitude', 'real'], metadata: { Scaling: scaling } };
+            },
+            readSlice(file, orientation, index, parameters, scaling = 'amplitude') {
+                return { points: [{position: 0, value: scaling === 'real' ? -3 : 5}], positionLabel: 'Column', valueLabel: scaling };
+            }
+        };`
+        );
+        await host.reload();
+        await assert.rejects(
+            host.rescale("file.test", "scaling", "real"),
+            /unavailable/
+        );
+        await host.open("file.test");
+        const image = await host.rescale("file.test", "scaling", "real");
+        assert.equal(image.scaling, "real");
+        assert.equal(image.metadata?.Scaling, "real");
+        const slice = await host.readSlice(
+            "file.test",
+            "scaling",
+            "horizontal",
+            1,
+            "real"
+        );
+        assert.equal(slice.points[0]?.value, -3);
+        await assert.rejects(
+            host.rescale("file.test", "scaling", "rcs"),
+            /unavailable/
+        );
+        await assert.rejects(
+            host.readSlice("file.test", "scaling", "horizontal", 1, "rcs"),
+            /unavailable/
+        );
+    }));
+
+test("invalid scaling capabilities are rejected", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "scaling",
+            `export default {
+            open() { return { scaling: 'unknown', scalingOptions: ['unknown'] }; }
+        };`
+        );
+        await host.reload();
+        await assert.rejects(
+            host.open("file.test"),
+            /Invalid image scaling options/
+        );
+    }));

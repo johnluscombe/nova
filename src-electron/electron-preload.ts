@@ -15,13 +15,16 @@ contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
     pathForFile: (file: File) => webUtils.getPathForFile(file),
-    slice: (filePath, pluginId, orientation, index) =>
+    rescale: (filePath, pluginId, scaling) =>
+        ipcRenderer.invoke("image:scaling", filePath, pluginId, scaling),
+    slice: (filePath, pluginId, orientation, index, scaling) =>
         ipcRenderer.invoke(
             "image:slice",
             filePath,
             pluginId,
             orientation,
-            index
+            index,
+            scaling
         ),
     open: async (onLoading?: (image: ImageInfo) => void, filePath?: string) => {
         const listener = (

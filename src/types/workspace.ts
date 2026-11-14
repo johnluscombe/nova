@@ -1,5 +1,7 @@
+import { isScaling, type Scaling } from "./scaling";
 import type { ImageInfo } from "./image";
 export interface SavedImageWindow {
+    scaling?: Scaling;
     id: number;
     path: string;
     pluginId: string;
@@ -21,6 +23,7 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
     for (const item of value) {
         if (
             !item ||
+            (item.scaling !== undefined && !isScaling(item.scaling)) ||
             !Number.isSafeInteger(item.id) ||
             item.id < 1 ||
             ids.has(item.id) ||
@@ -60,4 +63,5 @@ export interface ImageWorkspaceAPI {
     toggleMetadata(): void;
     toggleStatistics(): void;
     toggleSlice(): void;
+    setScaling(scaling: Scaling): Promise<void>;
 }

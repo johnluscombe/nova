@@ -262,3 +262,22 @@ preview luminance (Rec. 709 RGB weights, 0–255), clearly labeled on the graph.
 Preview sampling is limited to 1,600 pixels per dimension, so it represents the
 displayed preview rather than full-resolution source intensities. Transparent
 preview pixels and nonfinite SICD amplitudes produce gaps.
+
+## Image scaling
+
+Plugins can advertise per-image `scalingOptions` and a current `scaling` in their
+`open` result. Supported mode IDs are `amplitude`, `real`, `imaginary`, `phase`,
+`power`, `log-power`, `relative-power`, `rcs`, `rcs-db`, `sigma-zero`,
+`sigma-zero-db`, `beta-zero`, `beta-zero-db`, `gamma-zero`, and `gamma-zero-db`.
+Only advertise modes supported by that file's data and metadata.
+
+The optional third argument of `open(filePath, parameters, scaling?)` requests a
+mode. Return the requested `scaling`, updated preview/statistics, and the available
+`scalingOptions`. The optional fifth argument of
+`readSlice(filePath, orientation, index, parameters, scaling?)` selects the slice
+quantity; set `valueLabel` to its name and units. Omitted scaling preserves the
+plugin's default behavior. Existing plugins need no changes; Scaling stays disabled
+unless capabilities are advertised. The host accepts scaling requests only for
+previously opened images and their advertised modes.
+
+See [SICD scaling](sicd-plugin.md#scaling) for the built-in implementation.

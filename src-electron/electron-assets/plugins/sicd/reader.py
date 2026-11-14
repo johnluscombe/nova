@@ -56,7 +56,70 @@ def image_statistics(magnitude):
     return dict(zip(labels, map(float, np.percentile(values, percentiles))))
 
 
-def render(file_path):
+SCALING_LABELS = {
+    "amplitude": "Source amplitude", "real": "Real component", "imaginary": "Imaginary component",
+    "phase": "Phase (degrees)", "power": "Power (linear)", "log-power": "Power (dB, reference = 1 source power unit)",
+    "relative-power": "Relative power (dB, sampled peak = 0)",
+    "rcs": "RCS (m²)", "rcs-db": "RCS (dBsm)",
+    "sigma-zero": "Sigma-zero (linear)", "sigma-zero-db": "Sigma-zero (dB)",
+    "beta-zero": "Beta-zero (linear)", "beta-zero-db": "Beta-zero (dB)",
+    "gamma-zero": "Gamma-zero (linear)", "gamma-zero-db": "Gamma-zero (dB)",
+}
+CALIBRATION_FIELDS = {"rcs": "RCSSFPoly", "sigma-zero": "SigmaZeroSFPoly",
+                      "beta-zero": "BetaZeroSFPoly", "gamma-zero": "GammaZeroSFPoly"}
+
+
+def valid_spacing(value):
+    return isinstance(value, (int, float)) and math.isfinite(value) and value > 0
+
+
+def scaling_options(metadata):
+    options = list(SCALING_LABELS)[:7]
+    radiometric = getattr(metadata, "Radiometric", None)
+    grid = getattr(metadata, "Grid", None)
+    image = getattr(metadata, "ImageData", None)
+    # Calibration polynomials use physical coordinates relative to the SCP.
+    if (getattr(image, "SCPPixel", None) is not None and
+            all(valid_spacing(getattr(getattr(grid, axis, None), "SS", None)) for axis in ("Row", "Col"))):
+        for mode, field in CALIBRATION_FIELDS.items():
+            if getattr(radiometric, field, None) is not None:
+                options.extend([mode, mode + "-db"])
+    return options
+
+
+def scale_samples(samples, metadata, rows, columns, scaling):
+    import numpy as np
+    if scaling not in scaling_options(metadata):
+        raise ValueError("Scaling is unavailable for this image")
+    samples = np.asarray(samples, dtype=np.complex128)
+    samples = np.where(np.isfinite(samples), samples, complex(float("nan"), float("nan")))
+    if scaling == "real":
+        return samples.real
+    if scaling == "imaginary":
+        return samples.imag
+    if scaling == "phase":
+        return np.where(np.abs(samples) > 0, np.angle(samples, deg=True), np.nan)
+    if scaling == "amplitude":
+        return np.abs(samples)
+    power = np.abs(samples) ** 2
+    base = scaling.removesuffix("-db")
+    if base in CALIBRATION_FIELDS:
+        image, grid = metadata.ImageData, metadata.Grid
+        row_coords = (np.asarray(rows) + image.FirstRow - image.SCPPixel.Row) * grid.Row.SS
+        col_coords = (np.asarray(columns) + image.FirstCol - image.SCPPixel.Col) * grid.Col.SS
+        row_grid, col_grid = np.broadcast_arrays(row_coords[:, None], col_coords[None, :])
+        factor = getattr(metadata.Radiometric, CALIBRATION_FIELDS[base])(row_grid, col_grid)
+        power = np.where(np.isfinite(factor) & (factor > 0), power * factor, np.nan)
+    if scaling == "relative-power":
+        finite = power[np.isfinite(power) & (power > 0)]
+        power = power / finite.max() if finite.size else np.full_like(power, np.nan)
+    if scaling in ("log-power", "relative-power") or scaling.endswith("-db"):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(power > 0, 10 * np.log10(power), np.nan)
+    return power
+
+
+def render(file_path, scaling="amplitude"):
     import numpy as np
     from sarpy.io.complex.sicd import SICDReader
 
@@ -71,28 +134,35 @@ def render(file_path):
             raise ValueError("Invalid SICD dimensions")
         step = max(1, math.ceil(max(width, height) / 1600))
         # Read one sampled row at a time, keeping complex sample memory bounded.
-        magnitude = np.empty((math.ceil(height / step), math.ceil(width / step)), dtype=np.float32)
+        complex_samples = np.empty((math.ceil(height / step), math.ceil(width / step)), dtype=np.complex64)
         for output_row, source_row in enumerate(range(0, height, step)):
             samples = reader.read(slice(source_row, source_row + 1), slice(0, width, step), index=0, squeeze=False)
-            magnitude[output_row] = np.abs(samples).reshape(-1)
-        finite = np.isfinite(magnitude)
-        positive = finite & (magnitude > 0)
-        pixels = np.zeros(magnitude.shape, dtype=np.uint8)
-        if positive.any():
-            log_values = np.log1p(magnitude[positive])
-            low, high = np.percentile(log_values, [1, 99])
+            complex_samples[output_row] = samples.reshape(-1)
+        values = scale_samples(complex_samples, metadata, range(0, height, step), range(0, width, step), scaling)
+        finite = np.isfinite(values) & (values > 0 if scaling == "amplitude" else True)
+        # Preserve the familiar log-amplitude preview. Other modes display their
+        # selected numerical quantity with a percentile contrast stretch.
+        display = np.log1p(values) if scaling == "amplitude" else values
+        pixels = np.zeros(values.shape, dtype=np.uint8)
+        if finite.any():
+            low, high = np.percentile(display[finite], [1, 99])
             if high > low:
-                scaled = (np.log1p(np.where(positive, magnitude, 0)) - low) / (high - low)
-                pixels = np.clip(scaled * 255, 0, 255).astype(np.uint8)
-                pixels[~positive] = 0
+                stretched = np.where(finite, (display - low) / (high - low), 0)
+                pixels = np.clip(stretched * 255, 0, 255).astype(np.uint8)
             else:
-                pixels[positive] = 127
-        return {"statistics": image_statistics(magnitude), "metadata": image_metadata(metadata), "width": width, "height": height, "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
+                pixels[finite] = 127
+        info = image_metadata(metadata)
+        info["Scaling"] = SCALING_LABELS[scaling]
+        info["Preview"] = ("Log amplitude" if scaling == "amplitude" else SCALING_LABELS[scaling]) + ", 1st–99th percentile stretch"
+        return {"scalingOptions": scaling_options(metadata), "scaling": scaling,
+                "statistics": image_statistics(values), "metadata": info, "width": width, "height": height,
+                "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
+
     finally:
         reader.close()
 
 
-def slice_image(file_path, orientation, index):
+def slice_image(file_path, orientation, index, scaling="amplitude"):
     import numpy as np
     from sarpy.io.complex.sicd import SICDReader
     if orientation not in ("horizontal", "vertical"):
@@ -108,12 +178,13 @@ def slice_image(file_path, orientation, index):
         rows, columns = ((slice(index, index + 1), slice(0, width, step))
                          if orientation == "horizontal" else
                          (slice(0, height, step), slice(index, index + 1)))
-        values = np.abs(reader.read(rows, columns, index=0, squeeze=False)).reshape(-1)
+        samples = reader.read(rows, columns, index=0, squeeze=False)
+        values = scale_samples(samples, metadata, range(*rows.indices(height)), range(*columns.indices(width)), scaling).reshape(-1)
         return {
             "points": [{"position": int(position), "value": float(value) if np.isfinite(value) else None}
                        for position, value in zip(range(0, length, step), values)],
             "positionLabel": "Column (pixel)" if orientation == "horizontal" else "Row (pixel)",
-            "valueLabel": "Source amplitude",
+            "valueLabel": SCALING_LABELS[scaling],
         }
     finally:
         reader.close()
@@ -123,8 +194,10 @@ def main():
     try:
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(sys.argv) == 5 and sys.argv[2] == "--slice":
-                result = slice_image(sys.argv[1], sys.argv[3], int(sys.argv[4]))
+            if len(sys.argv) in (5, 6) and sys.argv[2] == "--slice":
+                result = slice_image(sys.argv[1], sys.argv[3], int(sys.argv[4]), sys.argv[5] if len(sys.argv) == 6 else "amplitude")
+            elif len(sys.argv) == 4 and sys.argv[2] == "--scaling":
+                result = render(sys.argv[1], sys.argv[3])
             elif len(sys.argv) == 2:
                 result = render(sys.argv[1])
             else:

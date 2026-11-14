@@ -46,7 +46,7 @@ a scenario and images together, Nova opens the scenario first.
 
 Bundled plugins support raster images, SVG, and SICD-in-NITF radar imagery.
 See [image plugins](docs/image-plugins.md) and [SICD setup](docs/sicd-plugin.md).
-The Settings dialog configures the amplitude percentiles displayed in Statistics.
+The Settings dialog configures the percentiles displayed in Statistics.
 
 Application and test sources use TypeScript. Plugins use Electron's native type
 stripping and must use erasable TypeScript syntax. Scenario schema definitions
@@ -54,5 +54,9 @@ live in `src-electron/scenario-schema.ts`.
 
 Enable Slice in the View ribbon group to reveal selection strips on the left and
 bottom of the image. Hover over the left strip to preview a horizontal slice, or
-the bottom strip for a vertical slice; click to open its graph. SICD plots source amplitude; other formats plot preview luminance.
+the bottom strip for a vertical slice; click to open its graph. SICD plots the selected source quantity; other formats plot preview luminance.
 Graphs open as independent temporary widgets and are not saved to scenarios.
+
+Use **View → Scaling** on SICD images or their slice graphs to select amplitude,
+complex components, phase, power, or calibrated radar quantities when available.
+Image scaling is saved with the scenario. See [SICD scaling](docs/sicd-plugin.md#scaling).

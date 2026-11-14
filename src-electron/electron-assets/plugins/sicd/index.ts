@@ -1,3 +1,4 @@
+import type { Scaling } from "../../../../src/types/scaling.ts";
 import type {
     SliceData,
     SliceOrientation
@@ -94,12 +95,14 @@ async function executeReader(
 export async function openSicd(
     filePath: string,
     parameters: PluginParameters = {},
-    run: Runner = execute
+    run: Runner = execute,
+    scaling?: Scaling
 ): Promise<ImagePluginResult> {
     const result = (await executeReader(
         filePath,
         parameters,
-        run
+        run,
+        scaling ? ["--scaling", scaling] : []
     )) as ImagePluginResult;
     if (
         !result ||
@@ -119,16 +122,26 @@ export async function readSicdSlice(
     orientation: SliceOrientation,
     index: number,
     parameters: PluginParameters = {},
-    run: Runner = execute
+    run: Runner = execute,
+    scaling?: Scaling
 ): Promise<SliceData> {
     return (await executeReader(filePath, parameters, run, [
         "--slice",
         orientation,
-        String(index)
+        String(index),
+        ...(scaling ? [scaling] : [])
     ])) as SliceData;
 }
 export default {
-    readSlice: (filePath, orientation, index, parameters) =>
-        readSicdSlice(filePath, orientation, index, parameters),
-    open: (filePath, parameters) => openSicd(filePath, parameters)
+    readSlice: (filePath, orientation, index, parameters, scaling) =>
+        readSicdSlice(
+            filePath,
+            orientation,
+            index,
+            parameters,
+            execute,
+            scaling
+        ),
+    open: (filePath, parameters, scaling?: Scaling) =>
+        openSicd(filePath, parameters, execute, scaling)
 } satisfies ImagePlugin;

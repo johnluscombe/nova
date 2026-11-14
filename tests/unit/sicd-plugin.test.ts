@@ -134,3 +134,54 @@ test("SICD source slices pass orientation and index to the Python worker", async
     );
     assert.deepEqual(result, expected);
 });
+
+test("SICD forwards scaling for previews and source slices", async () => {
+    const { readSicdSlice } =
+        await import("../../src-electron/electron-assets/plugins/sicd/index.ts");
+    await openSicd(
+        "image.nitf",
+        {},
+        async (_python, args) => {
+            assert.deepEqual(args.slice(1), [
+                "image.nitf",
+                "--scaling",
+                "real"
+            ]);
+            return {
+                stdout: JSON.stringify({
+                    width: 1,
+                    height: 1,
+                    previewDataUrl: "data:image/png;base64,eA==",
+                    scaling: "real",
+                    scalingOptions: ["amplitude", "real"]
+                })
+            };
+        },
+        "real"
+    );
+    const expected = {
+        points: [{ position: 0, value: -3 }],
+        positionLabel: "Column",
+        valueLabel: "Real component"
+    };
+    assert.deepEqual(
+        await readSicdSlice(
+            "image.nitf",
+            "horizontal",
+            0,
+            {},
+            async (_python, args) => {
+                assert.deepEqual(args.slice(1), [
+                    "image.nitf",
+                    "--slice",
+                    "horizontal",
+                    "0",
+                    "real"
+                ]);
+                return { stdout: JSON.stringify(expected) };
+            },
+            "real"
+        ),
+        expected
+    );
+});

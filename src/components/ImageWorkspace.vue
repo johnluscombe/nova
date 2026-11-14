@@ -118,6 +118,9 @@
                                 Loading statistics…
                             </p>
                             <template v-else>
+                                <p v-if="widget.image.metadata?.Scaling">
+                                    {{ widget.image.metadata.Scaling }}
+                                </p>
                                 <dl
                                     v-if="
                                         widget.image.statistics &&
@@ -236,6 +239,7 @@ import type {
 import ImageSliceView from "./ImageSliceView.vue";
 import LineGraph from "./LineGraph.vue";
 import { previewSlice } from "@/utils/image-slice";
+import type { Scaling, ScalingState } from "@/types/scaling";
 import type { SliceData, SliceSelection } from "@/types/slice";
 import type { ImageInfo } from "@/types/image";
 import { visibleStatistics } from "@/composables/useSettings";
@@ -257,7 +261,7 @@ interface ImageWindow {
     metadataOpen?: boolean;
     statisticsOpen?: boolean;
     sliceEnabled?: boolean;
-    graph?: { data?: SliceData };
+    graph?: { data?: SliceData; source: ImageInfo; selection: SliceSelection };
 }
 const activeWidget = computed(() =>
     windows.value.find(
@@ -296,18 +300,28 @@ async function createSliceGraph(
             name: title,
             path: source.path,
             pluginId: "",
-            pluginName: "Slice graph"
+            pluginName: "Slice graph",
+            ...(source.scalingOptions
+                ? {
+                      scalingOptions: source.scalingOptions,
+                      scaling: source.scaling
+                  }
+                : {})
         },
         true
     );
-    windows.value.find(widget => widget.id === id)!.graph = {};
+    windows.value.find(widget => widget.id === id)!.graph = {
+        source,
+        selection: { orientation, index }
+    };
     try {
         const data = source.supportsSourceSlices
             ? await window.images!.slice(
                   source.path,
                   source.pluginId,
                   orientation,
-                  index
+                  index,
+                  source.scaling
               )
             : await previewSlice(source, orientation, index);
         const widget = windows.value.find(widget => widget.id === id);
@@ -322,6 +336,48 @@ async function createSliceGraph(
                 ? cause.message
                 : "Unable to read image slice."
         );
+    }
+}
+
+async function setScaling(scaling: Scaling) {
+    const widget = activeWidget.value;
+    if (
+        !widget ||
+        widget.loading ||
+        !widget.image.scalingOptions?.includes(scaling) ||
+        widget.image.scaling === scaling
+    ) {
+        return;
+    }
+    widget.loading = true;
+    try {
+        if (widget.graph) {
+            const { source, selection } = widget.graph;
+            const data = await window.images!.slice(
+                source.path,
+                source.pluginId,
+                selection.orientation,
+                selection.index,
+                scaling
+            );
+            widget.graph.data = data;
+            widget.image.scaling = scaling;
+        } else {
+            const image = await window.images!.rescale(
+                widget.image.path,
+                widget.image.pluginId,
+                scaling
+            );
+            widget.image = image;
+        }
+        delete widget.error;
+    } catch (cause) {
+        emit(
+            "scalingError",
+            cause instanceof Error ? cause.message : "Unable to change scaling."
+        );
+    } finally {
+        widget.loading = false;
     }
 }
 
@@ -399,6 +455,7 @@ function snapshot(): SavedImageWindow[] {
         .filter(widget => widget.image.pluginId && !widget.graph)
         .map(widget => ({
             id: widget.id,
+            ...(widget.image.scaling ? { scaling: widget.image.scaling } : {}),
             path: widget.image.path,
             pluginId: widget.image.pluginId,
             rect: { ...widget.rect },
@@ -428,7 +485,19 @@ const emit = defineEmits<{
     statisticsChange: [available: boolean];
     sliceChange: [available: boolean];
     sliceModeChange: [enabled: boolean];
+    scalingChange: [state: ScalingState];
+    scalingError: [message: string];
 }>();
+watch(
+    () =>
+        ({
+            options: activeWidget.value?.image.scalingOptions ?? [],
+            value: activeWidget.value?.image.scaling ?? "amplitude",
+            loading: !!activeWidget.value?.loading
+        }) as ScalingState,
+    state => emit("scalingChange", state),
+    { immediate: true, deep: true }
+);
 watch(
     () => !!activeWidget.value?.sliceEnabled,
     enabled => emit("sliceModeChange", enabled),
@@ -474,7 +543,8 @@ defineExpose({
     snapshot,
     toggleMetadata,
     toggleStatistics,
-    toggleSlice
+    toggleSlice,
+    setScaling
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;

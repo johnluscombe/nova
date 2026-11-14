@@ -41,16 +41,45 @@ other image plugins remain available.
 
 ## Preview behavior
 
-The plugin reads complex samples with SarPy, displays amplitude (magnitude), and
-uses a logarithmic stretch with 1st/99th-percentile clipping. The preview's longest
-edge is at most 1600 pixels, sampled with a shared row/column stride to preserve
-aspect ratio. Source dimensions are returned for the window status bar. Data is
-read one sampled row at a time; complex samples are not all loaded into memory.
-Constant nonzero images render mid-gray and invalid or zero samples render black.
+The plugin reads complex samples with SarPy. The default amplitude preview uses
+logarithmic contrast with 1st/99th-percentile clipping. The preview's longest edge
+is at most 1600 pixels, sampled with a shared row/column stride to preserve aspect
+ratio. Data is read one sampled row at a time, with only the bounded preview held
+in memory. Source dimensions are retained for slicing.
 
-This is a quick-look preview, not radiometric calibration, phase visualization,
-georectification, or a full-resolution tiled viewer. Samples can alias during
-subsampling. The worker is terminated after two minutes and limits captured
-output to 16 MB. Original image bytes are never modified.
+## Scaling
+
+**View → Scaling** changes the active image or slice graph. Images update their
+preview and percentile statistics; new slices inherit the image's mode. Each
+existing graph can also be scaled independently. Image modes are saved in the
+scenario; graph windows remain temporary.
+
+| Mode             | Quantity                                                  |
+| ---------------- | --------------------------------------------------------- |
+| Amplitude        | `abs(I + jQ)`                                             |
+| Real / Imaginary | `I` / `Q`                                                 |
+| Phase            | `atan2(Q, I)` in degrees                                  |
+| Linear power     | `I² + Q²`                                                 |
+| Log power        | `10 log10(power)`, reference = one source power unit      |
+| Relative power   | `10 log10(power / sampled peak power)`                    |
+| RCS              | Pixel power × `Radiometric.RCSSFPoly`, in m² or dBsm      |
+| Sigma-zero       | Pixel power × `Radiometric.SigmaZeroSFPoly`, linear or dB |
+| Beta-zero        | Pixel power × `Radiometric.BetaZeroSFPoly`, linear or dB  |
+| Gamma-zero       | Pixel power × `Radiometric.GammaZeroSFPoly`, linear or dB |
+
+Calibrated modes require their corresponding polynomial, grid spacing, and scene
+center pixel coordinates. The polynomial is evaluated in image-plane meters
+relative to the scene center, including chip row/column offsets. Unavailable
+modes are disabled. Uncalibrated log power is not dBsm.
+
+Relative power uses the peak of the sampled preview or sampled slice, respectively.
+Zero power is a gap in logarithmic graphs; phase at zero amplitude is also a gap.
+Invalid calibration factors produce gaps rather than misleading values. Previews
+map invalid values to black. A percentile contrast stretch maps the selected
+quantity to grayscale; graph values and statistics retain the quantity's units.
+
+This remains a quick-look preview, not georectification or a full-resolution tiled
+viewer. Samples can alias during subsampling. The worker is terminated after two
+minutes and limits captured output to 16 MB. Original image bytes are never modified.
 
 See [SarPy's SICD reader documentation](https://sarpy.readthedocs.io/en/latest/io/complex/sicd.html).

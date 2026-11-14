@@ -130,6 +130,54 @@
                             flat
                             stack
                             no-caps
+                            icon="tune"
+                            label="Scaling"
+                            :disable="
+                                !scalingState.options.length ||
+                                scalingState.loading ||
+                                busy
+                            ">
+                            <q-menu>
+                                <q-list dense aria-label="Image scaling">
+                                    <q-item
+                                        v-for="option in scalingOptions"
+                                        :key="option.value"
+                                        clickable
+                                        role="menuitemradio"
+                                        :aria-checked="
+                                            scalingState.value === option.value
+                                        "
+                                        v-close-popup
+                                        :disable="
+                                            !scalingState.options.includes(
+                                                option.value
+                                            )
+                                        "
+                                        :active="
+                                            scalingState.value === option.value
+                                        "
+                                        @click="
+                                            workspace?.setScaling(option.value)
+                                        ">
+                                        <q-item-section>
+                                            {{ option.label }}
+                                        </q-item-section>
+                                        <q-item-section
+                                            side
+                                            v-if="
+                                                scalingState.value ===
+                                                option.value
+                                            ">
+                                            <q-icon name="check" />
+                                        </q-item-section>
+                                    </q-item>
+                                </q-list>
+                            </q-menu>
+                        </q-btn>
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
                             icon="content_cut"
                             label="Slice"
                             :disable="!hasSliceImage"
@@ -242,6 +290,8 @@
                 @statistics-change="hasActiveStatistics = $event"
                 @slice-change="hasSliceImage = $event"
                 @slice-mode-change="sliceModeActive = $event"
+                @scaling-change="scalingState = $event"
+                @scaling-error="error = $event"
                 :key="workspaceSession"
                 ref="workspace"
                 @change="saveLayout" />
@@ -257,6 +307,12 @@ import type { ImagePluginStatus } from "../types/image";
 import type { ImageWorkspaceAPI, SavedImageWindow } from "../types/workspace";
 import type { ScenarioInfo } from "../types/scenario";
 import { activeScenario as scenario } from "@/composables/useScenario";
+import { scalingOptions, type ScalingState } from "@/types/scaling";
+const scalingState = ref<ScalingState>({
+    options: [],
+    value: "amplitude",
+    loading: false
+});
 const settingsOpen = ref(false);
 const busy = ref(false);
 const error = ref("");

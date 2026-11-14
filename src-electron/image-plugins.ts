@@ -1,3 +1,4 @@
+import { isScaling, type Scaling } from "../src/types/scaling";
 import type { SliceData, SliceOrientation } from "../src/types/slice";
 import {
     validateRibbon,
@@ -20,7 +21,8 @@ export interface ImagePlugin {
         filePath: string,
         orientation: SliceOrientation,
         index: number,
-        parameters: PluginParameters
+        parameters: PluginParameters,
+        scaling?: Scaling
     ): SliceData | Promise<SliceData>;
     canOpen?(
         filePath: string,
@@ -28,7 +30,8 @@ export interface ImagePlugin {
     ): boolean | Promise<boolean>;
     open?(
         filePath: string,
-        parameters: PluginParameters
+        parameters: PluginParameters,
+        scaling?: Scaling
     ): ImagePluginResult | Promise<ImagePluginResult>;
     executeRibbonAction?(
         actionId: string,
@@ -45,7 +48,11 @@ type LoadedPlugin = {
 export class ImagePlugins {
     private readonly openedImages = new Map<
         string,
-        { width: number | undefined; height: number | undefined }
+        {
+            width: number | undefined;
+            height: number | undefined;
+            scalingOptions?: Scaling[];
+        }
     >();
     private plugins: LoadedPlugin[] = [];
     private errors: string[] = [];
@@ -276,7 +283,8 @@ export class ImagePlugins {
         filePath: string,
         pluginId: string,
         orientation: SliceOrientation,
-        index: number
+        index: number,
+        scaling?: Scaling
     ): Promise<SliceData> {
         const image = this.openedImages.get(
             JSON.stringify([filePath, pluginId])
@@ -295,11 +303,18 @@ export class ImagePlugins {
         ) {
             throw new Error("Slice index is outside the image.");
         }
+        if (
+            scaling !== undefined &&
+            (!isScaling(scaling) || !image.scalingOptions?.includes(scaling))
+        ) {
+            throw new Error("Scaling is unavailable for this image.");
+        }
         const result = await plugin.implementation.readSlice(
             filePath,
             orientation,
             index,
-            plugin.manifest.parameters ?? {}
+            plugin.manifest.parameters ?? {},
+            scaling
         );
         const length =
             orientation === "horizontal" ? image.width : image.height;
@@ -330,7 +345,25 @@ export class ImagePlugins {
         return result;
     }
 
-    async open(filePath: string, pluginId?: string): Promise<ImageInfo> {
+    async rescale(
+        filePath: string,
+        pluginId: string,
+        scaling: Scaling
+    ): Promise<ImageInfo> {
+        const image = this.openedImages.get(
+            JSON.stringify([filePath, pluginId])
+        );
+        if (!isScaling(scaling) || !image?.scalingOptions?.includes(scaling)) {
+            throw new Error("Scaling is unavailable for this image.");
+        }
+        return this.open(filePath, pluginId, scaling);
+    }
+
+    async open(
+        filePath: string,
+        pluginId?: string,
+        scaling?: Scaling
+    ): Promise<ImageInfo> {
         if (!this.plugins.length) {
             throw new Error("Install an image plugin before opening images.");
         }
@@ -354,7 +387,8 @@ export class ImagePlugins {
                 }
                 const result = await implementation.open!(
                     filePath,
-                    manifest.parameters ?? Object.freeze({})
+                    manifest.parameters ?? Object.freeze({}),
+                    scaling
                 );
                 if (!result || typeof result !== "object") {
                     throw new Error("Invalid image result.");
@@ -400,7 +434,29 @@ export class ImagePlugins {
                         "Preview must be a PNG, JPEG, WebP, or SVG data URL under 32 MB."
                     );
                 }
+                if (scaling !== undefined && result.scaling !== scaling) {
+                    throw new Error(
+                        "Plugin did not return the requested scaling."
+                    );
+                }
+                if (
+                    result.scalingOptions !== undefined &&
+                    (!Array.isArray(result.scalingOptions) ||
+                        !result.scalingOptions.length ||
+                        result.scalingOptions.length > 15 ||
+                        !result.scalingOptions.every(isScaling) ||
+                        !isScaling(result.scaling) ||
+                        !result.scalingOptions.includes(result.scaling))
+                ) {
+                    throw new Error("Invalid image scaling options.");
+                }
                 const info: ImageInfo = {
+                    ...(result.scalingOptions
+                        ? {
+                              scalingOptions: result.scalingOptions,
+                              scaling: result.scaling
+                          }
+                        : {}),
                     ...(implementation.readSlice
                         ? { supportsSourceSlices: true }
                         : {}),
@@ -426,7 +482,10 @@ export class ImagePlugins {
                 };
                 this.openedImages.set(JSON.stringify([filePath, manifest.id]), {
                     width: info.width,
-                    height: info.height
+                    height: info.height,
+                    ...(info.scalingOptions
+                        ? { scalingOptions: info.scalingOptions }
+                        : {})
                 });
                 return info;
             } catch (cause) {

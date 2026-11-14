@@ -1,3 +1,4 @@
+import type { Scaling } from "../src/types/scaling";
 import type { SliceOrientation } from "../src/types/slice";
 import { BrowserWindow, app, dialog } from "electron";
 import { ImagePlugins } from "./image-plugins";
@@ -143,7 +144,8 @@ async function createWindow() {
                         id: saved.id,
                         image: await imagePlugins.open(
                             saved.path,
-                            saved.pluginId
+                            saved.pluginId,
+                            saved.scaling
                         )
                     };
                 } catch (cause) {
@@ -249,13 +251,24 @@ async function createWindow() {
             })
     );
     mainWindow.webContents.ipc.handle(
+        "image:scaling",
+        (_event, filePath: string, pluginId: string, scaling: Scaling) =>
+            documentAction(() => {
+                if (!scenario.current) {
+                    throw new Error("Open a scenario before scaling images.");
+                }
+                return imagePlugins.rescale(filePath, pluginId, scaling);
+            })
+    );
+    mainWindow.webContents.ipc.handle(
         "image:slice",
         (
             _event,
             filePath: string,
             pluginId: string,
             orientation: SliceOrientation,
-            index: number
+            index: number,
+            scaling?: Scaling
         ) =>
             documentAction(() => {
                 if (!scenario.current) {
@@ -265,7 +278,8 @@ async function createWindow() {
                     filePath,
                     pluginId,
                     orientation,
-                    index
+                    index,
+                    scaling
                 );
             })
     );
