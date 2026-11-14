@@ -1,3 +1,4 @@
+import type { ImageAxes } from "./axes";
 import type { PixelData } from "./pixel";
 import type { Scaling } from "./scaling";
 import type { SliceData, SliceOrientation } from "./slice";
@@ -17,6 +18,7 @@ export interface ImagePluginManifest {
 }
 
 export interface ImagePluginResult {
+    axes?: ImageAxes;
     peakPower?: number;
     scalingOptions?: Scaling[];
     scaling?: Scaling;

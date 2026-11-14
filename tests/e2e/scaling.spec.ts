@@ -16,7 +16,7 @@ test.use({
             open(file, parameters, scaling = 'amplitude') {
                 if (scaling === 'imaginary') throw new Error('Scaling reader failure');
                 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="' + (scaling === 'real' ? 'red' : 'blue') + '"/></svg>';
-                return {width: 40, height: 20, scaling, scalingOptions: ['amplitude', 'real', 'imaginary', 'phase', 'power', 'log-power', 'relative-power'],
+                return {width: 40, height: 20, axes: {row: {label: 'Down-range', unit: 'm', origin: -20, spacing: 2}, column: {label: 'Cross-range', unit: 'm', origin: -10, spacing: 0.5}}, scaling, scalingOptions: ['amplitude', 'real', 'imaginary', 'phase', 'power', 'log-power', 'relative-power'],
                     previewDataUrl: 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'),
                     metadata: {Scaling: scaling}, statistics: {'50th percentile': scaling === 'real' ? -3 : 5}};
             },
@@ -186,4 +186,92 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     await expect(raster.getByRole("status")).toContainText(
         "Preview luminance (0–255): 54.213"
     );
+});
+
+test("image axes display source distances and remain aligned with slicing and hover", async ({
+    application,
+    profile
+}) => {
+    const page = await application.firstWindow();
+    const toggle = page.getByRole("button", { name: "Axes", exact: true });
+    await expect(toggle).toBeDisabled();
+    await createScenario(application, page, profile);
+    const file = path.join(profile, "axes.complex");
+    await writeFile(file, "fixture");
+    await chooseFile(application, file);
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    const source = page.getByRole("article", {
+        name: "axes.complex",
+        exact: true
+    });
+    await expect(
+        source.getByRole("img", { name: "axes.complex", exact: true })
+    ).toBeVisible();
+    await expect(source.locator(".image-axis")).toHaveCount(0);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const x = source.getByRole("img", {
+        name: "X axis: Cross-range (m)",
+        exact: true
+    });
+    const y = source.getByRole("img", {
+        name: "Y axis: Down-range (m)",
+        exact: true
+    });
+    await expect(x).toBeVisible();
+    await expect(y).toBeVisible();
+    await expect(x.locator("text").first()).toHaveText("-10");
+    await expect(x.locator("g text").last()).toHaveText("9.5");
+    await expect(y.locator("text").first()).toHaveText("-20");
+    await expect(y.locator("g text").last()).toHaveText("18");
+    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await page.getByRole("button", { name: "Slice", exact: true }).click();
+    await page
+        .getByRole("button", { name: "Pixel Values", exact: true })
+        .click();
+    const viewport = (await source.locator(".slice-viewport").boundingBox())!;
+    const scale = Math.min(viewport.width / 40, viewport.height / 20);
+    const top = (viewport.height - 20 * scale) / 2;
+    const left = (viewport.width - 40 * scale) / 2;
+    const axisBox = (await x.boundingBox())!;
+    const baseline = x.locator("line").first();
+    expect(
+        Math.abs(
+            axisBox.x +
+                Number(await baseline.getAttribute("x1")) -
+                viewport.x -
+                left
+        )
+    ).toBeLessThan(1);
+    await page.mouse.move(
+        viewport.x + left + 5.5 * scale,
+        viewport.y + top + 3.5 * scale
+    );
+    await expect(source.getByRole("status")).toContainText("Row 3 · Column 5");
+    await expect(source.getByRole("status")).toContainText(
+        "Down-range: -14 m · Cross-range: -7.5 m"
+    );
+    await expect(source.getByRole("status")).toContainText(
+        "Source amplitude: 125"
+    );
+    await toggle.click();
+    await expect(source.locator(".image-axis")).toHaveCount(0);
+    const svg = path.join(profile, "axes.svg");
+    await writeFile(
+        svg,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="red"/></svg>'
+    );
+    await chooseFile(application, svg);
+    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    const raster = page.getByRole("article", { name: "axes.svg", exact: true });
+    await expect(
+        raster.getByRole("img", { name: "axes.svg", exact: true })
+    ).toBeVisible();
+    await toggle.click();
+    await expect(
+        raster.getByRole("img", { name: "X axis: Column (pixel)", exact: true })
+    ).toBeVisible();
+    await expect(
+        raster.getByRole("img", { name: "Y axis: Row (pixel)", exact: true })
+    ).toBeVisible();
 });

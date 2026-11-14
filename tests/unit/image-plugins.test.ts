@@ -686,3 +686,28 @@ test("source pixel reads validate coordinates, capabilities, scaling and numeric
             /invalid pixel data/
         );
     }));
+
+test("plugin axes preserve physical coordinates and reject invalid metadata", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "axes",
+            `export default {
+            open(file) {
+                return {width: 8, height: 4, axes: {
+                    row: {label: 'Down-range', unit: 'm', origin: -4, spacing: 2},
+                    column: {label: 'Cross-range', unit: 'm', origin: -2, spacing: file.includes('invalid') ? 0 : 0.5}
+                }};
+            }
+        };`
+        );
+        await host.reload();
+        const image = await host.open("file.test");
+        assert.deepEqual(image.axes?.column, {
+            label: "Cross-range",
+            unit: "m",
+            origin: -2,
+            spacing: 0.5
+        });
+        await assert.rejects(host.open("invalid.test"), /Invalid image axes/);
+    }));

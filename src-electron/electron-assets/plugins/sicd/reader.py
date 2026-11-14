@@ -43,6 +43,33 @@ def image_metadata(metadata):
     return result
 
 
+def image_axes(metadata):
+    grid, image = getattr(metadata, "Grid", None), getattr(metadata, "ImageData", None)
+    center = getattr(image, "SCPPixel", None)
+    if grid is None or center is None:
+        return None
+    grid_type = getattr(grid, "Type", None)
+    # Preserve the actual grid directions; arbitrary planes cannot be relabeled
+    # as range/cross-range without resampling the image.
+    labels = {
+        "XRGYCR": ("Down-range", "Cross-range"),
+        "RGAZIM": ("Down-range", "Cross-range (azimuth)"),
+        "RGZERO": ("Down-range", "Cross-range (azimuth)"),
+        "XCTYAT": ("Cross-track", "Along-track"),
+    }.get(grid_type, ("Row distance", "Column distance"))
+    axes = {}
+    for key, direction, first, label in zip(("row", "column"), ("Row", "Col"), ("FirstRow", "FirstCol"), labels):
+        spacing = getattr(getattr(grid, direction, None), "SS", None)
+        offset, scp = getattr(image, first, None), getattr(center, direction, None)
+        if not valid_spacing(spacing) or offset is None or scp is None:
+            return None
+        origin = (offset - scp) * spacing
+        if not math.isfinite(origin):
+            return None
+        axes[key] = {"label": label, "unit": "m", "origin": origin, "spacing": spacing}
+    return axes
+
+
 def image_statistics(magnitude):
     import numpy as np
     values = magnitude[np.isfinite(magnitude)].astype(np.float64)
@@ -156,7 +183,8 @@ def render(file_path, scaling="amplitude"):
         info["Preview"] = ("Log amplitude" if scaling == "amplitude" else SCALING_LABELS[scaling]) + ", 1st–99th percentile stretch"
         power = np.abs(complex_samples.astype(np.complex128)) ** 2
         finite_power = power[np.isfinite(power)]
-        return {"peakPower": float(finite_power.max()) if finite_power.size else 0,
+        axes = image_axes(metadata)
+        return {**({"axes": axes} if axes else {}), "peakPower": float(finite_power.max()) if finite_power.size else 0,
                 "scalingOptions": scaling_options(metadata), "scaling": scaling,
                 "statistics": image_statistics(values), "metadata": info, "width": width, "height": height,
                 "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}

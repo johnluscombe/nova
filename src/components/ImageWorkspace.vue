@@ -91,6 +91,7 @@
                                 :image="widget.image"
                                 :enabled="!!widget.sliceEnabled"
                                 :inspect="!!widget.pixelValuesEnabled"
+                                :axes="!!widget.axesEnabled"
                                 @slice="
                                     createSliceGraph(widget.image, $event)
                                 " />
@@ -263,6 +264,7 @@ interface ImageWindow {
     statisticsOpen?: boolean;
     sliceEnabled?: boolean;
     pixelValuesEnabled?: boolean;
+    axesEnabled?: boolean;
     graph?: { data?: SliceData; source: ImageInfo; selection: SliceSelection };
 }
 const activeWidget = computed(() =>
@@ -290,6 +292,11 @@ const canSlice = computed(
 function toggleSlice() {
     if (canSlice.value && activeWidget.value) {
         activeWidget.value.sliceEnabled = !activeWidget.value.sliceEnabled;
+    }
+}
+function toggleAxes() {
+    if (canSlice.value && activeWidget.value) {
+        activeWidget.value.axesEnabled = !activeWidget.value.axesEnabled;
     }
 }
 function togglePixelValues() {
@@ -494,6 +501,7 @@ const emit = defineEmits<{
     sliceChange: [available: boolean];
     sliceModeChange: [enabled: boolean];
     pixelValuesChange: [enabled: boolean];
+    axesChange: [enabled: boolean];
     scalingChange: [state: ScalingState];
     scalingError: [message: string];
 }>();
@@ -506,6 +514,11 @@ watch(
         }) as ScalingState,
     state => emit("scalingChange", state),
     { immediate: true, deep: true }
+);
+watch(
+    () => !!activeWidget.value?.axesEnabled,
+    enabled => emit("axesChange", enabled),
+    { immediate: true }
 );
 watch(
     () => !!activeWidget.value?.pixelValuesEnabled,
@@ -559,6 +572,7 @@ defineExpose({
     toggleStatistics,
     toggleSlice,
     togglePixelValues,
+    toggleAxes,
     setScaling
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {

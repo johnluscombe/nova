@@ -188,6 +188,16 @@
                             flat
                             stack
                             no-caps
+                            icon="square_foot"
+                            label="Axes"
+                            :disable="!hasSliceImage"
+                            :aria-pressed="axesActive"
+                            :color="axesActive ? 'primary' : undefined"
+                            @click="workspace?.toggleAxes()" />
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
                             icon="my_location"
                             label="Pixel Values"
                             :disable="!hasSliceImage"
@@ -311,6 +321,7 @@
                 @slice-change="hasSliceImage = $event"
                 @slice-mode-change="sliceModeActive = $event"
                 @pixel-values-change="pixelValuesActive = $event"
+                @axes-change="axesActive = $event"
                 @scaling-change="scalingState = $event"
                 @scaling-error="error = $event"
                 :key="workspaceSession"
@@ -340,6 +351,7 @@ const error = ref("");
 const workspace = ref<ImageWorkspaceAPI>();
 const sliceModeActive = ref(false);
 const pixelValuesActive = ref(false);
+const axesActive = ref(false);
 const hasSliceImage = ref(false);
 const hasActiveWidget = ref(false);
 const hasActiveStatistics = ref(false);

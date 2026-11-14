@@ -307,3 +307,17 @@ labels the value as preview luminance (Rec. 709 weights, 0–255). Fully transpa
 pixels have no value. Source coordinates may map to a reduced-resolution preview
 pixel. Requests are debounced and serialized per widget, and late results are
 ignored after the pointer moves, leaves, or the image changes.
+
+## Image axes
+
+Plugins may return `axes: { row, column }` from `open`. Each direction specifies
+`{ label: string, unit: "m" | "pixel", origin: number, spacing: number }`.
+`origin` is the coordinate at the center of local source pixel zero; `spacing`
+is the signed increment per source pixel. Both values must be finite and spacing
+must be nonzero. Provide source width and height. The host validates axes before
+passing them to the renderer.
+
+**View → Axes** draws columns horizontally and rows vertically, aligned with the
+contained image preview. Without axis metadata, Nova displays zero-based pixel
+coordinates. The toggle is independent per window and temporary, like Slice and
+Pixel Values. See [SICD axes](sicd-plugin.md#image-axes) for physical conventions.

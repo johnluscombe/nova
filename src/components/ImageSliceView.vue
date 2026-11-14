@@ -1,5 +1,11 @@
 <template>
-    <div class="slice-image" :class="{ enabled }">
+    <div class="slice-image" :class="{ enabled, 'axes-enabled': axes }">
+        <ImageAxes
+            v-if="axes"
+            :axes="imageAxes"
+            :width="sourceWidth"
+            :height="sourceHeight"
+            :rect="rect" />
         <button
             v-if="enabled"
             type="button"
@@ -51,6 +57,24 @@
                     Row {{ pixelPosition.row }} · Column
                     {{ pixelPosition.column }} (zero-based)
                 </div>
+                <div v-if="axes && image.axes">
+                    {{ imageAxes.row.label }}:
+                    {{
+                        coordinate(
+                            axisCoordinate(imageAxes.row, pixelPosition.row)
+                        )
+                    }}
+                    {{ imageAxes.row.unit }} · {{ imageAxes.column.label }}:
+                    {{
+                        coordinate(
+                            axisCoordinate(
+                                imageAxes.column,
+                                pixelPosition.column
+                            )
+                        )
+                    }}
+                    {{ imageAxes.column.unit }}
+                </div>
                 <div v-if="pixelError">{{ pixelError }}</div>
                 <div v-else-if="pixelData">
                     {{ pixelData.valueLabel }}:
@@ -87,6 +111,8 @@
 </template>
 
 <script setup lang="ts">
+import ImageAxes from "./ImageAxes.vue";
+import { axisCoordinate } from "@/types/axes";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { ImageInfo } from "@/types/image";
 import type { SliceOrientation, SliceSelection } from "@/types/slice";
@@ -97,6 +123,7 @@ const props = defineProps<{
     image: ImageInfo;
     enabled: boolean;
     inspect?: boolean;
+    axes?: boolean;
 }>();
 const emit = defineEmits<{ slice: [selection: SliceSelection] }>();
 const viewport = ref<HTMLDivElement>();
@@ -216,6 +243,26 @@ watch(() => [props.inspect, props.image], leavePixel);
 let observer: ResizeObserver | undefined;
 const sourceWidth = computed(() => props.image.width ?? naturalWidth.value);
 const sourceHeight = computed(() => props.image.height ?? naturalHeight.value);
+const imageAxes = computed(
+    () =>
+        props.image.axes ?? {
+            row: {
+                label: "Row",
+                unit: "pixel" as const,
+                origin: 0,
+                spacing: 1
+            },
+            column: {
+                label: "Column",
+                unit: "pixel" as const,
+                origin: 0,
+                spacing: 1
+            }
+        }
+);
+function coordinate(value: number) {
+    return Number(value.toPrecision(7)).toString();
+}
 const rect = computed(() => {
     const w = naturalWidth.value || sourceWidth.value;
     const h = naturalHeight.value || sourceHeight.value;
@@ -342,21 +389,27 @@ onBeforeUnmount(() => {
 <style scoped>
 .slice-image {
     display: grid;
-    grid-template-columns: 0 minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 0;
+    --axis-width: 0px;
+    --axis-height: 0px;
+    --slice-size: 0px;
+    grid-template-columns: var(--axis-width) var(--slice-size) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) var(--slice-size) var(--axis-height);
     width: 100%;
     height: 100%;
     min-height: 0;
     min-width: 0;
 }
 .slice-image.enabled {
-    grid-template-columns: 28px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 28px;
+    --slice-size: 28px;
     background: #263b51;
+}
+.slice-image.axes-enabled {
+    --axis-width: 78px;
+    --axis-height: 50px;
 }
 .slice-viewport {
     position: relative;
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     min-height: 0;
     min-width: 0;
@@ -379,11 +432,11 @@ onBeforeUnmount(() => {
     overflow: hidden;
 }
 .slice-strip-left {
-    grid-column: 1;
+    grid-column: 2;
     grid-row: 1;
 }
 .slice-strip-bottom {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 2;
 }
 .strip-range {

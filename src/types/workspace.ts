@@ -64,5 +64,6 @@ export interface ImageWorkspaceAPI {
     toggleStatistics(): void;
     toggleSlice(): void;
     togglePixelValues(): void;
+    toggleAxes(): void;
     setScaling(scaling: Scaling): Promise<void>;
 }

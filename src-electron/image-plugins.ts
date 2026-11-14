@@ -1,3 +1,4 @@
+import { validateImageAxes, axisCoordinate } from "../src/types/axes";
 import type { PixelData } from "../src/types/pixel";
 import { isScaling, type Scaling } from "../src/types/scaling";
 import type { SliceData, SliceOrientation } from "../src/types/slice";
@@ -524,7 +525,23 @@ export class ImagePlugins {
                 ) {
                     throw new Error("Invalid image peak power.");
                 }
+                if (result.axes !== undefined) {
+                    validateImageAxes(result.axes);
+                    if (
+                        !result.width ||
+                        !result.height ||
+                        !Number.isFinite(
+                            axisCoordinate(result.axes.row, result.height - 1)
+                        ) ||
+                        !Number.isFinite(
+                            axisCoordinate(result.axes.column, result.width - 1)
+                        )
+                    ) {
+                        throw new Error("Invalid image axis dimensions.");
+                    }
+                }
                 const info: ImageInfo = {
+                    ...(result.axes ? { axes: result.axes } : {}),
                     ...(implementation.readPixel
                         ? { supportsSourcePixels: true }
                         : {}),

@@ -89,3 +89,22 @@ the image. Values use the selected scaling mode and are accompanied by zero-base
 row/column coordinates. Relative power uses the sampled image preview's peak as
 its reference. Undefined phase, zero logarithmic power, and invalid samples are
 shown as unavailable.
+
+## Image axes
+
+**View → Axes** adds a horizontal X axis (columns) and vertical Y axis (rows).
+Values are in image-plane meters relative to the scene center pixel (SCP):
+`(local index + FirstRow/FirstCol - SCPPixel.Row/Col) × Grid.Row/Col.SS`.
+Cropped images retain their original coordinate origin. Ticks identify pixel
+centers and stay aligned with the fitted image when resizing or opening panels.
+
+For `XRGYCR` grids, Y is **Down-range** and X is **Cross-range**. `RGAZIM` and
+`RGZERO` use **Down-range** and **Cross-range (azimuth)**. `XCTYAT` keeps
+**Cross-track / Along-track** labels; arbitrary grids keep **Row distance /
+Column distance**. Nova does not rotate or project the source to relabel these
+directions. These are image-plane offsets, not absolute radar ranges or projected
+ground distances. See [SICD grid definitions](https://sarpy.readthedocs.io/en/stable/io/complex/sicd_elements/grid.html).
+
+Missing or invalid spacing/scene-center metadata falls back to pixel coordinates.
+When Axes and Pixel Values are both enabled, the hover readout also includes the
+physical coordinates. Axes can be toggled independently for each image window.

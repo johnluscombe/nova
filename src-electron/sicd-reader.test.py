@@ -11,6 +11,7 @@ import warnings
 import zlib
 from types import SimpleNamespace
 from sarpy.io.complex.sicd_elements.blocks import Poly2DType
+from sarpy.io.complex.sicd_elements.Grid import GridType
 import numpy as np
 from sarpy.io.complex.sicd import SICDWriter
 from sarpy.io.complex.sicd_elements.SICD import SICDType
@@ -22,12 +23,12 @@ spec.loader.exec_module(reader)
 
 
 class SicdPreviewTests(unittest.TestCase):
-    def fixture(self, file, data, encoding="RE32F_IM32F"):
+    def fixture(self, file, data, encoding="RE32F_IM32F", grid=None):
         height, width = data.shape
         image = ImageDataType(PixelType=encoding, NumRows=height, NumCols=width, FirstRow=0, FirstCol=0,
                               FullImage={"NumRows": height, "NumCols": width}, SCPPixel={"Row": height // 2, "Col": width // 2},
                               AmpTable=np.arange(256, dtype=np.float64) if encoding == "AMP8I_PHS8I" else None)
-        metadata = SICDType(ImageData=image)
+        metadata = SICDType(ImageData=image, Grid=grid)
         metadata.NITF["FTITLE"] = "Nova synthetic test"
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
@@ -189,6 +190,37 @@ class SicdPreviewTests(unittest.TestCase):
             for row, column in [(-1, 0), (0, -1), (2, 0), (0, 3)]:
                 with self.assertRaises(ValueError):
                     reader.pixel_image(str(file), row, column)
+
+    def test_axes_use_scene_center_offsets_and_actual_grid_directions(self):
+        metadata = SimpleNamespace(
+            ImageData=SimpleNamespace(FirstRow=10, FirstCol=20, SCPPixel=SimpleNamespace(Row=9, Col=18)),
+            Grid=SimpleNamespace(Type="XRGYCR", Row=SimpleNamespace(SS=2), Col=SimpleNamespace(SS=0.5)))
+        self.assertEqual(reader.image_axes(metadata), {
+            "row": {"label": "Down-range", "unit": "m", "origin": 2, "spacing": 2},
+            "column": {"label": "Cross-range", "unit": "m", "origin": 1, "spacing": 0.5}})
+        for kind, labels in [("RGAZIM", ("Down-range", "Cross-range (azimuth)")),
+                             ("RGZERO", ("Down-range", "Cross-range (azimuth)")),
+                             ("XCTYAT", ("Cross-track", "Along-track")),
+                             ("PLANE", ("Row distance", "Column distance"))]:
+            metadata.Grid.Type = kind
+            axes = reader.image_axes(metadata)
+            self.assertEqual((axes["row"]["label"], axes["column"]["label"]), labels)
+        metadata.ImageData.FirstRow = 0
+        self.assertEqual(reader.image_axes(metadata)["row"]["origin"], -18)
+        for spacing in [None, 0, -1, float("nan"), float("inf")]:
+            metadata.Grid.Row.SS = spacing
+            self.assertIsNone(reader.image_axes(metadata))
+        self.assertIsNone(reader.image_axes(SimpleNamespace()))
+
+    def test_render_exposes_physical_axes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "axes.nitf"
+            grid = GridType(ImagePlane="SLANT", Type="XRGYCR", Row={"SS": 2}, Col={"SS": 0.5})
+            self.fixture(file, np.ones((4, 8), dtype="complex64"), grid=grid)
+            axes = reader.render(str(file))["axes"]
+            self.assertEqual(axes["row"], {"label": "Down-range", "unit": "m", "origin": -4, "spacing": 2})
+            self.assertEqual(axes["column"], {"label": "Cross-range", "unit": "m", "origin": -2, "spacing": 0.5})
+            self.assertEqual(reader.render(str(file), "real")["axes"], axes)
 
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:
