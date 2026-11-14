@@ -25,9 +25,7 @@ test("startup reports plugin discovery and session restoration errors", async ({
     ).toBeDisabled();
 });
 
-test("unknown routes offer recovery to the workspace", async ({
-    application
-}) => {
+test("unknown routes redirect to the workspace", async ({ application }) => {
     const page = await application.firstWindow();
     await expect(
         page.getByRole("button", { name: "New", exact: true })
@@ -35,16 +33,10 @@ test("unknown routes offer recovery to the workspace", async ({
     await page.evaluate(() => {
         window.location.hash = "/missing-route";
     });
-    await expect(page.getByText("Oops. Nothing here...")).toBeVisible();
-    await page.getByRole("link", { name: "Go Home" }).click();
     await expect(
         page.getByRole("button", { name: "New", exact: true })
     ).toBeVisible();
-    await page.evaluate(() => {
-        window.location.hash = "/second";
-    });
-    await page.getByRole("link", { name: "Go to Index Page" }).click();
-    await expect(
-        page.getByRole("button", { name: "New", exact: true })
-    ).toBeVisible();
+    await expect
+        .poll(() => page.evaluate(() => window.location.hash))
+        .toBe("#/");
 });

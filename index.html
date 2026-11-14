@@ -5,11 +5,7 @@
 
         <meta charset="utf-8" />
         <meta name="description" content="<%= productDescription %>" />
-        <meta name="format-detection" content="telephone=no" />
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1<% if (ctx.mode.cordova || ctx.mode.capacitor) { %>, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover<% } %>"
-        />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta
             http-equiv="Content-Security-Policy"
             content="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline';<% if (ctx.dev) { %> connect-src 'self' ws://localhost:*; worker-src 'self' blob:;<% } %>"
@@ -40,11 +36,6 @@
             href="icons/nova-16.png"
         />
         <link rel="icon" type="image/ico" href="nova.ico" />
-        <link
-            rel="apple-touch-icon"
-            sizes="180x180"
-            href="icons/nova-180.png"
-        />
     </head>
     <body>
         <!-- quasar:entry-point -->

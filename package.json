@@ -4,13 +4,10 @@
     "private": true,
     "description": "Nova radar imagery workspace",
     "keywords": [
-        "quasar",
-        "quasar-app",
-        "quasar-app-vite",
-        "quasar-cli",
-        "vite",
-        "vue",
-        "vuejs"
+        "electron",
+        "imagery",
+        "radar",
+        "sicd"
     ],
     "type": "module",
     "scripts": {
