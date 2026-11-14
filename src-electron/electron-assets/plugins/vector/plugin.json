@@ -2,6 +2,6 @@
     "apiVersion": 1,
     "id": "nova.vector",
     "name": "SVG vector images",
-    "main": "index.mjs",
+    "main": "index.ts",
     "extensions": ["svg"]
 }

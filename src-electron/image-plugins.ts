@@ -161,10 +161,10 @@ export class ImagePlugins {
                 if (
                     relative.startsWith("..") ||
                     path.isAbsolute(relative) ||
-                    path.extname(modulePath) !== ".mjs"
+                    ![".ts", ".mjs"].includes(path.extname(modulePath))
                 ) {
                     throw new Error(
-                        "Plugin main must be an .mjs file inside its folder."
+                        "Plugin main must be a .ts or .mjs file inside its folder."
                     );
                 }
                 // External user-installed modules must stay outside the application bundle.

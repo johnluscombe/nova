@@ -1,3 +1,4 @@
+import type { ImagePlugin } from "../../../src-electron/image-plugins.ts";
 export default {
     async executeRibbonAction(actionId, context) {
         switch (actionId) {
@@ -13,4 +14,4 @@ export default {
                 throw new Error("Unknown example action.");
         }
     }
-};
+} satisfies ImagePlugin;

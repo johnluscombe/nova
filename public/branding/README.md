@@ -5,7 +5,7 @@ with its radar imagery workflow. Cyan and white sit on a navy app tile.
 
 The master is `nova-logo.png`, generated with the built-in image generation tool.
 PNG, ICO, and ICNS derivatives are generated with
-`node scripts/generate-icons.mjs` on macOS. The header uses a bundled 96px copy
+`node scripts/generate-icons.ts` on macOS. The header uses a bundled 96px copy
 at `src/assets/nova-logo.png`.
 
 ## Generation prompt

@@ -224,7 +224,11 @@ import {
     watch,
     computed
 } from "vue";
-import type { RestoredImageWindow, SavedImageWindow } from "@/types/workspace";
+import type {
+    ImageWorkspaceAPI,
+    RestoredImageWindow,
+    SavedImageWindow
+} from "@/types/workspace";
 import type { ImageInfo } from "@/types/image";
 import { activeScenario } from "@/composables/useScenario";
 import {
@@ -393,7 +397,7 @@ defineExpose({
     snapshot,
     toggleMetadata,
     toggleStatistics
-});
+} satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;
     return {

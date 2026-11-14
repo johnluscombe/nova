@@ -1,3 +1,4 @@
+import type { ImagePlugin } from "../../../image-plugins.ts";
 import { readFile } from "node:fs/promises";
 import { nativeImage } from "electron";
 
@@ -15,4 +16,4 @@ export default {
             previewDataUrl: `data:image/png;base64,${preview.toPNG().toString("base64")}`
         };
     }
-};
+} satisfies ImagePlugin;

@@ -13,7 +13,9 @@ test("opens scenarios, pages records, preserves large integers, and rejects inva
     const file = path.join(directory, "test.scenario");
     const scenario = new ScenarioDatabase();
     // Register a predefined test schema without adding placeholder production tables.
-    schema.records = sqliteTable('odd"table', {
+    (
+        schema as typeof schema & { records?: ReturnType<typeof sqliteTable> }
+    ).records = sqliteTable('odd"table', {
         id: blob("id", { mode: "bigint" }),
         data: blob("data", { mode: "buffer" }),
         value: text("value")
@@ -59,7 +61,11 @@ test("opens scenarios, pages records, preserves large integers, and rejects inva
         assert.throws(() => scenario.readTable('odd"table', 0));
     } finally {
         scenario.close();
-        delete schema.records;
+        delete (
+            schema as typeof schema & {
+                records?: ReturnType<typeof sqliteTable>;
+            }
+        ).records;
         rmSync(directory, { recursive: true, force: true });
     }
 });
@@ -95,7 +101,7 @@ test("creates, saves, overwrites, and reopens an empty scenario", async () => {
         await assert.rejects(
             scenario.save(path.join(directory, "missing", "fail.scenario"))
         );
-        assert.equal(scenario.current.path, null);
+        assert.equal(scenario.current!.path, null);
         await assert.rejects(scenario.save(path.join(directory, "wrong.txt")));
         const saved = await scenario.save(file);
         assert.equal(saved.path, file);
@@ -128,7 +134,7 @@ test("saving an opened scenario preserves undeclared tables", async () => {
         const copy = new DatabaseSync(destination, { readOnly: true });
         try {
             assert.equal(
-                copy.prepare("SELECT value FROM retained").get().value,
+                copy.prepare("SELECT value FROM retained").get()!.value,
                 "keep me"
             );
         } finally {

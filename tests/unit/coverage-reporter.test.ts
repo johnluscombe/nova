@@ -7,7 +7,8 @@ import CoverageReporter from "../e2e/coverage-reporter.ts";
 
 test("reads a custom raw input file and preserves it at startup", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-coverage-input-"));
-    const execute = vi.fn();
+    const execute =
+        vi.fn<(context: import("istanbul-lib-report").Context) => void>();
     const create = vi.spyOn(reports, "create").mockReturnValue({ execute });
     try {
         const input = path.join(directory, "input.json");
@@ -42,10 +43,13 @@ test("reads a custom raw input file and preserves it at startup", async () => {
             file: "coverage-playwright.json"
         });
         expect(
-            execute.mock.calls[0][0]
-                .getTree("pkg")
-                .getRoot()
-                .getCoverageSummary().lines.pct
+            (
+                execute.mock.calls[0]![0].getTree(
+                    "pkg"
+                ).getRoot() as import("istanbul-lib-report").Node & {
+                    getCoverageSummary(): import("istanbul-lib-coverage").CoverageSummary;
+                }
+            ).getCoverageSummary().lines.pct
         ).toBe(100);
     } finally {
         create.mockRestore();

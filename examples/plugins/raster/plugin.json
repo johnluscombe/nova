@@ -2,6 +2,6 @@
     "apiVersion": 1,
     "id": "nova.raster",
     "name": "JPG / PNG images",
-    "main": "index.mjs",
+    "main": "index.ts",
     "extensions": ["jpg", "jpeg", "png"]
 }

@@ -44,7 +44,7 @@ export const test = base.extend<ElectronFixtures>({
             delete env.ELECTRON_RUN_AS_NODE;
             const application = await electron.launch({
                 executablePath: requireElectron("electron") as string,
-                args: [path.resolve("tests/e2e/electron-entry.cjs")],
+                args: [path.resolve("tests/e2e/electron-entry.ts")],
                 cwd: path.resolve("dist/electron/UnPackaged"),
                 env: Object.fromEntries(
                     Object.entries(env).filter(

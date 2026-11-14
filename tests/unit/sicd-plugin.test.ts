@@ -2,7 +2,7 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import { homedir } from "node:os";
 import path from "node:path";
-import { openSicd } from "../../src-electron/electron-assets/plugins/sicd/index.mjs";
+import { openSicd } from "../../src-electron/electron-assets/plugins/sicd/index.ts";
 
 test("SICD uses an argument array and returns the worker preview", async () => {
     const result = {
@@ -17,7 +17,7 @@ test("SICD uses an argument array and returns the worker preview", async () => {
         async (_python, args, options) => {
             assert.equal(_python, "/custom Python/bin/python");
             assert.equal(args[1], file);
-            assert.ok(args[0].endsWith("reader.py"));
+            assert.ok(args[0]!.endsWith("reader.py"));
             assert.equal(options.timeout, 120000);
             assert.equal(options.windowsHide, true);
             assert.equal(options.shell, undefined);
@@ -100,7 +100,7 @@ test("SICD rejects invalid interpreter parameters", async () => {
 
 test("default SICD export forwards configured interpreter parameters", async () => {
     const plugin = (
-        await import("../../src-electron/electron-assets/plugins/sicd/index.mjs")
+        await import("../../src-electron/electron-assets/plugins/sicd/index.ts")
     ).default;
     await assert.rejects(
         plugin.open("missing.nitf", { python: "" }),

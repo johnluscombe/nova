@@ -52,13 +52,13 @@ test.use({
             apiVersion: 1,
             id: "test.decoder",
             name: "Test decoder",
-            main: "index.mjs",
+            main: "index.ts",
             extensions: ["test"],
             ribbon
         }),
-        "test/index.mjs": `import { access } from 'node:fs/promises';
+        "test/index.ts": `import { access } from 'node:fs/promises';
         export default {
-            async open(file) {
+            async open(file: string) {
                 if (file.includes('slow')) {
                     for (let i = 0; i < 500; i++) {
                         try { await access(file + '.ready'); break; } catch {}
@@ -69,7 +69,7 @@ test.use({
                 if (file.includes('broken')) throw new Error('Intentional decoder failure');
                 return { width: 40, height: 20, metadata: { Collector: 'Test radar' }, statistics: { Mean: 2.5, Basis: 'Source amplitude' }, previewDataUrl: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="blue"/></svg>').toString('base64') };
             },
-            executeRibbonAction(id, context) {
+            executeRibbonAction(id: string, context: { scenarioPath: string | null }) {
                 if (id === 'fail') throw new Error('Intentional action failure');
                 return { message: id === 'inspect' ? 'Inspected ' + context.scenarioPath : 'Action ' + id };
             }

@@ -2,7 +2,7 @@
     "apiVersion": 1,
     "id": "nova.ribbon-example",
     "name": "Ribbon example",
-    "main": "index.mjs",
+    "main": "index.ts",
     "extensions": [],
     "ribbon": {
         "tabs": [

@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 /* oxlint-disable typescript/unbound-method -- Assertions inspect mocked IPC methods without invoking them. */
 import { test, expect, vi, beforeEach, afterEach } from "vitest";
+import type { VueWrapper } from "@vue/test-utils";
+import type { Component } from "vue";
+import type { Mocked } from "vitest";
+import type { ImageAPI } from "../../src/types/image.ts";
+import type { ScenarioAPI } from "../../src/types/scenario.ts";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { activeScenario } from "../../src/composables/useScenario.ts";
@@ -22,7 +27,10 @@ vi.mock("../../src/components/ImageWorkspace.vue", () => ({
     })
 }));
 import IndexPage from "../../src/pages/IndexPage.vue";
-let wrapper, flush;
+let wrapper: VueWrapper<InstanceType<typeof IndexPage>> | undefined;
+let flush: () => void;
+let scenarioMock: Mocked<ScenarioAPI>;
+let imagesMock: Mocked<ImageAPI>;
 const scenario = { name: "Test", path: "/test.scenario", tables: [] };
 const image = {
     name: "image",
@@ -31,7 +39,7 @@ const image = {
     pluginName: "Test"
 };
 const container = { template: "<div><slot /></div>" };
-const stubs = Object.fromEntries(
+const stubs: Record<string, Component> = Object.fromEntries(
     [
         "QPage",
         "QTabs",
@@ -57,19 +65,27 @@ stubs.QDialog = {
 beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
-    window.images = {
-        plugins: vi.fn(async () => ({
+    imagesMock = {
+        plugins: vi.fn<ImageAPI["plugins"]>(async () => ({
             directory: "/plugins",
-            plugins: [{ id: "test", extensions: ["test"] }],
+            plugins: [
+                {
+                    apiVersion: 1,
+                    id: "test",
+                    name: "Test",
+                    main: "index.ts",
+                    extensions: ["test"]
+                }
+            ],
             errors: []
         })),
-        open: vi.fn(async () => image),
+        open: vi.fn<ImageAPI["open"]>(async () => image),
         executeRibbonAction: vi.fn(async () => ({}))
     };
-    window.scenario = {
-        restoreLast: vi.fn(async () => null),
+    scenarioMock = {
+        restoreLast: vi.fn<ScenarioAPI["restoreLast"]>(async () => null),
         saveWorkspace: vi.fn(async () => {}),
-        onFlushRequested: vi.fn(callback => {
+        onFlushRequested: vi.fn<ScenarioAPI["onFlushRequested"]>(callback => {
             flush = callback;
             return vi.fn();
         }),
@@ -77,35 +93,54 @@ beforeEach(() => {
         create: vi.fn(async () => scenario),
         open: vi.fn(async () => scenario),
         close: vi.fn(async () => {}),
-        loadImages: vi.fn(async () => {})
+        loadImages: vi.fn<ScenarioAPI["loadImages"]>(async () => {}),
+        readTable: vi.fn(async () => ({
+            columns: [],
+            rows: [],
+            hasMore: false
+        }))
     };
+    window.scenario = scenarioMock;
+    window.images = imagesMock;
 });
 afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
     activeScenario.value = null;
     delete window.images;
-    delete window.scenario;
+    Reflect.deleteProperty(window, "scenario");
 });
 async function page() {
     wrapper = mount(IndexPage, { global: { stubs } });
     await flushPromises();
     return wrapper;
 }
-async function click(label) {
-    await wrapper
+async function click(label: string) {
+    await wrapper!
         .findAll("button")
-        .find(button => button.text() === label)
+        .find(button => button.text() === label)!
         .trigger("click");
     await flushPromises();
 }
 
 test("restored image updates complete or fail the saved widgets", async () => {
-    window.scenario.restoreLast.mockResolvedValue({
+    scenarioMock.restoreLast.mockResolvedValue({
         ...scenario,
-        workspace: [{ id: 1, loading: true }]
+        workspace: [
+            {
+                id: 1,
+                loading: true,
+                image,
+                path: image.path,
+                pluginId: image.pluginId,
+                rect: { x: 0, y: 0, width: 520, height: 360 },
+                z: 1,
+                minimized: false,
+                maximized: false
+            }
+        ]
     });
-    window.scenario.loadImages.mockImplementation(async callback => {
+    scenarioMock.loadImages.mockImplementation(async callback => {
         callback({ id: 1, image });
         callback({ id: 2 });
     });
@@ -115,30 +150,30 @@ test("restored image updates complete or fail the saved widgets", async () => {
     expect(workspace.fail).toHaveBeenCalledWith(2, "Unable to restore image.");
     flush();
     await flushPromises();
-    expect(window.scenario.confirmClose).toHaveBeenCalledOnce();
+    expect(scenarioMock.confirmClose).toHaveBeenCalledOnce();
 });
 
 test("image opening handles plugins that return directly or announce loading first", async () => {
     await page();
     await click("New");
     await click("Open");
-    expect(window.scenario.open).toHaveBeenCalledOnce();
+    expect(scenarioMock.open).toHaveBeenCalledOnce();
     // Image Open has the same label as scenario Open; select it by aria-label.
-    await wrapper.get('[aria-label="Open image"]').trigger("click");
+    await wrapper!.get('[aria-label="Open image"]').trigger("click");
     await flushPromises();
     expect(workspace.add).toHaveBeenCalledWith(image);
-    window.images.open.mockImplementation(async callback => {
-        callback(image);
+    imagesMock.open.mockImplementation(async callback => {
+        callback?.(image);
         return image;
     });
-    await wrapper.get('[aria-label="Open image"]').trigger("click");
+    await wrapper!.get('[aria-label="Open image"]').trigger("click");
     await flushPromises();
     expect(workspace.complete).toHaveBeenCalledWith(1, image);
-    window.images.open.mockImplementation(async callback => {
-        callback(image);
+    imagesMock.open.mockImplementation(async callback => {
+        callback?.(image);
         throw "decode failed";
     });
-    await wrapper.get('[aria-label="Open image"]').trigger("click");
+    await wrapper!.get('[aria-label="Open image"]').trigger("click");
     await flushPromises();
     expect(workspace.fail).toHaveBeenCalledWith(1, "Unable to open image.");
     await click("Close");
@@ -147,38 +182,38 @@ test("image opening handles plugins that return directly or announce loading fir
 
 test("missing desktop APIs provide actionable errors", async () => {
     delete window.images;
-    delete window.scenario;
+    Reflect.deleteProperty(window, "scenario");
     await page();
     await click("New");
-    expect(wrapper.text()).toContain(
+    expect(wrapper!.text()).toContain(
         "Use the Nova desktop app to create scenarios"
     );
     await click("Open");
-    expect(wrapper.text()).toContain("Open scenarios in the Nova desktop app");
+    expect(wrapper!.text()).toContain("Open scenarios in the Nova desktop app");
 });
 
 test("unknown error values have readable plugin and session error messages", async () => {
-    window.images.plugins.mockRejectedValue("plugins failed");
-    window.scenario.restoreLast.mockRejectedValue("restore failed");
+    imagesMock.plugins.mockRejectedValue("plugins failed");
+    scenarioMock.restoreLast.mockRejectedValue("restore failed");
     await page();
-    expect(wrapper.text()).toContain("Unable to restore scenario.");
-    window.scenario.create.mockRejectedValue("create failed");
+    expect(wrapper!.text()).toContain("Unable to restore scenario.");
+    scenarioMock.create.mockRejectedValue("create failed");
     await click("New");
-    expect(wrapper.text()).toContain("Unable to create scenario.");
-    window.scenario.open.mockRejectedValue("open failed");
+    expect(wrapper!.text()).toContain("Unable to create scenario.");
+    scenarioMock.open.mockRejectedValue("open failed");
     await click("Open");
-    expect(wrapper.text()).toContain("Unable to open scenario.");
+    expect(wrapper!.text()).toContain("Unable to open scenario.");
 });
 
 test("failed saves keep work open and prevent confirming application shutdown", async () => {
-    window.scenario.restoreLast.mockResolvedValue(scenario);
+    scenarioMock.restoreLast.mockResolvedValue(scenario);
     await page();
-    window.scenario.saveWorkspace.mockRejectedValue("disk full");
+    scenarioMock.saveWorkspace.mockRejectedValue("disk full");
     flush();
     await flushPromises();
-    expect(window.scenario.confirmClose).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("Unable to save before closing");
+    expect(scenarioMock.confirmClose).not.toHaveBeenCalled();
+    expect(wrapper!.text()).toContain("Unable to save before closing");
     await click("Close");
-    expect(window.scenario.close).not.toHaveBeenCalled();
+    expect(scenarioMock.close).not.toHaveBeenCalled();
     expect(activeScenario.value).toEqual(scenario);
 });

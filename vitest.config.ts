@@ -17,7 +17,7 @@ export default defineConfig({
     },
     test: {
         environment: "node",
-        include: ["tests/unit/**/*.test.{ts,mjs}"],
+        include: ["tests/unit/**/*.test.ts"],
         exclude: ["**/node_modules/**"],
         coverage: {
             provider: "istanbul",
@@ -27,7 +27,7 @@ export default defineConfig({
                 "src/**/*.ts",
                 "src/**/*.vue",
                 "src-electron/**/*.ts",
-                "src-electron/electron-assets/plugins/**/*.mjs"
+                "src-electron/electron-assets/plugins/**/*.ts"
             ],
             exclude: [
                 "**/*.d.ts",

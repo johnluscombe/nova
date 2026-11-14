@@ -2,7 +2,7 @@ import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import vector from "../../src-electron/electron-assets/plugins/vector/index.mjs";
+import vector from "../../src-electron/electron-assets/plugins/vector/index.ts";
 
 test("vector rejects non-SVG content and oversized source files", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "nova-vector-"));

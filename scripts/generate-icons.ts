@@ -1,4 +1,4 @@
-// Run on macOS: node scripts/generate-icons.mjs
+// Run on macOS: node scripts/generate-icons.ts
 import { execFileSync } from "node:child_process";
 import {
     copyFileSync,
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const source = path.join(root, "public/branding/nova-logo.png");
 const temporary = mkdtempSync(path.join(tmpdir(), "nova-icons-"));
-const resize = (size, destination) => {
+const resize = (size: number, destination: string) => {
     execFileSync(
         "sips",
         ["-z", String(size), String(size), source, "--out", destination],
@@ -48,8 +48,8 @@ try {
     let offset = directory.length;
     images.forEach((image, index) => {
         const entry = 6 + index * 16;
-        directory[entry] = sizes[index] % 256;
-        directory[entry + 1] = sizes[index] % 256;
+        directory[entry] = sizes[index]! % 256;
+        directory[entry + 1] = sizes[index]! % 256;
         directory.writeUInt16LE(1, entry + 4);
         directory.writeUInt16LE(32, entry + 6);
         directory.writeUInt32LE(image.length, entry + 8);
@@ -64,12 +64,14 @@ try {
     );
 
     // Modern ICNS elements embed PNG data directly.
-    const chunks = [
-        [128, "ic07"],
-        [256, "ic08"],
-        [512, "ic09"],
-        [1024, "ic10"]
-    ].map(([size, type]) => {
+    const chunks = (
+        [
+            [128, "ic07"],
+            [256, "ic08"],
+            [512, "ic09"],
+            [1024, "ic10"]
+        ] as const
+    ).map(([size, type]) => {
         const file = path.join(temporary, String(size) + ".png");
         resize(size, file);
         const image = readFileSync(file);

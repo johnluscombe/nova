@@ -60,11 +60,11 @@ scenarios; save failures are shown in the workspace. Existing empty scenarios
 receive the workspace table automatically.
 Schema definitions do not create tables; add migrations when adding the first tables.
 
-Run the database tests with `npm test -- tests/unit/scenario-database.test.mjs`.
+Run the database tests with `npm test -- tests/unit/scenario-database.test.ts`.
 
 ### Tests
 
-- `npm test` runs the JavaScript/TypeScript unit tests with Vitest.
+- `npm test` runs the TypeScript unit tests with Vitest.
 - `npm run test:watch` runs Vitest in watch mode.
 - `npm run test:e2e` builds the Electron app without packaging and runs Playwright.
 - `npm run test:e2e:ui` opens Playwright's UI using the last build. Run
@@ -92,7 +92,7 @@ Each directory contains `index.html` and `lcov.info`. The JSON reports are
 `coverage/unit/coverage-final.json` and
 `coverage/playwright/coverage-playwright.json`. Coverage summaries also appear in the terminal. Reports are ignored by Git.
 
-Unit coverage includes TypeScript application logic, JavaScript image plugins,
+Unit coverage includes TypeScript application logic, TypeScript image plugins,
 and Vue components. Vue unit tests use jsdom and stub native IPC/Quasar controls.
 Electron main/preload entrypoints remain outside its scope.
 Playwright coverage measures renderer files loaded by the tests, including Vue
@@ -163,3 +163,12 @@ Vite's combined source map directly to Istanbul, preserving original Vue SFC
 locations. A regression test verifies that generated line 1 remaps to original
 line 5 before merging. Avoid replacing those maps with identity maps: that makes
 unit and e2e coverage refer to different lines in the same Vue source file.
+
+### TypeScript sources
+
+Application code, unit/e2e tests, bundled and example plugins, configuration, and
+utility scripts use `.ts` files. Plugin manifests point to `index.ts`; Electron
+loads plugins using native type stripping, so plugin code must use erasable
+TypeScript syntax and type-only imports for type dependencies. Existing external
+`.mjs` plugins remain supported. Compiled Electron bundles and preload files
+remain JavaScript build artifacts.

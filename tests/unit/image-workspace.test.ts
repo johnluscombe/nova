@@ -1,12 +1,21 @@
 // @vitest-environment jsdom
+import type { ImageWorkspaceAPI } from "../../src/types/workspace.ts";
 import { test, expect, vi, beforeEach, afterEach } from "vitest";
+import type { VueWrapper } from "@vue/test-utils";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ImageWorkspace from "../../src/components/ImageWorkspace.vue";
 import { activeScenario } from "../../src/composables/useScenario.ts";
-let wrapper, resize;
+let wrapper: VueWrapper<InstanceType<typeof ImageWorkspace>>;
+let resize: (
+    entries: { contentRect: { width: number; height: number } }[]
+) => void;
 const disconnect = vi.fn();
-async function pointer(target, type, properties = {}) {
+async function pointer(
+    target: { element: Element },
+    type: string,
+    properties: Record<string, number> = {}
+) {
     const event = new Event(type, { bubbles: true });
     for (const [name, value] of Object.entries(properties)) {
         Object.defineProperty(event, name, { value });
@@ -18,7 +27,7 @@ beforeEach(() => {
     vi.stubGlobal(
         "ResizeObserver",
         class {
-            constructor(callback) {
+            constructor(callback: typeof resize) {
                 resize = callback;
             }
             observe() {
@@ -48,7 +57,7 @@ function workspace() {
             }
         }
     });
-    return wrapper.vm;
+    return wrapper.vm as unknown as ImageWorkspaceAPI;
 }
 const image = {
     name: "image.test",
@@ -68,7 +77,7 @@ test("panels follow image readiness and closing a widget ignores late completion
     activeScenario.value = { name: "Test", path: "/test.scenario", tables: [] };
     await nextTick();
     expect(wrapper.text()).toContain("Open an image");
-    const id = api.add({ ...image, previewDataUrl: undefined }, true);
+    const id = api.add({ ...image, previewDataUrl: "" }, true);
     await nextTick();
     expect(wrapper.text()).toContain("Loading image");
     api.toggleMetadata();
@@ -105,7 +114,7 @@ test("hydration preserves window state, failure placeholders and resizes to the 
             id: 4,
             path: image.path,
             pluginId: image.pluginId,
-            image: { ...image, previewDataUrl: undefined },
+            image: { ...image, previewDataUrl: "" },
             rect: { x: 100, y: 100, width: 520, height: 360 },
             z: 5,
             minimized: false,
@@ -122,7 +131,7 @@ test("hydration preserves window state, failure placeholders and resizes to the 
     resize([]);
     resize([{ contentRect: { width: 300, height: 200 } }]);
     await nextTick();
-    expect(api.snapshot()[0].rect).toEqual({
+    expect(api.snapshot()[0]!.rect).toEqual({
         x: 0,
         y: 0,
         width: 300,
@@ -146,7 +155,7 @@ test("pointer gestures distinguish move and resize and ignore wrong pointers", a
         clientX: 20,
         clientY: 20
     });
-    const initial = api.snapshot()[0].rect;
+    const initial = api.snapshot()[0]!.rect;
     await pointer(title, "pointerdown", {
         button: 0,
         pointerId: 1,
@@ -158,18 +167,18 @@ test("pointer gestures distinguish move and resize and ignore wrong pointers", a
         clientX: 90,
         clientY: 90
     });
-    expect(api.snapshot()[0].rect).toEqual(initial);
+    expect(api.snapshot()[0]!.rect).toEqual(initial);
     await pointer(title, "pointermove", {
         pointerId: 1,
         clientX: 20,
         clientY: 20
     });
     await pointer(title, "pointerup");
-    expect(api.snapshot()[0].rect.x).toBe(initial.x + 20);
+    expect(api.snapshot()[0]!.rect.x).toBe(initial.x + 20);
     await title.trigger("keydown", { key: "ArrowLeft" });
     const handle = wrapper.get(".resize-se");
     handle.element.setPointerCapture = vi.fn();
-    const width = api.snapshot()[0].rect.width;
+    const width = api.snapshot()[0]!.rect.width;
     await pointer(handle, "pointerdown", {
         button: 0,
         pointerId: 3,
@@ -182,5 +191,5 @@ test("pointer gestures distinguish move and resize and ignore wrong pointers", a
         clientY: 20
     });
     await pointer(handle, "pointercancel");
-    expect(api.snapshot()[0].rect.width).toBe(width + 20);
+    expect(api.snapshot()[0]!.rect.width).toBe(width + 20);
 });

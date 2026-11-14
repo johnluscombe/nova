@@ -1,3 +1,4 @@
+import type { ImagePlugin } from "../../../image-plugins.ts";
 import { readFile } from "node:fs/promises";
 
 export default {
@@ -15,4 +16,4 @@ export default {
             previewDataUrl: `data:image/svg+xml;base64,${Buffer.from(source).toString("base64")}`
         };
     }
-};
+} satisfies ImagePlugin;

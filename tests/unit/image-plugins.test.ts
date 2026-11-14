@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { ImagePlugins } from "../../src-electron/image-plugins.ts";
 
-async function fixture(run) {
+async function fixture(
+    run: (directory: string, host: ImagePlugins) => Promise<void>
+) {
     const directory = await mkdtemp(path.join(tmpdir(), "nova-plugin-test-"));
     try {
         await run(directory, new ImagePlugins(directory));
@@ -14,7 +16,12 @@ async function fixture(run) {
     }
 }
 
-async function plugin(directory, name, code, overrides = {}) {
+async function plugin(
+    directory: string,
+    name: string,
+    code: string,
+    overrides: Record<string, unknown> = {}
+) {
     const folder = path.join(directory, name);
     await mkdir(folder);
     await writeFile(
@@ -23,12 +30,12 @@ async function plugin(directory, name, code, overrides = {}) {
             apiVersion: 1,
             id: name,
             name,
-            main: "index.mjs",
+            main: "index.ts",
             extensions: ["test"],
             ...overrides
         })
     );
-    await writeFile(path.join(folder, "index.mjs"), code);
+    await writeFile(path.join(folder, "index.ts"), code);
 }
 
 test("no plugins means no supported filters or image opening", () =>
@@ -61,7 +68,7 @@ test("discovers plugins, isolates failures, invokes plugin-owned file I/O, and r
         const state = await host.reload();
         assert.equal(state.plugins.length, 1);
         assert.equal(state.errors.length, 2);
-        assert.deepEqual(host.filters[0].extensions, ["test"]);
+        assert.deepEqual(host.filters[0]!.extensions, ["test"]);
         const file = path.join(directory, "image.TEST");
         await writeFile(file, "8");
         assert.deepEqual(await host.open(file), {
@@ -112,10 +119,10 @@ test("tries subsequent matching decoders after decline, failure, or invalid outp
 test("rejects escaping entry paths and duplicate IDs", () =>
     fixture(async (directory, host) => {
         await writeFile(
-            path.join(directory, "outside.mjs"),
+            path.join(directory, "outside.ts"),
             "export default {open() {return {};}};"
         );
-        await plugin(directory, "a-escape", "", { main: "../outside.mjs" });
+        await plugin(directory, "a-escape", "", { main: "../outside.ts" });
         await plugin(
             directory,
             "b-first",
@@ -167,7 +174,7 @@ test("bundled plugins load without user installation and user overrides take pri
 test("vector plugin reads SVG and host accepts a vector preview", () =>
     fixture(async directory => {
         const { default: vector } =
-            await import("../../src-electron/electron-assets/plugins/vector/index.mjs");
+            await import("../../src-electron/electron-assets/plugins/vector/index.ts");
         const file = path.join(directory, "sample.svg");
         const svg =
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/></svg>';
@@ -175,7 +182,7 @@ test("vector plugin reads SVG and host accepts a vector preview", () =>
         const result = await vector.open(file);
         assert.equal(
             Buffer.from(
-                result.previewDataUrl.split(",")[1],
+                result.previewDataUrl!.split(",")[1]!,
                 "base64"
             ).toString(),
             svg
@@ -228,7 +235,7 @@ test("ribbon-only plugins contribute controls and dispatch only declared actions
         );
         const state = await host.reload();
         assert.equal(state.errors.length, 0);
-        assert.deepEqual(state.plugins[0].ribbon, ribbon);
+        assert.deepEqual(state.plugins[0]!.ribbon, ribbon);
         assert.deepEqual(host.filters, []);
         await assert.rejects(
             host.executeRibbonAction("ribbon", "run", { scenarioPath: null }),
@@ -280,7 +287,7 @@ test("invalid ribbon declarations and missing action handlers are isolated", () 
                             ...ribbon.tabs[0],
                             groups: [
                                 {
-                                    ...ribbon.tabs[0].groups[0],
+                                    ...ribbon.tabs[0]!.groups[0],
                                     buttons: [button, button]
                                 }
                             ]
@@ -301,7 +308,7 @@ test("invalid ribbon declarations and missing action handlers are isolated", () 
                             ...ribbon.tabs[0],
                             groups: [
                                 {
-                                    ...ribbon.tabs[0].groups[0],
+                                    ...ribbon.tabs[0]!.groups[0],
                                     buttons: [
                                         {
                                             ...button,

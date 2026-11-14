@@ -15,7 +15,7 @@ vary). Copy a plugin folder there and restart Nova. Restart after updating or
 removing plugins too; plugins are discovered at application startup. A faulty
 plugin is reported separately and does not stop other plugins loading.
 
-Plugins are trusted local JavaScript executing in the Electron main process with
+Plugins are trusted local TypeScript modules executing in the Electron main process with
 Node.js access. Install only plugins you trust. They are not sandboxed; plugin
 errors are caught, but a blocking or crashing decoder can affect the application.
 
@@ -25,7 +25,7 @@ errors are caught, but a blocking or crashing decoder can affect the application
 plugins/
   my-decoder/
     plugin.json
-    index.mjs
+    index.ts
 ```
 
 ```json
@@ -33,16 +33,18 @@ plugins/
     "apiVersion": 1,
     "id": "example.decoder",
     "name": "My image decoder",
-    "main": "index.mjs",
+    "main": "index.ts",
     "extensions": ["myimage"]
 }
 ```
 
-Use lowercase extensions without a dot. The entry must be an `.mjs` module inside
-its plugin folder. IDs must be unique. Dependencies may be bundled or installed
+Use lowercase extensions without a dot. The entry should be a `.ts` module inside
+its plugin folder. TypeScript runs through Electron’s native type stripping; use
+erasable syntax and `import type` for type dependencies. Existing external `.mjs`
+entries remain supported. IDs must be unique. Dependencies may be bundled or installed
 in the plugin's own `node_modules` directory.
 
-```js
+```ts
 export default {
     // Optional. Inspect file contents here when an extension is shared by formats.
     async canOpen(filePath, parameters) {
@@ -102,7 +104,7 @@ labels, not plugin HTML or renderer scripts.
     "apiVersion": 1,
     "id": "example.tools",
     "name": "Example tools",
-    "main": "index.mjs",
+    "main": "index.ts",
     "extensions": [],
     "ribbon": {
         "tabs": [
@@ -145,7 +147,7 @@ labels, not plugin HTML or renderer scripts.
 
 The module's default export handles declared button IDs:
 
-```js
+```ts
 export default {
     async executeRibbonAction(actionId, context, parameters) {
         if (actionId === "inspect") {
@@ -192,7 +194,7 @@ For bundled plugins in an installed app, configure a user copy with the same ID.
 Image results may include a `metadata` object mapping display labels to strings,
 finite numbers, booleans, or null. For example:
 
-```js
+```ts
 return {
     width: 1024,
     height: 512,

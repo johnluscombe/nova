@@ -244,12 +244,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import ImageWorkspace from "@/components/ImageWorkspace.vue";
 import type { ImagePluginStatus } from "../types/image";
-import type { SavedImageWindow } from "../types/workspace";
+import type { ImageWorkspaceAPI, SavedImageWindow } from "../types/workspace";
 import type { ScenarioInfo } from "../types/scenario";
 import { activeScenario as scenario } from "@/composables/useScenario";
 const busy = ref(false);
 const error = ref("");
-const workspace = ref<InstanceType<typeof ImageWorkspace>>();
+const workspace = ref<ImageWorkspaceAPI>();
 const hasActiveWidget = ref(false);
 const hasActiveStatistics = ref(false);
 const workspaceSession = ref(0);

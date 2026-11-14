@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import { test, expect, vi, afterEach } from "vitest";
+import type { VueWrapper } from "@vue/test-utils";
+import type { Component } from "vue";
+import type { WindowState } from "../../src/types/window-controls.ts";
 import { mount, flushPromises } from "@vue/test-utils";
 import MainLayout from "../../src/layouts/MainLayout.vue";
 import { activeScenario } from "../../src/composables/useScenario.ts";
 
 const container = { template: "<div><slot /></div>" };
-const stubs = Object.fromEntries(
+const stubs: Record<string, Component> = Object.fromEntries(
     [
         "QLayout",
         "QHeader",
@@ -20,7 +23,7 @@ stubs.QBtn = {
     emits: ["click"],
     template: "<button @click=\"$emit('click')\"><slot /></button>"
 };
-let wrapper;
+let wrapper: VueWrapper<InstanceType<typeof MainLayout>> | undefined;
 afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
@@ -32,7 +35,7 @@ function mountLayout() {
     return wrapper;
 }
 function controls() {
-    let publish;
+    let publish: (state: WindowState) => void = () => {};
     const unsubscribe = vi.fn();
     const api = {
         platform: "win32",
@@ -40,13 +43,17 @@ function controls() {
         minimize: vi.fn(async () => {}),
         close: vi.fn(async () => {}),
         toggleMaximize: vi.fn(async () => ({ maximized: true })),
-        onStateChanged: vi.fn(callback => {
+        onStateChanged: vi.fn((callback: (state: WindowState) => void) => {
             publish = callback;
             return unsubscribe;
         })
     };
     window.windowControls = api;
-    return { api, unsubscribe, publish: state => publish(state) };
+    return {
+        api,
+        unsubscribe,
+        publish: (state: WindowState) => publish(state)
+    };
 }
 
 test("Windows controls dispatch actions, reflect native state and unsubscribe on unmount", async () => {
@@ -96,10 +103,10 @@ test("macOS and browser mode omit custom window controls", async () => {
 
 test("a late state response after unmount does not update a destroyed layout", async () => {
     const { api, unsubscribe } = controls();
-    let resolve;
+    let resolve: (state: WindowState) => void = () => {};
     api.getState.mockImplementationOnce(
         () =>
-            new Promise(done => {
+            new Promise<WindowState>(done => {
                 resolve = done;
             })
     );

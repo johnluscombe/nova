@@ -7,6 +7,11 @@ import { coverageInstrumentation } from "../coverage/instrumentation.ts";
 
 test("instrumentation preserves original Vue line locations instead of generated lines", async () => {
     const plugin = coverageInstrumentation();
+    const transform = plugin.transform as (
+        this: { getCombinedSourcemap(): unknown },
+        code: string,
+        id: string
+    ) => { code: string } | undefined;
     const file = path.resolve("src/Fixture.vue");
     const source =
         "<template><div /></template>\n<script setup>\n\n\nconst result = 42;\n</script>";
@@ -19,13 +24,9 @@ test("instrumentation preserves original Vue line locations instead of generated
         mappings: "AAIA"
     };
     const context = { getCombinedSourcemap: () => sourceMap };
-    const transformed = plugin.transform.call(
-        context,
-        "const result = 42;",
-        file
-    );
+    const transformed = transform.call(context, "const result = 42;", file);
     const sandbox = vm.createContext({});
-    vm.runInContext(transformed.code, sandbox);
+    vm.runInContext(transformed!.code, sandbox);
     const remapped = await sourceMaps
         .createSourceMapStore()
         .transformCoverage(
@@ -33,9 +34,9 @@ test("instrumentation preserves original Vue line locations instead of generated
         );
     expect(remapped.fileCoverageFor(file).getLineCoverage()).toEqual({ 5: 1 });
     expect(
-        plugin.transform.call(context, "", "/node_modules/package/index.js")
+        transform.call(context, "", "/node_modules/package/index.js")
     ).toBeUndefined();
     expect(
-        plugin.transform.call(context, "", file + "?vue&type=style")
+        transform.call(context, "", file + "?vue&type=style")
     ).toBeUndefined();
 });

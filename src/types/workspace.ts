@@ -50,3 +50,13 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
     }
     return value as SavedImageWindow[];
 }
+
+export interface ImageWorkspaceAPI {
+    add(image: ImageInfo, loading?: boolean): number;
+    complete(id: number, image: ImageInfo): void;
+    fail(id: number, message: string): void;
+    snapshot(): SavedImageWindow[];
+    hydrate(saved: RestoredImageWindow[]): void;
+    toggleMetadata(): void;
+    toggleStatistics(): void;
+}

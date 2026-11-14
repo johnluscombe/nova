@@ -1,3 +1,9 @@
+import type { ImagePlugin } from "../../../image-plugins.ts";
+import type {
+    PluginParameters,
+    ImagePluginResult
+} from "../../../../src/types/image.ts";
+import type { ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -5,7 +11,16 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 const execute = promisify(execFile);
-export async function openSicd(filePath, parameters = {}, run = execute) {
+type Runner = (
+    python: string,
+    args: string[],
+    options: ExecFileOptionsWithStringEncoding
+) => Promise<{ stdout: string }>;
+export async function openSicd(
+    filePath: string,
+    parameters: PluginParameters = {},
+    run: Runner = execute
+): Promise<ImagePluginResult> {
     const configuredPython =
         parameters.python ??
         (process.platform === "win32" ? "python" : "python3");
@@ -35,7 +50,11 @@ export async function openSicd(filePath, parameters = {}, run = execute) {
                 }
             }
         ));
-    } catch (error) {
+    } catch (cause) {
+        const error = cause as NodeJS.ErrnoException & {
+            killed?: boolean;
+            stderr?: string;
+        };
         if (error.code === "ENOENT") {
             throw new Error(
                 `SICD could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/sicd-plugin.md.`
@@ -76,4 +95,4 @@ export async function openSicd(filePath, parameters = {}, run = execute) {
 }
 export default {
     open: (filePath, parameters) => openSicd(filePath, parameters)
-};
+} satisfies ImagePlugin;
