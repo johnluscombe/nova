@@ -1,8 +1,10 @@
-# SICD plugin
+# SICD / SIDD plugin
 
-The bundled `nova.sicd` plugin opens SICD-in-NITF files with `.sicd`, `.nitf`, or
-`.ntf` extensions. It uses NGA's SarPy SICDReader in a separate Python process.
-Ordinary NITF images without SICD metadata are not supported by this plugin.
+The bundled `nova.sicd` plugin opens SICD and SIDD NITF files with `.sicd`,
+`.sidd`, `.nitf`, or `.ntf` extensions. It identifies the product from its metadata,
+not its extension, using NGA's SarPy readers in a separate Python process. Both
+formats use the same `parameters.python` interpreter setting. Ordinary NITF files
+without SICD or SIDD metadata are not supported.
 
 ## Runtime setup
 
@@ -114,3 +116,33 @@ labels. Horizontal slice graphs plot cross-range; vertical slice graphs plot
 down-range on range grids. The graph's coordinate axis uses scene-center meters,
 with original row/column indices retained in the window title. Without physical
 axis metadata, slicing continues to use pixel coordinates.
+
+## SIDD derived imagery
+
+SIDD 1.0, 2.0, and 3.0 products are decoded by SarPy's `SIDDReader`. The plugin
+opens the first derived image in a multi-image product and identifies this in
+Metadata. Embedded source SICD metadata does not cause the derived pixels to be
+interpreted as complex I/Q samples.
+
+- 8-bit monochrome and RGB previews preserve the product's display values.
+- 16-bit monochrome previews use a 1st–99th percentile contrast stretch.
+- Previews are sampled to at most 1600 pixels per dimension with a shared stride.
+- Metadata includes product name, class, classification, pixel type, projection,
+  sensor, and collection time when available.
+- Statistics and source slices use the original derived intensity, or weighted
+  RGB luminance for color products. Slices remain bounded to 4096 samples.
+- Pixel Values reads the exact source pixel, independent of preview stretching.
+- Plane-projection spacing and reference pixels provide meter axes labeled
+  Row distance / Column distance. Other projections fall back to pixel axes.
+
+SIDD pixels are already derived display/intensity data. Complex real/imaginary,
+phase, power, and SICD radiometric scaling options remain disabled; Nova does not
+infer physical calibration from display values. Image opening, drag and drop,
+loading widgets, and scenario restoration work the same way as other images.
+
+Run the reader tests with the configured Python environment:
+
+```sh
+python src-electron/sicd-reader.test.py
+python src-electron/sidd-reader.test.py
+```

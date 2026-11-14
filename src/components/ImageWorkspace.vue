@@ -120,8 +120,19 @@
                                 Loading statistics…
                             </p>
                             <template v-else>
-                                <p v-if="widget.image.metadata?.Scaling">
-                                    {{ widget.image.metadata.Scaling }}
+                                <p
+                                    v-if="
+                                        widget.image.metadata?.Scaling ??
+                                        widget.image.metadata?.[
+                                            'Statistics quantity'
+                                        ]
+                                    ">
+                                    {{
+                                        widget.image.metadata?.Scaling ??
+                                        widget.image.metadata?.[
+                                            "Statistics quantity"
+                                        ]
+                                    }}
                                 </p>
                                 <dl
                                     v-if="

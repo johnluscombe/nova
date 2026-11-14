@@ -1,9 +1,9 @@
 {
     "apiVersion": 1,
     "id": "nova.sicd",
-    "name": "SICD radar images",
+    "name": "SICD / SIDD radar images",
     "main": "index.ts",
-    "extensions": ["sicd", "nitf", "ntf"],
+    "extensions": ["sicd", "sidd", "nitf", "ntf"],
     "parameters": {
         "python": "~/.nova/bin/python3"
     }

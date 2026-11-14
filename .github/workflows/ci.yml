@@ -46,8 +46,10 @@ jobs:
               run: |
                   npm run typecheck
                   npm run lint:check
-            - name: Test the SICD reader
-              run: python src-electron/sicd-reader.test.py
+            - name: Test the SICD and SIDD readers
+              run: |
+                  python src-electron/sicd-reader.test.py
+                  python src-electron/sidd-reader.test.py
             - name: Run unit and Electron tests with combined coverage
               run: npm run test:coverage:all
             - name: Summarize coverage and prepare badge

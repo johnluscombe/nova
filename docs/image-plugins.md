@@ -330,3 +330,9 @@ the image axes, even when the image Axes toggle is off. Plugins continue returni
 source pixel indices from `readSlice`; Nova converts those positions for display
 using the `axes` returned by `open`. Do not preconvert them in the plugin. Graph
 scaling changes preserve the physical coordinate labels and positions.
+
+The bundled radar plugin supports SICD and SIDD in NITF containers, including
+`.sidd` files. Both formats share its configured Python interpreter. SIDD provides
+source intensity/luminance slices, source pixel inspection, metadata, statistics,
+and plane-grid meter axes when available. Complex scaling is reserved for SICD.
+See [SIDD support](sicd-plugin.md#sidd-derived-imagery).

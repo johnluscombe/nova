@@ -44,8 +44,8 @@ Drag a `.scenario` file into Nova to open it, or drop images into an open scenar
 to create image widgets. Multiple images can be dropped together. When dropping
 a scenario and images together, Nova opens the scenario first.
 
-Bundled plugins support raster images, SVG, and SICD-in-NITF radar imagery.
-See [image plugins](docs/image-plugins.md) and [SICD setup](docs/sicd-plugin.md).
+Bundled plugins support raster images, SVG, and SICD/SIDD-in-NITF radar imagery.
+See [image plugins](docs/image-plugins.md) and [SICD/SIDD setup](docs/sicd-plugin.md).
 The Settings dialog configures the percentiles displayed in Statistics.
 
 Application and test sources use TypeScript. Plugins use Electron's native type
@@ -54,7 +54,7 @@ live in `src-electron/scenario-schema.ts`.
 
 Enable Slice in the View ribbon group to reveal selection strips on the left and
 bottom of the image. Hover over the left strip to preview a horizontal slice, or
-the bottom strip for a vertical slice; click to open its graph. SICD plots the selected source quantity; other formats plot preview luminance.
+the bottom strip for a vertical slice; click to open its graph. SICD plots the selected source quantity; SIDD plots derived intensity or RGB luminance. Other formats plot preview luminance.
 Graphs open as independent temporary widgets and are not saved to scenarios.
 
 Use **View → Scaling** on SICD images or their slice graphs to select amplitude,
@@ -63,7 +63,7 @@ Image scaling is saved with the scenario. See [SICD scaling](docs/sicd-plugin.md
 
 Enable **View → Pixel Values** to see pixel coordinates and values while hovering
 over an image. SICD reads exact source values in the selected scaling mode;
-other formats report preview luminance.
+SIDD reads derived source values. Other formats report preview luminance.
 
 Enable **View → Axes** to display image coordinates. SICD range grids show
 cross-range and down-range in meters relative to the scene center; ordinary

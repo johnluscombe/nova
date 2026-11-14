@@ -1,4 +1,4 @@
-"""Read SICD using SarPy and return a bounded log-magnitude PNG preview as JSON."""
+"""Read SICD complex imagery and SIDD derived imagery using SarPy."""
 import base64
 import contextlib
 import json
@@ -8,12 +8,141 @@ import sys
 import zlib
 
 
-def png_grayscale(pixels):
-    height, width = pixels.shape
+def png_preview(pixels):
+    height, width = pixels.shape[:2]
+    color_type = 2 if pixels.ndim == 3 else 0
     def chunk(kind, payload):
         return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
     scanlines = b"".join(b"\x00" + row.tobytes() for row in pixels)
-    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(scanlines)) + chunk(b"IEND", b"")
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(scanlines)) + chunk(b"IEND", b"")
+
+
+def open_radar_reader(file_path):
+    from sarpy.io.product.sidd import SIDDReader, SIDDDetails
+    from sarpy.io.complex.sicd import SICDReader
+    from sarpy.io.general.base import SarpyIOError
+    # SIDD products may embed source SICD metadata. Inspect SIDD first so that
+    # derived image pixels are never interpreted as complex source samples.
+    try:
+        details = SIDDDetails(file_path)
+    except (SarpyIOError, ValueError):
+        return SICDReader(file_path)
+    return SIDDReader(details)
+
+
+def sidd_metadata(metadata):
+    fields = {"Product": "ProductCreation.ProductName", "Product class": "ProductCreation.ProductClass",
+              "Classification": "ProductCreation.Classification.classification", "Pixel type": "Display.PixelType",
+              "Projection": "Measurement.ProjectionType"}
+    result = {"Format": "SIDD / NITF", "Image selection": "First derived image"}
+    for label, field in fields.items():
+        value = metadata
+        for part in field.split("."):
+            value = getattr(value, part, None)
+        if value is not None:
+            result[label] = str(value)
+    collections = getattr(getattr(metadata, "ExploitationFeatures", None), "Collections", None)
+    if collections:
+        information = getattr(collections[0], "Information", None)
+        for label, field in (("Sensor", "SensorName"), ("Collection time (UTC)", "CollectionDateTime"), ("Duration (seconds)", "CollectionDuration")):
+            value = getattr(information, field, None)
+            if value is not None:
+                result[label] = str(value)
+    return result
+
+
+def sidd_axes(metadata):
+    measurement = getattr(metadata, "Measurement", None)
+    plane = getattr(measurement, "PlaneProjection", None)
+    spacing = getattr(plane, "SampleSpacing", None)
+    reference = getattr(getattr(plane, "ReferencePoint", None), "Point", None)
+    if spacing is None or reference is None:
+        return None
+    axes = {}
+    for key, direction in (("row", "Row"), ("column", "Col")):
+        step, center = getattr(spacing, direction, None), getattr(reference, direction, None)
+        if not valid_spacing(step) or center is None or not math.isfinite(center):
+            return None
+        axes[key] = {"label": "Row distance" if key == "row" else "Column distance", "unit": "m", "origin": -center * step, "spacing": step}
+    return axes
+
+
+def sidd_values(samples):
+    import numpy as np
+    if samples.ndim == 2:
+        return samples.astype(np.float64), "Derived image intensity"
+    if samples.ndim == 3 and samples.shape[-1] == 1:
+        return samples[..., 0].astype(np.float64), "Derived image intensity"
+    if samples.ndim == 3 and samples.shape[-1] == 3:
+        return samples.astype(np.float64) @ np.array([0.2126, 0.7152, 0.0722]), "Source RGB luminance (0–255)"
+    raise ValueError("Unsupported SIDD image bands")
+
+
+def render_sidd(reader):
+    import numpy as np
+    metadata = reader.get_sidds_as_tuple()[0]
+    height, width = reader.get_data_size_as_tuple()[0][:2]
+    if width <= 0 or height <= 0:
+        raise ValueError("Invalid SIDD dimensions")
+    step = max(1, math.ceil(max(width, height) / 1600))
+    # Read one sampled row at a time, preserving RGB channels and bounding memory.
+    preview = None
+    for out_row, row in enumerate(range(0, height, step)):
+        samples = reader.read(slice(row, row + 1), slice(0, width, step), index=0, squeeze=False)
+        if preview is None:
+            preview = np.empty((math.ceil(height / step),) + samples.shape[1:], dtype=samples.dtype)
+        preview[out_row] = samples[0]
+    values, value_label = sidd_values(preview)
+    info = sidd_metadata(metadata)
+    info["Statistics quantity"] = value_label
+    info["Image selection"] = f"First of {len(reader.get_sidds_as_tuple())} derived image(s)"
+    if preview.dtype == np.uint8:
+        pixels = preview[..., 0] if preview.ndim == 3 and preview.shape[-1] == 1 else preview
+        info["Preview"] = "Derived display values (no additional stretch)"
+    else:
+        finite = np.isfinite(values)
+        pixels = np.zeros(values.shape, dtype=np.uint8)
+        if finite.any():
+            low, high = np.percentile(values[finite], [1, 99])
+            if high > low:
+                pixels = np.clip(np.where(finite, (values - low) / (high - low), 0) * 255, 0, 255).astype(np.uint8)
+            else:
+                pixels[finite] = 127
+        info["Preview"] = "Derived intensity, 1st–99th percentile stretch"
+    axes = sidd_axes(metadata)
+    return {"width": int(width), "height": int(height), "metadata": info,
+            "statistics": image_statistics(values), **({"axes": axes} if axes else {}),
+            "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_preview(pixels)).decode("ascii")}
+
+
+def sidd_slice(reader, orientation, index, scaling):
+    import numpy as np
+    if scaling != "amplitude":
+        raise ValueError("SIDD derived pixels do not support complex scaling")
+    height, width = reader.get_data_size_as_tuple()[0][:2]
+    horizontal = orientation == "horizontal"
+    limit, length = (height, width) if horizontal else (width, height)
+    if not 0 <= index < limit:
+        raise ValueError("Slice index is outside the image")
+    step = max(1, math.ceil(length / 4096))
+    rows, columns = ((slice(index, index + 1), slice(0, width, step)) if horizontal else
+                     (slice(0, height, step), slice(index, index + 1)))
+    values, label = sidd_values(reader.read(rows, columns, index=0, squeeze=False))
+    return {"points": [{"position": position, "value": float(value) if np.isfinite(value) else None}
+                       for position, value in zip(range(0, length, step), values.reshape(-1))],
+            "positionLabel": "Column (pixel)" if horizontal else "Row (pixel)", "valueLabel": label}
+
+
+def sidd_pixel(reader, row, column, scaling):
+    import numpy as np
+    if scaling != "amplitude":
+        raise ValueError("SIDD derived pixels do not support complex scaling")
+    height, width = reader.get_data_size_as_tuple()[0][:2]
+    if not (0 <= row < height and 0 <= column < width):
+        raise ValueError("Pixel is outside the image")
+    values, label = sidd_values(reader.read(slice(row, row + 1), slice(column, column + 1), index=0, squeeze=False))
+    value = float(values[0, 0])
+    return {"value": value if np.isfinite(value) else None, "valueLabel": label}
 
 
 def image_metadata(metadata):
@@ -148,13 +277,16 @@ def scale_samples(samples, metadata, rows, columns, scaling):
 
 def render(file_path, scaling="amplitude"):
     import numpy as np
-    from sarpy.io.complex.sicd import SICDReader
 
     with open(file_path, "rb") as source:
         if source.read(9) != b"NITF02.10":
-            raise ValueError("SICD requires a NITF 2.1 file")
-    reader = SICDReader(file_path)
+            raise ValueError("SICD/SIDD requires a NITF 2.1 file")
+    reader = open_radar_reader(file_path)
     try:
+        if reader.reader_type == "SIDD":
+            if scaling != "amplitude":
+                raise ValueError("SIDD derived pixels do not support complex scaling")
+            return render_sidd(reader)
         metadata = reader.get_sicds_as_tuple()[0]
         height, width = int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols)
         if width <= 0 or height <= 0:
@@ -187,7 +319,7 @@ def render(file_path, scaling="amplitude"):
         return {**({"axes": axes} if axes else {}), "peakPower": float(finite_power.max()) if finite_power.size else 0,
                 "scalingOptions": scaling_options(metadata), "scaling": scaling,
                 "statistics": image_statistics(values), "metadata": info, "width": width, "height": height,
-                "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_grayscale(pixels)).decode("ascii")}
+                "previewDataUrl": "data:image/png;base64," + base64.b64encode(png_preview(pixels)).decode("ascii")}
 
     finally:
         reader.close()
@@ -195,11 +327,12 @@ def render(file_path, scaling="amplitude"):
 
 def slice_image(file_path, orientation, index, scaling="amplitude"):
     import numpy as np
-    from sarpy.io.complex.sicd import SICDReader
     if orientation not in ("horizontal", "vertical"):
         raise ValueError("Invalid slice orientation")
-    reader = SICDReader(file_path)
+    reader = open_radar_reader(file_path)
     try:
+        if reader.reader_type == "SIDD":
+            return sidd_slice(reader, orientation, index, scaling)
         metadata = reader.get_sicds_as_tuple()[0]
         height, width = int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols)
         limit, length = (height, width) if orientation == "horizontal" else (width, height)
@@ -223,9 +356,10 @@ def slice_image(file_path, orientation, index, scaling="amplitude"):
 
 def pixel_image(file_path, row, column, scaling="amplitude", peak_power=None):
     import numpy as np
-    from sarpy.io.complex.sicd import SICDReader
-    reader = SICDReader(file_path)
+    reader = open_radar_reader(file_path)
     try:
+        if reader.reader_type == "SIDD":
+            return sidd_pixel(reader, row, column, scaling)
         metadata = reader.get_sicds_as_tuple()[0]
         if not (0 <= row < metadata.ImageData.NumRows and 0 <= column < metadata.ImageData.NumCols):
             raise ValueError("Pixel is outside the image")
@@ -257,9 +391,9 @@ def main():
         print(json.dumps(result, allow_nan=False))
         return 0
     except ImportError as error:
-        print(f"Missing SICD dependency: {error}. Install the plugin's requirements.txt into your configured Python environment.", file=sys.stderr)
+        print(f"Missing SICD/SIDD dependency: {error}. Install the plugin's requirements.txt into your configured Python environment.", file=sys.stderr)
     except Exception as error:
-        print(f"Unable to read SICD: {error}", file=sys.stderr)
+        print(f"Unable to read SICD/SIDD: {error}", file=sys.stderr)
     return 1
 
 

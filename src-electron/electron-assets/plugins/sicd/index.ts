@@ -33,7 +33,7 @@ async function executeReader(
         (process.platform === "win32" ? "python" : "python3");
     if (typeof configuredPython !== "string" || !configuredPython.trim()) {
         throw new Error(
-            "SICD's python parameter must be a nonempty Python executable path or command."
+            "SICD/SIDD's python parameter must be a nonempty Python executable path or command."
         );
     }
     const python =
@@ -68,19 +68,21 @@ async function executeReader(
         };
         if (error.code === "ENOENT") {
             throw new Error(
-                `SICD could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/sicd-plugin.md.`
+                `SICD/SIDD could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/sicd-plugin.md.`
             );
         }
         if (error.code === "EACCES") {
             throw new Error(
-                `SICD cannot execute Python interpreter ${JSON.stringify(python)}: permission denied.`
+                `SICD/SIDD cannot execute Python interpreter ${JSON.stringify(python)}: permission denied.`
             );
         }
         if (error.killed) {
-            throw new Error("SICD preview exceeded the two-minute time limit.");
+            throw new Error(
+                "SICD/SIDD preview exceeded the two-minute time limit."
+            );
         }
         throw new Error(
-            `SICD reader failed: ${String(error.stderr || error.message)
+            `SICD/SIDD reader failed: ${String(error.stderr || error.message)
                 .trim()
                 .slice(-2000)}`
         );
@@ -89,7 +91,7 @@ async function executeReader(
     try {
         result = JSON.parse(stdout);
     } catch {
-        throw new Error("SICD reader returned invalid output.");
+        throw new Error("SICD/SIDD reader returned invalid output.");
     }
     return result;
 }
@@ -114,7 +116,7 @@ export async function openSicd(
         typeof result.previewDataUrl !== "string" ||
         !result.previewDataUrl.startsWith("data:image/png;base64,")
     ) {
-        throw new Error("SICD reader returned an invalid preview.");
+        throw new Error("SICD/SIDD reader returned an invalid preview.");
     }
     return result;
 }
