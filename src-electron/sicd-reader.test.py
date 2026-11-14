@@ -66,17 +66,23 @@ class SicdPreviewTests(unittest.TestCase):
             self.assertEqual(struct.unpack(">II", png[16:24]), (1067, 2))
 
     def test_statistics(self):
-        result = reader.image_statistics(np.array([0, 2, 4, np.nan, np.inf]), 3)
-        self.assertEqual(result["Sampling stride (rows / columns)"], 3)
-        self.assertEqual(result["Sample count"], 5)
-        self.assertEqual(result["Invalid samples"], 2)
-        self.assertEqual(result["Minimum amplitude"], 0)
-        self.assertEqual(result["Maximum amplitude"], 4)
-        self.assertEqual(result["Mean amplitude"], 2)
-        self.assertEqual(result["Median amplitude"], 2)
-        self.assertAlmostEqual(result["Standard deviation"], np.std([0, 2, 4]))
-        self.assertAlmostEqual(result["RMS amplitude"], np.sqrt(20 / 3))
-        self.assertIsNone(reader.image_statistics(np.array([np.nan]), 1)["Mean amplitude"])
+        result = reader.image_statistics(np.array([0, 2, 4, np.nan, np.inf, -np.inf]))
+        expected = {
+            "1st percentile": 0.04, "5th percentile": 0.2,
+            "25th percentile": 1, "50th percentile": 2,
+            "75th percentile": 3, "95th percentile": 3.8,
+            "99th percentile": 3.96,
+        }
+        self.assertEqual(len(result), 101)
+        self.assertEqual(result["0th percentile"], 0)
+        self.assertEqual(result["100th percentile"], 4)
+        for label, value in expected.items():
+            self.assertAlmostEqual(result[label], value)
+        for values in [np.array([np.nan, np.inf]), np.array([])]:
+            self.assertEqual(reader.image_statistics(values), dict.fromkeys(result))
+        for value in [0, 7]:
+            self.assertEqual(reader.image_statistics(np.full((2, 3), value)),
+                             dict.fromkeys(result, value))
 
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:

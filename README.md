@@ -172,3 +172,13 @@ loads plugins using native type stripping, so plugin code must use erasable
 TypeScript syntax and type-only imports for type dependencies. Existing external
 `.mjs` plugins remain supported. Compiled Electron bundles and preload files
 remain JavaScript build artifacts.
+
+### Percentile settings
+
+Open the ribbon's Settings group and click Settings to configure the Statistics
+panel. Select percentiles from 0 to 100 in the multiselect field, then Save. Cancel
+discards edits; Restore defaults resets the draft to `1, 5, 25, 50, 75, 95, 99`.
+The selection applies to all open image widgets and is stored in the app's local
+preferences, independently of scenarios. SICD calculates all whole-number
+percentiles during its existing sampled read, so changing the display requires no
+additional decode. Reopen images loaded before this update to obtain the full set.

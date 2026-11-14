@@ -213,13 +213,15 @@ characters, and string values up to 10,000 characters. Nested objects are reject
 The global View group's Statistics button toggles a panel below the active
 widget's image, independently of Metadata. Plugins may return a `statistics`
 object using the same scalar values and size limits as `metadata`, for example
-`{ statistics: { "Mean amplitude": 2.5, Basis: "Sampled source amplitude" } }`.
+`{ statistics: { "50th percentile": 2.5 } }`.
 Plugins without statistics display an unavailable message.
 
-SICD reports sample counts, minimum, maximum, mean, median, population standard
-deviation, and RMS amplitude. These use finite source magnitudes before the
-display stretch, including zeros. Large images use the preview's sampling stride,
-which is shown in the panel; these are sampled statistics, not full-image results.
-Invalid values are counted and excluded; amplitude metrics are unavailable if no
-finite samples exist. Statistics are returned during decoding and scenario
-restoration without an additional file read.
+SICD provides whole-number percentiles from 0 to 100 of finite source amplitudes
+before the display stretch, including zeros. The Statistics panel defaults to
+the 1st, 5th, 25th, 50th, 75th, 95th, and 99th percentiles. Use Settings in the
+ribbon to choose which percentiles are shown; preferences persist across launches
+and apply immediately to open images.
+Large images use the preview's sampled data, so these are sampled percentiles.
+Nonfinite values are excluded. Percentiles are unavailable if no finite samples
+exist. Statistics are returned during decoding and scenario restoration without
+an additional file read.

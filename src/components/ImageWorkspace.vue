@@ -119,13 +119,19 @@
                                 <dl
                                     v-if="
                                         widget.image.statistics &&
-                                        Object.keys(widget.image.statistics)
-                                            .length
+                                        Object.keys(
+                                            visibleStatistics(
+                                                widget.image.statistics
+                                            )
+                                        ).length
                                     "
                                 >
                                     <div
-                                        v-for="(value, label) in widget.image
-                                            .statistics"
+                                        v-for="(
+                                            value, label
+                                        ) in visibleStatistics(
+                                            widget.image.statistics
+                                        )"
                                         :key="label"
                                     >
                                         <dt>{{ label }}</dt
@@ -134,7 +140,9 @@
                                 </dl>
                                 <p v-else>{{
                                     widget.error ??
-                                    "This plugin does not provide image statistics."
+                                    (widget.image.statistics
+                                        ? "The selected percentiles are not available for this image."
+                                        : "This plugin does not provide image statistics.")
                                 }}</p>
                             </template>
                         </section>
@@ -230,6 +238,7 @@ import type {
     SavedImageWindow
 } from "@/types/workspace";
 import type { ImageInfo } from "@/types/image";
+import { visibleStatistics } from "@/composables/useSettings";
 import { activeScenario } from "@/composables/useScenario";
 import {
     fitWindow,

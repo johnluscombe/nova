@@ -67,7 +67,7 @@ test.use({
                 }
                 await access(file);
                 if (file.includes('broken')) throw new Error('Intentional decoder failure');
-                return { width: 40, height: 20, metadata: { Collector: 'Test radar' }, statistics: { Mean: 2.5, Basis: 'Source amplitude' }, previewDataUrl: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="blue"/></svg>').toString('base64') };
+                return { width: 40, height: 20, metadata: { Collector: 'Test radar' }, statistics: { '25th percentile': 1.25, '50th percentile': 2.5, '90th percentile': 9, '99th percentile': 9.9 }, previewDataUrl: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="blue"/></svg>').toString('base64') };
             },
             executeRibbonAction(id: string, context: { scenarioPath: string | null }) {
                 if (id === 'fail') throw new Error('Intentional action failure');
@@ -367,4 +367,86 @@ test("surfaces autosave errors and prevents switching away from unsaved work", a
         ipc.removeHandler("scenario:workspace");
         ipc.handle("scenario:workspace", () => undefined);
     });
+});
+
+test("percentile settings validate, update open images, and persist after reload", async ({
+    application,
+    profile
+}) => {
+    const page = await application.firstWindow();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Settings", exact: true });
+    const field = dialog.getByRole("combobox", {
+        name: "Percentiles",
+        exact: true
+    });
+    // Removing every chip should keep the dialog open with validation feedback.
+    for (let index = 0; index < 7; index++) {
+        await dialog
+            .getByRole("button", { name: "Remove", exact: true })
+            .first()
+            .click();
+    }
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(
+        dialog.getByText("Select at least one percentile from 0 to 100.")
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await createScenario(application, page, profile);
+    const file = path.join(profile, "percentiles.test");
+    await writeFile(file, "fixture");
+    await chooseFile(application, file);
+    await page.getByRole("button", { name: "Open image", exact: true }).click();
+    const widget = page.getByRole("article", {
+        name: "percentiles.test",
+        exact: true
+    });
+    await expect(widget.getByRole("img")).toBeVisible();
+    await page.getByRole("button", { name: "Statistics", exact: true }).click();
+    await expect(
+        widget.getByText("50th percentile", { exact: true })
+    ).toBeVisible();
+    await expect(
+        widget.getByText("90th percentile", { exact: true })
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    for (const value of [1, 5, 50, 75, 95, 99]) {
+        await dialog
+            .locator(".q-chip")
+            .filter({ has: page.getByText(String(value), { exact: true }) })
+            .getByRole("button", { name: "Remove", exact: true })
+            .click();
+    }
+    await field.click();
+    await field.fill("90");
+    await page.getByRole("option", { name: "90", exact: true }).click();
+    await field.press("Escape");
+    await expect(page.getByRole("listbox")).toBeHidden();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(
+        widget.getByText("90th percentile", { exact: true })
+    ).toBeVisible();
+    await expect(
+        widget.getByText("50th percentile", { exact: true })
+    ).toHaveCount(0);
+    await collectCoverage(application);
+    await page.reload();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await expect(dialog.locator(".q-chip")).toHaveCount(2);
+    await expect(dialog.locator(".q-chip")).toContainText(["25", "90"]);
+    await dialog
+        .getByRole("button", { name: "Restore defaults", exact: true })
+        .click();
+    await expect(dialog.locator(".q-chip")).toHaveCount(7);
+    await expect(dialog.locator(".q-chip")).toContainText([
+        "1",
+        "5",
+        "25",
+        "50",
+        "75",
+        "95",
+        "99"
+    ]);
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
 });

@@ -145,6 +145,25 @@
                     >
                 </div>
                 <div
+                    class="ribbon-group"
+                    role="group"
+                    aria-labelledby="settings-group-label"
+                >
+                    <div class="ribbon-actions">
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
+                            icon="settings"
+                            label="Settings"
+                            @click="settingsOpen = true"
+                        />
+                    </div>
+                    <div id="settings-group-label" class="ribbon-group-label"
+                        >Settings</div
+                    >
+                </div>
+                <div
                     v-for="group in extraGroups"
                     :key="group.key"
                     class="ribbon-group"
@@ -176,6 +195,7 @@
                 class="ribbon-progress"
             />
         </section>
+        <SettingsDialog v-model="settingsOpen" />
         <q-dialog
             :model-value="!!actionMessage"
             @update:model-value="actionMessage = ''"
@@ -242,11 +262,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import SettingsDialog from "@/components/SettingsDialog.vue";
 import ImageWorkspace from "@/components/ImageWorkspace.vue";
 import type { ImagePluginStatus } from "../types/image";
 import type { ImageWorkspaceAPI, SavedImageWindow } from "../types/workspace";
 import type { ScenarioInfo } from "../types/scenario";
 import { activeScenario as scenario } from "@/composables/useScenario";
+const settingsOpen = ref(false);
 const busy = ref(false);
 const error = ref("");
 const workspace = ref<ImageWorkspaceAPI>();
