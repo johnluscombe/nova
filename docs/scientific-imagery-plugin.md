@@ -55,7 +55,7 @@ in memory. Source dimensions are retained for slicing.
 
 ## Scaling
 
-**View → Scaling** changes the active image or slice graph. Images update their
+**Scientific Imagery → Analysis → Scaling** changes the active image or slice graph. Images update their
 preview and percentile statistics; new slices inherit the image's mode. Each
 existing graph can also be scaled independently. Image modes are saved in the
 scenario; graph windows remain temporary.

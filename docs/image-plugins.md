@@ -202,7 +202,7 @@ return {
 };
 ```
 
-The global View group's Metadata button toggles a panel to the right of the
+Home's View group's Metadata button toggles a panel to the right of the
 active widget's image. File details and dimensions are always available; plugin
 fields appear when decoding finishes, including when restoring saved widgets.
 Metadata is displayed as text. Results allow up to 200 fields, labels up to 200
@@ -210,7 +210,7 @@ characters, and string values up to 10,000 characters. Nested objects are reject
 
 ## Image statistics
 
-The global View group's Statistics button toggles a panel below the active
+The contextual image tab's Analysis group's Statistics button toggles a panel below the active
 widget's image, independently of Metadata. Plugins may return a `statistics`
 object using the same scalar values and size limits as `metadata`, for example
 `{ statistics: { "50th percentile": 2.5 } }`.
@@ -228,7 +228,7 @@ an additional file read.
 
 ## Image slices
 
-The View ribbon group's Slice toggle reveals selection strips at the left and
+The contextual image tab's Analysis group's Slice toggle reveals selection strips at the left and
 bottom of the active image widget. Hover on the left strip to preview a horizontal
 line; hover on the bottom strip for a vertical line. Click to open a graph of that
 line. Letterboxed margins are excluded, so the line tracks the actual image even
@@ -349,3 +349,13 @@ results retain their embedded axes; the workspace resolves any validated sidecar
 axes for display. Plugin slice handlers continue to return source pixel indices,
 so selected coordinate sources also apply consistently to slice graphs. See
 [metadata association and supported axis schemas](metadata.md).
+
+## Built-in image ribbon
+
+Home's View group contains Metadata, Axes, and Pixel Values. The
+contextual Scientific Imagery tab appears for active widgets opened with
+`nova.sicd`, including their slice graphs. Other image widgets use a contextual
+Image tab. Both provide a Data group (Attach Metadata) and an Analysis group
+(Statistics, Scaling, and Slice), enabling actions according to the active widget's
+capabilities. Plugin-contributed tabs keep their own contents. The ribbon returns
+to Home if its contextual tab loses the active widget.

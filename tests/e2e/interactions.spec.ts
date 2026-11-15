@@ -1,3 +1,4 @@
+import { clickRibbon, selectRibbonFor } from "./helpers";
 import { collectCoverage } from "./coverage";
 import { test, expect } from "./fixtures";
 import { createScenario, chooseFile } from "./helpers";
@@ -89,7 +90,7 @@ test("widget loading, statistics, keyboard movement, dragging, resizing and wind
     const file = path.join(profile, "slow.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const widget = page.getByRole("article", {
         name: "slow.test",
         exact: true
@@ -97,15 +98,16 @@ test("widget loading, statistics, keyboard movement, dragging, resizing and wind
     await expect(
         widget.getByText("Loading image…", { exact: true })
     ).toBeVisible();
+    await selectRibbonFor(page, "Statistics");
     await expect(
         page.getByRole("button", { name: "Statistics", exact: true })
     ).toBeDisabled();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await expect(widget.getByText("Loading metadata…")).toBeVisible();
     await writeFile(file + ".ready", "ready");
     await expect(widget.getByRole("img")).toBeVisible();
     await expect(widget.getByText("Test radar")).toBeVisible();
-    await page.getByRole("button", { name: "Statistics", exact: true }).click();
+    await clickRibbon(page, "Statistics");
     await expect(
         widget.getByRole("region", { name: "Image statistics" })
     ).toContainText("2.5");
@@ -162,7 +164,7 @@ test("reopens saved widgets, preserves geometry and reports missing image refere
     const file = path.join(profile, "saved.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const widget = page.getByRole("article", {
         name: "saved.test",
         exact: true
@@ -172,15 +174,15 @@ test("reopens saved widgets, preserves geometry and reports missing image refere
         .getByLabel("saved.test window title. Use arrow keys to move.")
         .press("Shift+ArrowRight");
     const bounds = await widget.boundingBox();
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await expect(widget).toHaveCount(0);
     await chooseFile(application, scenario);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(widget.getByRole("img")).toBeVisible();
     expect((await widget.boundingBox())!.x).toBe(bounds!.x);
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await rm(file);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(widget).toContainText("ENOENT");
     await expect(widget.getByRole("img")).toHaveCount(0);
 });
@@ -230,9 +232,9 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
         });
         dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
     });
-    await page.getByRole("button", { name: "New", exact: true }).click();
-    await page.getByRole("button", { name: "Open", exact: true }).click();
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "New");
+    await clickRibbon(page, "Open");
+    await clickRibbon(page, "Add Image");
     await expect(page.getByRole("article")).toHaveCount(0);
     const canvas = page.getByRole("region", {
         name: "Image workspace",
@@ -242,7 +244,7 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     const invalid = path.join(profile, "invalid.scenario");
     await writeFile(invalid, "not sqlite");
     await chooseFile(application, invalid);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(page.getByRole("alert")).toBeVisible();
     expect(await canvas.boundingBox()).toEqual(canvasBeforeError);
     await page
@@ -256,7 +258,7 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     const broken = path.join(profile, "slow-broken.test");
     await writeFile(broken, "bad");
     await chooseFile(application, broken);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     await expect(
         page.getByText("Loading image…", { exact: true })
     ).toBeVisible();
@@ -275,7 +277,7 @@ test("closing a loading widget does not recreate it when decoding completes", as
     const file = path.join(profile, "slow-close.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const widget = page.getByRole("article", {
         name: "slow-close.test",
         exact: true
@@ -300,7 +302,7 @@ test("restores the last session on renderer startup", async ({
     const file = path.join(profile, "startup.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     await expect(
         page
             .getByRole("article", { name: "startup.test", exact: true })
@@ -315,6 +317,7 @@ test("restores the last session on renderer startup", async ({
             .getByRole("article", { name: "startup.test", exact: true })
             .getByRole("img")
     ).toBeVisible();
+    await selectRibbonFor(page, "Statistics");
     await expect(
         page.getByRole("button", { name: "Statistics", exact: true })
     ).toBeEnabled();
@@ -332,7 +335,7 @@ test("reports scenario creation and close failures without discarding the docume
         },
         path.join(profile, "missing", "invalid.scenario")
     );
-    await page.getByRole("button", { name: "New", exact: true }).click();
+    await clickRibbon(page, "New");
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(
         page.getByRole("button", { name: "Add Image", exact: true })
@@ -344,7 +347,7 @@ test("reports scenario creation and close failures without discarding the docume
             throw new Error("Close failed");
         });
     });
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await expect(page.getByRole("alert")).toContainText("Close failed");
     await expect(
         page.getByRole("button", { name: "Add Image", exact: true })
@@ -367,13 +370,13 @@ test("surfaces autosave errors and prevents switching away from unsaved work", a
     const file = path.join(profile, "unsaved.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     await expect(page.getByRole("alert")).toContainText("Disk full");
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await expect(
         page.getByRole("article", { name: "unsaved.test", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(page.getByRole("alert")).toContainText("Disk full");
     // Restore the IPC contract so fixture shutdown can flush successfully.
     await application.evaluate(({ BrowserWindow }) => {
@@ -388,7 +391,7 @@ test("percentile settings validate, update open images, and persist after reload
     profile
 }) => {
     const page = await application.firstWindow();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await clickRibbon(page, "Settings");
     const dialog = page.getByRole("dialog", { name: "Settings", exact: true });
     const field = dialog.getByRole("combobox", {
         name: "Percentiles",
@@ -410,20 +413,20 @@ test("percentile settings validate, update open images, and persist after reload
     const file = path.join(profile, "percentiles.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const widget = page.getByRole("article", {
         name: "percentiles.test",
         exact: true
     });
     await expect(widget.getByRole("img")).toBeVisible();
-    await page.getByRole("button", { name: "Statistics", exact: true }).click();
+    await clickRibbon(page, "Statistics");
     await expect(
         widget.getByText("50th percentile", { exact: true })
     ).toBeVisible();
     await expect(
         widget.getByText("90th percentile", { exact: true })
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await clickRibbon(page, "Settings");
     for (const value of [1, 5, 50, 75, 95, 99]) {
         await dialog
             .locator(".q-chip")
@@ -446,7 +449,7 @@ test("percentile settings validate, update open images, and persist after reload
     ).toHaveCount(0);
     await collectCoverage(application);
     await page.reload();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await clickRibbon(page, "Settings");
     await expect(dialog.locator(".q-chip")).toHaveCount(2);
     await expect(dialog.locator(".q-chip")).toContainText(["25", "90"]);
     await dialog
@@ -471,12 +474,14 @@ test("visual slice strips preview the selected source line and open independent 
 }) => {
     const page = await application.firstWindow();
     const toggle = page.getByRole("button", { name: "Slice", exact: true });
-    await expect(toggle).toBeDisabled();
+    await expect(
+        page.getByRole("tab", { name: /^(Scientific Imagery|Image)$/ })
+    ).toHaveCount(0);
     await createScenario(application, page, profile);
     const file = path.join(profile, "slice.test");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "slice.test",
         exact: true
@@ -485,7 +490,8 @@ test("visual slice strips preview the selected source line and open independent 
         source.getByRole("img", { name: "slice.test", exact: true })
     ).toBeVisible();
     // Metadata narrows the image, creating letterboxing that must not affect row mapping.
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
+    await selectRibbonFor(page, "Slice");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     const left = source.getByRole("button", {
@@ -527,8 +533,10 @@ test("visual slice strips preview the selected source line and open independent 
         .getByLabel("slice.test window title. Use arrow keys to move.")
         .click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await selectRibbonFor(page, "Slice");
     await toggle.click();
     await expect(left).toHaveCount(0);
+    await selectRibbonFor(page, "Slice");
     await toggle.click();
     const area = (await source.locator(".slice-viewport").boundingBox())!;
     const below = (await bottom.boundingBox())!;
@@ -568,7 +576,7 @@ test("SVG preview slices support keyboard selection and clearly label luminance"
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="white"/></svg>'
     );
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "preview.svg",
         exact: true
@@ -576,7 +584,7 @@ test("SVG preview slices support keyboard selection and clearly label luminance"
     await expect(
         source.getByRole("img", { name: "preview.svg", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Slice", exact: true }).click();
+    await clickRibbon(page, "Slice");
     const selector = source.getByRole("button", {
         name: "Vertical slice selector for preview.svg",
         exact: true
@@ -603,7 +611,7 @@ test("dropping native files opens a scenario and images without an open dialog",
 }) => {
     const page = await application.firstWindow();
     const scenarioPath = await createScenario(application, page, profile);
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     const imagePath = path.join(profile, "dropped.test");
     await writeFile(imagePath, "test image");
     // File inputs supply native-backed File objects, so this exercises Electron's

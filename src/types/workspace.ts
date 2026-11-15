@@ -85,3 +85,8 @@ export interface ImageWorkspaceAPI {
     toggleAxes(): void;
     setScaling(scaling: Scaling): Promise<void>;
 }
+
+export interface ImageContext {
+    available: boolean;
+    scientific: boolean;
+}

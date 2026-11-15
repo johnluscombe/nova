@@ -1,3 +1,4 @@
+import { clickRibbon, selectRibbonFor } from "./helpers";
 import { test, expect } from "./fixtures";
 import { createScenario, chooseFile } from "./helpers";
 import { readFileSync, existsSync } from "node:fs";
@@ -66,7 +67,7 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "derived.sidd",
         exact: true
@@ -74,17 +75,16 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     await expect(
         source.getByRole("img", { name: "derived.sidd", exact: true })
     ).toBeVisible();
+    await selectRibbonFor(page, "Scaling");
     await expect(
         page.getByRole("button", { name: "Scaling", exact: true })
     ).toBeDisabled();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await expect(
         source.getByRole("complementary", { name: "Image metadata" })
     ).toContainText("SIDD / NITF");
     await expect(source).toContainText("MONO16I");
-    await page
-        .getByRole("button", { name: "Pixel Values", exact: true })
-        .click();
+    await clickRibbon(page, "Pixel Values");
     const bounds = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(bounds.width / 8, bounds.height / 4);
     await page.mouse.move(
@@ -95,7 +95,7 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     await expect(source.getByRole("status")).toContainText(
         "Derived image intensity: 19000"
     );
-    await page.getByRole("button", { name: "Slice", exact: true }).click();
+    await clickRibbon(page, "Slice");
     const strip = source.getByRole("button", {
         name: "Horizontal slice selector for derived.sidd",
         exact: true
@@ -112,9 +112,9 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
             exact: true
         })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await chooseFile(application, scenario);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(
         source.getByRole("img", { name: "derived.sidd", exact: true })
     ).toBeVisible();
@@ -147,7 +147,7 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
     await chooseFile(application, mono);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "intensity.tif",
         exact: true
@@ -155,13 +155,11 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
     await expect(
         source.getByRole("img", { name: "intensity.tif", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await expect(
         source.getByRole("complementary", { name: "Image metadata" })
     ).toContainText("TIFF");
-    await page
-        .getByRole("button", { name: "Pixel Values", exact: true })
-        .click();
+    await clickRibbon(page, "Pixel Values");
     const bounds = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(bounds.width / 8, bounds.height / 4);
     await page.mouse.move(
@@ -172,7 +170,7 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
         "Source intensity: 19000"
     );
     await chooseFile(application, color);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const colorImage = page
         .getByRole("article", { name: "color.tiff", exact: true })
         .getByRole("img", { name: "color.tiff", exact: true });
@@ -188,9 +186,9 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
             return [...context.getImageData(0, 0, 1, 1).data];
         })
     ).toEqual([255, 0, 0, 255]);
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await chooseFile(application, scenario);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(colorImage).toBeVisible();
     await expect(
         source.getByRole("img", { name: "intensity.tif", exact: true })

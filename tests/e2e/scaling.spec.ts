@@ -1,3 +1,4 @@
+import { clickRibbon, selectRibbonFor } from "./helpers";
 import { test, expect } from "./fixtures";
 import { createScenario, chooseFile } from "./helpers";
 import { writeFile } from "node:fs/promises";
@@ -36,12 +37,14 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
 }) => {
     const page = await application.firstWindow();
     const scaling = page.getByRole("button", { name: "Scaling", exact: true });
-    await expect(scaling).toBeDisabled();
+    await expect(
+        page.getByRole("tab", { name: /^(Scientific Imagery|Image)$/ })
+    ).toHaveCount(0);
     const scenarioPath = await createScenario(application, page, profile);
     const file = path.join(profile, "radar.complex");
     await writeFile(file, "complex fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "radar.complex",
         exact: true
@@ -52,6 +55,7 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     });
     await expect(preview).toBeVisible();
     const original = await preview.getAttribute("src");
+    await selectRibbonFor(page, "Scaling");
     await scaling.click();
     await expect(
         page.getByRole("menuitemradio", { name: "RCS (m²)", exact: true })
@@ -61,8 +65,9 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
         .click();
     await expect(preview).not.toHaveAttribute("src", original!);
     const real = await preview.getAttribute("src");
-    await page.getByRole("button", { name: "Statistics", exact: true }).click();
+    await clickRibbon(page, "Statistics");
     await expect(source.getByText("-3", { exact: true })).toBeVisible();
+    await selectRibbonFor(page, "Scaling");
     await scaling.click();
     await expect(
         page.getByRole("menuitemradio", { name: "Real", exact: true })
@@ -74,7 +79,7 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
         "Scaling reader failure"
     );
     await expect(preview).toHaveAttribute("src", real!);
-    await page.getByRole("button", { name: "Slice", exact: true }).click();
+    await clickRibbon(page, "Slice");
     const strip = source.getByRole("button", {
         name: "Vertical slice selector for radar.complex",
         exact: true
@@ -88,6 +93,7 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     await expect(
         graph.getByRole("img", { name: "real by Down-range (m)", exact: true })
     ).toBeVisible();
+    await selectRibbonFor(page, "Scaling");
     await scaling.click();
     await page
         .getByRole("menuitemradio", { name: "Linear power", exact: true })
@@ -95,11 +101,12 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     await expect(
         graph.getByRole("img", { name: "power by Down-range (m)", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await chooseFile(application, scenarioPath);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(preview).toHaveAttribute("src", real!);
     await expect(page.getByRole("article")).toHaveCount(1);
+    await selectRibbonFor(page, "Scaling");
     await scaling.click();
     await expect(
         page.getByRole("menuitemradio", { name: "Real", exact: true })
@@ -120,7 +127,7 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     const file = path.join(profile, "hover.complex");
     await writeFile(file, "complex fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "hover.complex",
         exact: true
@@ -128,7 +135,8 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     await expect(
         source.getByRole("img", { name: "hover.complex", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
+    await selectRibbonFor(page, "Pixel Values");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     const viewport = (await source.locator(".slice-viewport").boundingBox())!;
@@ -145,7 +153,7 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     );
     await page.mouse.move(viewport.x + 1, viewport.y + 1);
     await expect(source.locator(".pixel-readout")).toHaveCount(0);
-    await page.getByRole("button", { name: "Scaling", exact: true }).click();
+    await clickRibbon(page, "Scaling");
     await page
         .getByRole("menuitemradio", { name: "Real", exact: true })
         .click();
@@ -162,6 +170,7 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     await expect(source.getByRole("status")).toContainText(
         "Real component: -3"
     );
+    await selectRibbonFor(page, "Pixel Values");
     await toggle.click();
     await expect(source.locator(".pixel-readout")).toHaveCount(0);
     const svg = path.join(profile, "red.svg");
@@ -170,12 +179,13 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="red"/></svg>'
     );
     await chooseFile(application, svg);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const raster = page.getByRole("article", { name: "red.svg", exact: true });
     await expect(
         raster.getByRole("img", { name: "red.svg", exact: true })
     ).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await selectRibbonFor(page, "Pixel Values");
     await toggle.click();
     const bounds = (await raster.locator(".slice-viewport").boundingBox())!;
     await page.mouse.move(
@@ -199,7 +209,7 @@ test("image axes display source distances and remain aligned with slicing and ho
     const file = path.join(profile, "axes.complex");
     await writeFile(file, "fixture");
     await chooseFile(application, file);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "axes.complex",
         exact: true
@@ -208,6 +218,7 @@ test("image axes display source distances and remain aligned with slicing and ho
         source.getByRole("img", { name: "axes.complex", exact: true })
     ).toBeVisible();
     await expect(source.locator(".image-axis")).toHaveCount(0);
+    await selectRibbonFor(page, "Axes");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     const x = source.getByRole("img", {
@@ -224,11 +235,9 @@ test("image axes display source distances and remain aligned with slicing and ho
     await expect(x.locator("g text").last()).toHaveText("9.5");
     await expect(y.locator("text").first()).toHaveText("-20");
     await expect(y.locator("g text").last()).toHaveText("18");
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
-    await page.getByRole("button", { name: "Slice", exact: true }).click();
-    await page
-        .getByRole("button", { name: "Pixel Values", exact: true })
-        .click();
+    await clickRibbon(page, "Metadata");
+    await clickRibbon(page, "Slice");
+    await clickRibbon(page, "Pixel Values");
     const viewport = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(viewport.width / 40, viewport.height / 20);
     const top = (viewport.height - 20 * scale) / 2;
@@ -279,6 +288,7 @@ test("image axes display source distances and remain aligned with slicing and ho
     await source
         .getByLabel("axes.complex window title. Use arrow keys to move.")
         .click();
+    await selectRibbonFor(page, "Axes");
     await toggle.click();
     await expect(source.locator(".image-axis")).toHaveCount(0);
     const svg = path.join(profile, "axes.svg");
@@ -287,11 +297,12 @@ test("image axes display source distances and remain aligned with slicing and ho
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="red"/></svg>'
     );
     await chooseFile(application, svg);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const raster = page.getByRole("article", { name: "axes.svg", exact: true });
     await expect(
         raster.getByRole("img", { name: "axes.svg", exact: true })
     ).toBeVisible();
+    await selectRibbonFor(page, "Axes");
     await toggle.click();
     await expect(
         raster.getByRole("img", { name: "X axis: Column (pixel)", exact: true })

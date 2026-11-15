@@ -1,3 +1,4 @@
+import { clickRibbon, selectRibbonFor } from "./helpers";
 import { test, expect } from "./fixtures";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,8 +11,8 @@ test("creates a scenario, opens a raster widget, and shows metadata", async ({
     const ribbon = page.getByRole("region", { name: "Scenario ribbon" });
     // The ribbon is a labelled section and native dialogs are stubbed in main.
     await expect(
-        ribbon.getByRole("button", { name: "Statistics", exact: true })
-    ).toBeDisabled();
+        page.getByRole("tab", { name: /^(Scientific Imagery|Image)$/ })
+    ).toHaveCount(0);
     await expect(
         ribbon.getByRole("button", { name: "Add Image", exact: true })
     ).toBeDisabled();
@@ -19,7 +20,7 @@ test("creates a scenario, opens a raster widget, and shows metadata", async ({
     await application.evaluate(({ dialog }, filePath) => {
         dialog.showSaveDialog = async () => ({ canceled: false, filePath });
     }, scenarioPath);
-    await ribbon.getByRole("button", { name: "New", exact: true }).click();
+    await clickRibbon(page, "New");
     await expect(
         ribbon.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
@@ -37,18 +38,17 @@ test("creates a scenario, opens a raster widget, and shows metadata", async ({
             filePaths: [filePath]
         });
     }, imagePath);
-    await ribbon
-        .getByRole("button", { name: "Add Image", exact: true })
-        .click();
+    await clickRibbon(page, "Add Image");
     const widget = page.getByRole("article", {
         name: "sample.png",
         exact: true
     });
     await expect(widget.getByRole("img", { name: "sample.png" })).toBeVisible();
+    await selectRibbonFor(page, "Statistics");
     await expect(
         ribbon.getByRole("button", { name: "Statistics", exact: true })
     ).toBeDisabled();
-    await ribbon.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await expect(
         widget.getByRole("complementary", { name: "Image metadata" })
     ).toBeVisible();

@@ -52,12 +52,12 @@ Application and test sources use TypeScript. Plugins use Electron's native type
 stripping and must use erasable TypeScript syntax. Scenario schema definitions
 live in `src-electron/scenario-schema.ts`.
 
-Enable Slice in the View ribbon group to reveal selection strips on the left and
+Enable Slice in the contextual image tab’s Analysis group to reveal selection strips on the left and
 bottom of the image. Hover over the left strip to preview a horizontal slice, or
 the bottom strip for a vertical slice; click to open its graph. SICD plots the selected source quantity; SIDD plots derived intensity or RGB luminance. Other formats plot preview luminance.
 Graphs open as independent temporary widgets and are not saved to scenarios.
 
-Use **View → Scaling** on SICD images or their slice graphs to select amplitude,
+Use **Scientific Imagery → Analysis → Scaling** on SICD images or their slice graphs to select amplitude,
 complex components, phase, power, or calibrated radar quantities when available.
 Image scaling is saved with the scenario. See [SICD scaling](docs/scientific-imagery-plugin.md#scaling).
 
@@ -70,6 +70,12 @@ cross-range and down-range in meters relative to the scene center; ordinary
 images use pixel coordinates.
 
 Add Image supports multi-file selection and ZIP imports. JSON metadata can be
-associated during import or added later using **View → Attach Metadata**.
+associated during import or added later using the image tab’s **Data → Attach Metadata**.
 Recognized JSON axes can supply physical coordinates or explicitly override
 embedded axes. See [metadata and axis sources](docs/metadata.md).
+
+The contextual tab is named **Scientific Imagery** for SICD, SIDD, and TIFF, or
+**Image** for ordinary images. It contains **Data** (Attach Metadata) and
+**Analysis** (Statistics, Scaling, and Slice). Home’s **View** group retains Metadata,
+Axes, and Pixel Values. Image tools remain available for slice graphs
+where applicable, and the ribbon returns to Home when no widget is active.

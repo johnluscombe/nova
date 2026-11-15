@@ -11,6 +11,12 @@
                 indicator-color="primary">
                 <q-tab name="home" label="Home" />
                 <q-tab
+                    v-if="imageContext.available"
+                    name="image-tools"
+                    :label="
+                        imageContext.scientific ? 'Scientific Imagery' : 'Image'
+                    " />
+                <q-tab
                     v-for="tab in pluginTabs"
                     :key="tab.key"
                     :name="tab.key"
@@ -118,7 +124,8 @@
                 <div
                     class="ribbon-group"
                     role="group"
-                    aria-labelledby="view-group-label">
+                    aria-labelledby="view-group-label"
+                    v-if="activeTab === 'home'">
                     <div class="ribbon-actions">
                         <q-btn
                             flat
@@ -128,70 +135,7 @@
                             label="Metadata"
                             :disable="!hasActiveWidget"
                             @click="workspace?.toggleMetadata()" />
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="attach_file"
-                            label="Attach Metadata"
-                            :disable="busy || !hasActiveWidget"
-                            @click="workspace?.attachMetadata()" />
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="bar_chart"
-                            label="Statistics"
-                            :disable="!hasActiveStatistics"
-                            @click="workspace?.toggleStatistics()" />
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="tune"
-                            label="Scaling"
-                            :disable="
-                                !scalingState.options.length ||
-                                scalingState.loading ||
-                                busy
-                            ">
-                            <q-menu>
-                                <q-list dense aria-label="Image scaling">
-                                    <q-item
-                                        v-for="option in scalingOptions"
-                                        :key="option.value"
-                                        clickable
-                                        role="menuitemradio"
-                                        :aria-checked="
-                                            scalingState.value === option.value
-                                        "
-                                        v-close-popup
-                                        :disable="
-                                            !scalingState.options.includes(
-                                                option.value
-                                            )
-                                        "
-                                        :active="
-                                            scalingState.value === option.value
-                                        "
-                                        @click="
-                                            workspace?.setScaling(option.value)
-                                        ">
-                                        <q-item-section>
-                                            {{ option.label }}
-                                        </q-item-section>
-                                        <q-item-section
-                                            side
-                                            v-if="
-                                                scalingState.value ===
-                                                option.value
-                                            ">
-                                            <q-icon name="check" />
-                                        </q-item-section>
-                                    </q-item>
-                                </q-list>
-                            </q-menu>
-                        </q-btn>
+
                         <q-btn
                             flat
                             stack
@@ -212,21 +156,116 @@
                             :aria-pressed="pixelValuesActive"
                             :color="pixelValuesActive ? 'primary' : undefined"
                             @click="workspace?.togglePixelValues()" />
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="content_cut"
-                            label="Slice"
-                            :disable="!hasSliceImage"
-                            :aria-pressed="sliceModeActive"
-                            :color="sliceModeActive ? 'primary' : undefined"
-                            @click="workspace?.toggleSlice()" />
                     </div>
                     <div id="view-group-label" class="ribbon-group-label">
                         View
                     </div>
                 </div>
+                <template
+                    v-if="
+                        activeTab === 'image-tools' && imageContext.available
+                    ">
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="data-group-label">
+                        <div class="ribbon-actions">
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="attach_file"
+                                label="Attach Metadata"
+                                :disable="busy || !hasActiveWidget"
+                                @click="workspace?.attachMetadata()" />
+                        </div>
+                        <div id="data-group-label" class="ribbon-group-label">
+                            Data
+                        </div>
+                    </div>
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="analysis-group-label">
+                        <div class="ribbon-actions">
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="bar_chart"
+                                label="Statistics"
+                                :disable="!hasActiveStatistics"
+                                @click="workspace?.toggleStatistics()" />
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="tune"
+                                label="Scaling"
+                                :disable="
+                                    !scalingState.options.length ||
+                                    scalingState.loading ||
+                                    busy
+                                ">
+                                <q-menu>
+                                    <q-list dense aria-label="Image scaling">
+                                        <q-item
+                                            v-for="option in scalingOptions"
+                                            :key="option.value"
+                                            clickable
+                                            role="menuitemradio"
+                                            :aria-checked="
+                                                scalingState.value ===
+                                                option.value
+                                            "
+                                            v-close-popup
+                                            :disable="
+                                                !scalingState.options.includes(
+                                                    option.value
+                                                )
+                                            "
+                                            :active="
+                                                scalingState.value ===
+                                                option.value
+                                            "
+                                            @click="
+                                                workspace?.setScaling(
+                                                    option.value
+                                                )
+                                            ">
+                                            <q-item-section>
+                                                {{ option.label }}
+                                            </q-item-section>
+                                            <q-item-section
+                                                side
+                                                v-if="
+                                                    scalingState.value ===
+                                                    option.value
+                                                ">
+                                                <q-icon name="check" />
+                                            </q-item-section>
+                                        </q-item>
+                                    </q-list>
+                                </q-menu>
+                            </q-btn>
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="content_cut"
+                                label="Slice"
+                                :disable="!hasSliceImage"
+                                :aria-pressed="sliceModeActive"
+                                :color="sliceModeActive ? 'primary' : undefined"
+                                @click="workspace?.toggleSlice()" />
+                        </div>
+                        <div
+                            id="analysis-group-label"
+                            class="ribbon-group-label">
+                            Analysis
+                        </div>
+                    </div>
+                </template>
                 <div
                     class="ribbon-group"
                     role="group"
@@ -347,6 +386,7 @@
             </div>
             <ImageWorkspace
                 @active-change="hasActiveWidget = $event"
+                @image-context-change="imageContext = $event"
                 @statistics-change="hasActiveStatistics = $event"
                 @slice-change="hasSliceImage = $event"
                 @slice-mode-change="sliceModeActive = $event"
@@ -363,11 +403,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch
+} from "vue";
 import SettingsDialog from "@/components/SettingsDialog.vue";
 import ImageWorkspace from "@/components/ImageWorkspace.vue";
 import type { ImagePluginStatus } from "../types/image";
-import type { ImageWorkspaceAPI, SavedImageWindow } from "../types/workspace";
+import type {
+    ImageContext,
+    ImageWorkspaceAPI,
+    SavedImageWindow
+} from "../types/workspace";
 import type { ScenarioInfo } from "../types/scenario";
 import { activeScenario as scenario } from "@/composables/useScenario";
 import { scalingOptions, type ScalingState } from "@/types/scaling";
@@ -392,6 +443,15 @@ const pluginNoticeDismissed = ref(false);
 const pluginStatus = ref<ImagePluginStatus | null>(null);
 
 const activeTab = ref("home");
+const imageContext = ref<ImageContext>({ available: false, scientific: false });
+watch(
+    () => imageContext.value.available,
+    available => {
+        if (!available && activeTab.value === "image-tools") {
+            activeTab.value = "home";
+        }
+    }
+);
 const hasImageDecoders = computed(
     () =>
         pluginStatus.value?.plugins.some(plugin => plugin.extensions.length) ??

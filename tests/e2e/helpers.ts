@@ -28,3 +28,23 @@ export async function chooseFile(
         });
     }, file);
 }
+
+/** Select the tab that owns a built-in ribbon control. */
+export async function selectRibbonFor(page: Page, label: string) {
+    const imageTools = [
+        "Attach Metadata",
+        "Statistics",
+        "Scaling",
+        "Slice"
+    ].includes(label);
+    await page
+        .getByRole("tab", {
+            name: imageTools ? /^(Scientific Imagery|Image)$/ : "Home",
+            exact: true
+        })
+        .click();
+}
+export async function clickRibbon(page: Page, label: string) {
+    await selectRibbonFor(page, label);
+    await page.getByRole("button", { name: label, exact: true }).click();
+}

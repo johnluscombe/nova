@@ -20,6 +20,7 @@ const workspace = vi.hoisted(() => ({
 }));
 vi.mock("../../src/components/ImageWorkspace.vue", () => ({
     default: defineComponent({
+        name: "ImageWorkspace",
         setup(_, { expose }) {
             expose(workspace);
             return () => h("div", "Workspace");
@@ -52,6 +53,17 @@ const stubs: Record<string, Component> = Object.fromEntries(
         "QBanner"
     ].map(name => [name, container])
 );
+stubs.QTabs = {
+    name: "QTabs",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div><slot /></div>"
+};
+stubs.QTab = {
+    name: "QTab",
+    props: ["name", "label"],
+    template: "<span>{{ label }}</span>"
+};
 stubs.QBtn = {
     props: ["label", "disable"],
     emits: ["click"],
@@ -292,4 +304,56 @@ test("image drops keep the existing loading and failure behavior", async () => {
     wrapper = undefined;
     window.dispatchEvent(new Event("drop"));
     expect(scenarioMock.open).not.toHaveBeenCalled();
+});
+
+test("contextual image tabs separate data and analysis from Home viewing controls", async () => {
+    await page();
+    const labels = () =>
+        wrapper!.findAll("button").map(button => button.text());
+    expect(labels()).toContain("Metadata");
+    expect(labels()).not.toContain("Slice");
+    expect(labels()).not.toContain("Statistics");
+    const workspaceComponent = wrapper!.getComponent({
+        name: "ImageWorkspace"
+    });
+    workspaceComponent.vm.$emit("imageContextChange", {
+        available: true,
+        scientific: true
+    });
+    await flushPromises();
+    expect(wrapper!.text()).toContain("Scientific Imagery");
+    wrapper!
+        .getComponent({ name: "QTabs" })
+        .vm.$emit("update:modelValue", "image-tools");
+    await flushPromises();
+    expect(
+        wrapper!.get('[aria-labelledby="data-group-label"]').text()
+    ).toContain("Attach Metadata");
+    expect(
+        wrapper!.get('[aria-labelledby="analysis-group-label"]').text()
+    ).toContain("Scaling");
+    expect(labels()).toContain("Slice");
+    expect(
+        wrapper!.get('[aria-labelledby="analysis-group-label"]').text()
+    ).toContain("Statistics");
+    expect(labels()).not.toContain("Metadata");
+    workspaceComponent.vm.$emit("imageContextChange", {
+        available: true,
+        scientific: false
+    });
+    await flushPromises();
+    expect(wrapper!.text()).not.toContain("Scientific Imagery");
+    expect(
+        wrapper!
+            .findAllComponents({ name: "QTab" })
+            .some(tab => tab.props("label") === "Image")
+    ).toBe(true);
+    workspaceComponent.vm.$emit("imageContextChange", {
+        available: false,
+        scientific: false
+    });
+    await flushPromises();
+    expect(labels()).toContain("Metadata");
+    expect(labels()).not.toContain("Slice");
+    expect(labels()).not.toContain("Statistics");
 });

@@ -1,3 +1,4 @@
+import { clickRibbon } from "./helpers";
 import { test, expect } from "./fixtures";
 import { createScenario, chooseFile } from "./helpers";
 import { writeFile, rm } from "node:fs/promises";
@@ -58,42 +59,40 @@ test("multi-select shares JSON axes and late attachments persist with the scenar
         },
         [a, b, shared]
     );
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     await expect(page.getByRole("article")).toHaveCount(2);
     const beta = page.getByRole("article", { name: "beta.test", exact: true });
     await expect(
         beta.getByRole("img", { name: "beta.test", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Axes", exact: true }).click();
+    await clickRibbon(page, "Axes");
     await expect(
         beta.getByRole("img", { name: "X axis: Easting (m)", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await beta.getByText("shared.json", { exact: true }).click();
     await expect(beta.locator("pre")).toContainText("Test collection");
     await chooseFile(application, extra);
-    await page
-        .getByRole("button", { name: "Attach Metadata", exact: true })
-        .click();
+    await clickRibbon(page, "Attach Metadata");
     await beta.getByText("extra.json", { exact: true }).click();
     await expect(
         beta.getByRole("region", { name: "Attached JSON metadata" })
     ).toContainText("Attached later");
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await rm(extra);
     await chooseFile(application, scenario);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(
         beta.getByRole("img", { name: "beta.test", exact: true })
     ).toBeVisible();
     await beta
         .getByLabel("beta.test window title. Use arrow keys to move.")
         .click();
-    await page.getByRole("button", { name: "Axes", exact: true }).click();
+    await clickRibbon(page, "Axes");
     await expect(
         beta.getByRole("img", { name: "X axis: Easting (m)", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await expect(
         beta.getByText("extra.json — unavailable", { exact: true })
     ).toBeVisible();
@@ -117,7 +116,7 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
         },
         [file, metadata]
     );
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "embedded.test",
         exact: true
@@ -125,14 +124,14 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
     await expect(
         source.getByRole("img", { name: "embedded.test", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Axes", exact: true }).click();
+    await clickRibbon(page, "Axes");
     await expect(
         source.getByRole("img", {
             name: "X axis: Cross-range (m)",
             exact: true
         })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Slice", exact: true }).click();
+    await clickRibbon(page, "Slice");
     const strip = source.getByRole("button", {
         name: "Horizontal slice selector for embedded.test",
         exact: true
@@ -148,7 +147,7 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
     await source
         .getByLabel("embedded.test window title. Use arrow keys to move.")
         .click();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await source.getByText("axes.json", { exact: true }).click();
     await source
         .getByRole("button", { name: "Override embedded axes", exact: true })
@@ -166,17 +165,17 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
             exact: true
         })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await chooseFile(application, scenario);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(
         source.getByRole("img", { name: "embedded.test", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Axes", exact: true }).click();
+    await clickRibbon(page, "Axes");
     await expect(
         source.getByRole("img", { name: "X axis: Easting (m)", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await clickRibbon(page, "Metadata");
     await source
         .getByRole("button", { name: "Use embedded axes", exact: true })
         .click();
@@ -204,7 +203,7 @@ test("ZIP images and JSON axes restore independently of the original archive", a
         })
     );
     await chooseFile(application, archive);
-    await page.getByRole("button", { name: "Add Image", exact: true }).click();
+    await clickRibbon(page, "Add Image");
     const source = page.getByRole("article", {
         name: "second.test",
         exact: true
@@ -213,18 +212,18 @@ test("ZIP images and JSON axes restore independently of the original archive", a
     await expect(
         source.getByRole("img", { name: "second.test", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Axes", exact: true }).click();
+    await clickRibbon(page, "Axes");
     await expect(
         source.getByRole("img", { name: "X axis: Easting (m)", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await clickRibbon(page, "Close");
     await rm(archive);
     await chooseFile(application, scenario);
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await clickRibbon(page, "Open");
     await expect(
         source.getByRole("img", { name: "second.test", exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Axes", exact: true }).click();
+    await clickRibbon(page, "Axes");
     await expect(
         source.getByRole("img", { name: "X axis: Easting (m)", exact: true })
     ).toBeVisible();

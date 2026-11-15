@@ -12,7 +12,7 @@ suffixes) and explicit image references inside JSON. If no such match exists, a
 sole JSON in an image's directory is used. Unmatched JSON is reported so it can be
 attached manually; it is not silently assigned to unrelated images.
 
-Select an image and choose **View → Attach Metadata** to add one or more JSON
+Select an image and choose **Data → Attach Metadata** in the contextual Image or Scientific Imagery tab to add one or more JSON
 files later. This opens its Metadata panel. Attached files appear in expandable
 sections, separately from embedded image metadata. Reattaching the same path
 updates that attachment. Their file paths are saved with the scenario; missing

@@ -253,6 +253,7 @@ import {
     computed
 } from "vue";
 import type {
+    ImageContext,
     ImageWorkspaceAPI,
     RestoredImageWindow,
     SavedImageWindow
@@ -623,6 +624,7 @@ function hydrate(saved: RestoredImageWindow[]) {
 const emit = defineEmits<{
     change: [windows: SavedImageWindow[]];
     activeChange: [available: boolean];
+    imageContextChange: [context: ImageContext];
     statisticsChange: [available: boolean];
     sliceChange: [available: boolean];
     sliceModeChange: [enabled: boolean];
@@ -632,6 +634,18 @@ const emit = defineEmits<{
     scalingError: [message: string];
     metadataError: [message: string];
 }>();
+watch(
+    () => {
+        const widget = activeWidget.value;
+        const source = widget?.graph?.source ?? widget?.image;
+        return {
+            available: !!widget,
+            scientific: source?.pluginId === "nova.sicd"
+        };
+    },
+    context => emit("imageContextChange", context),
+    { immediate: true }
+);
 watch(
     () =>
         ({
