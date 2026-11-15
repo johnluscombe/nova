@@ -371,3 +371,14 @@ and are repeated on scenario restoration. Statistics can be opened while this
 initial calculation is pending; its pane shows a loading indicator. A closed
 polygon replaces these with regional percentiles, and clearing it restores the
 cached whole-preview values. Reader-provided source statistics remain preferred.
+
+### Image formation
+
+The Scientific Imagery plugin implements the optional handler
+`formSicd(filePath, outputPath, settings, parameters): Promise<void>`. Nova passes a
+validated `FormationSettings` object (see `src/types/formation.ts`) and a new output
+path owned by the application. The plugin writes a complete SICD there or rejects
+with an error; the host opens the resulting file through the same plugin's `open`
+handler. Formation requires an already opened source. The built-in Form SICD
+control is available for an active Scientific Imagery CPHD widget, and settings
+are configured globally in the Settings dialog.

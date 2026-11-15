@@ -33,6 +33,10 @@ test.use({
             path.join(folder, "index.ts"),
             "utf8"
         ),
+        "scientific-imagery/formation.py": readFileSync(
+            path.join(folder, "formation.py"),
+            "utf8"
+        ),
         "scientific-imagery/reader.py": readFileSync(
             path.join(folder, "reader.py"),
             "utf8"
@@ -270,4 +274,181 @@ fixtures.SicdPreviewTests().fixture(pathlib.Path(sys.argv[2]),data)`,
     await clickRibbon(page, "Clear Region");
     await expect(median).toHaveText("100");
     await expect(source.locator(".closed-polygon")).toHaveCount(0);
+});
+
+test("CPHD image formation uses saved settings and restores the resulting SICD", async ({
+    application,
+    profile
+}) => {
+    try {
+        await execute(python, ["-c", "import sarpy, numpy, lxml"]);
+    } catch {
+        test.skip(
+            true,
+            "Image formation requires the Scientific Imagery Python dependencies."
+        );
+    }
+    const file = path.join(profile, "target.cphd");
+    await execute(python, [
+        "-c",
+        `import runpy, pathlib, sys
+sys.dont_write_bytecode = True
+fixture = runpy.run_path(sys.argv[1])
+fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
+        path.resolve("src-electron/formation.test.py"),
+        file
+    ]);
+    const page = await application.firstWindow();
+    const scenario = await createScenario(application, page, profile);
+    await clickRibbon(page, "Settings");
+    const settings = page.getByRole("dialog", {
+        name: "Settings",
+        exact: true
+    });
+    await settings
+        .getByRole("combobox", {
+            name: "Output size (square pixels)",
+            exact: true
+        })
+        .click();
+    await page.getByRole("option", { name: "64", exact: true }).click();
+    await settings
+        .getByRole("spinbutton", { name: "Pixel spacing (m)", exact: true })
+        .fill("0.5");
+    await settings
+        .getByRole("spinbutton", {
+            name: "Maximum aperture vectors",
+            exact: true
+        })
+        .fill("64");
+    await settings.getByRole("button", { name: "Save", exact: true }).click();
+    await chooseFile(application, file);
+    await clickRibbon(page, "Add Image");
+    const source = page.getByRole("article", {
+        name: "target.cphd",
+        exact: true
+    });
+    await expect(source.getByRole("img")).toBeVisible();
+    await selectRibbonFor(page, "Form SICD");
+    await expect(
+        page.getByRole("button", { name: "Form SICD", exact: true })
+    ).toBeEnabled();
+    await clickRibbon(page, "Form SICD");
+    const formed = page.getByRole("article", {
+        name: "target-formed.sicd",
+        exact: true
+    });
+    await expect(formed.getByRole("img")).toBeVisible();
+    await expect(source).toBeVisible();
+    await clickRibbon(page, "Metadata");
+    await expect(formed).toContainText("SICD / NITF");
+    await expect(formed).toContainText("64 × 64");
+    await expect(formed).toContainText("Nova CPU backprojection");
+    await selectRibbonFor(page, "Form SICD");
+    await expect(
+        page.getByRole("button", { name: "Form SICD", exact: true })
+    ).toBeDisabled();
+    const slides = page.getByRole("complementary", {
+        name: "Formation products",
+        exact: true
+    });
+    await expect(
+        slides
+            .getByRole("list", { name: "Processing slides" })
+            .getByRole("button")
+    ).toHaveCount(7);
+    await slides
+        .getByRole("button", { name: "1. Input phase history", exact: true })
+        .click();
+    const inputProduct = page.getByRole("article", {
+        name: "Input phase history · target-formed.sicd",
+        exact: true
+    });
+    await expect(
+        inputProduct.getByRole("figure", {
+            name: "Intermediate product preview"
+        })
+    ).toContainText("Selected first-channel aperture");
+    await source
+        .getByRole("button", { name: "Maximize target.cphd", exact: true })
+        .click();
+    await expect(slides).toBeVisible();
+    await source
+        .getByRole("button", { name: "Restore target.cphd", exact: true })
+        .click();
+    await slides
+        .getByRole("button", { name: "1. Input phase history", exact: true })
+        .click();
+    await expect(
+        page.getByRole("article", {
+            name: "Input phase history · target-formed.sicd",
+            exact: true
+        })
+    ).toHaveCount(1);
+    await page.screenshot({
+        path: test.info().outputPath("formation-products.png")
+    });
+    await slides
+        .getByRole("button", { name: "Close formation products", exact: true })
+        .click();
+    await expect(slides).toHaveCount(0);
+    await expect(
+        inputProduct.getByRole("img", {
+            name: "Input phase history",
+            exact: true
+        })
+    ).toBeVisible();
+    await page
+        .getByRole("button", { name: "Show formation products", exact: true })
+        .click();
+    await expect(
+        slides.getByRole("button", {
+            name: "1. Input phase history",
+            exact: true
+        })
+    ).toHaveAttribute("aria-current", "step");
+    await selectRibbonFor(page, "Scaling");
+    await expect(
+        page.getByRole("button", { name: "Scaling", exact: true })
+    ).toBeDisabled();
+    await slides
+        .getByRole("button", { name: "1. Input phase history", exact: true })
+        .press("End");
+    await expect(
+        formed.getByRole("img", { name: "target-formed.sicd", exact: true })
+    ).toBeVisible();
+    await slides
+        .getByRole("button", {
+            name: "3. Range-compressed profiles",
+            exact: true
+        })
+        .click();
+    await clickRibbon(page, "Close");
+    await chooseFile(application, scenario);
+    await clickRibbon(page, "Open");
+    await expect(
+        slides.getByRole("button", {
+            name: "3. Range-compressed profiles",
+            exact: true
+        })
+    ).toHaveAttribute("aria-current", "step");
+    await expect(
+        page
+            .getByRole("article", {
+                name: "Range-compressed profiles · target-formed.sicd",
+                exact: true
+            })
+            .getByRole("img", {
+                name: "Range-compressed profiles",
+                exact: true
+            })
+    ).toBeVisible();
+    await clickRibbon(page, "Settings");
+    await expect(
+        settings.getByRole("spinbutton", {
+            name: "Pixel spacing (m)",
+            exact: true
+        })
+    ).toHaveValue("0.5");
+    await settings.getByRole("button", { name: "Cancel", exact: true }).click();
 });

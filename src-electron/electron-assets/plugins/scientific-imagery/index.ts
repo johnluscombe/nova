@@ -1,3 +1,5 @@
+import { readFile, stat } from "node:fs/promises";
+import type { FormationSettings } from "../../../../src/types/formation.ts";
 import type {
     PolygonPoint,
     RegionStatistics
@@ -30,7 +32,8 @@ async function executeReader(
     filePath: string,
     parameters: PluginParameters = {},
     run: Runner = execute,
-    extraArgs: string[] = []
+    extraArgs: string[] = [],
+    timeout = 120_000
 ): Promise<unknown> {
     const configuredPython =
         parameters.python ??
@@ -69,7 +72,7 @@ async function executeReader(
             ],
             {
                 encoding: "utf8",
-                timeout: 120_000,
+                timeout,
                 maxBuffer: 16 * 1024 * 1024,
                 windowsHide: true,
                 env: {
@@ -96,7 +99,9 @@ async function executeReader(
         }
         if (error.killed) {
             throw new Error(
-                "Scientific Imagery preview exceeded the two-minute time limit."
+                timeout > 120_000
+                    ? "Image formation exceeded the ten-minute time limit. Try a smaller output or aperture."
+                    : "Scientific Imagery preview exceeded the two-minute time limit."
             );
         }
         throw new Error(
@@ -139,6 +144,30 @@ export async function openScientificImage(
         throw new Error(
             "Scientific Imagery reader returned an invalid preview."
         );
+    }
+    if (
+        result.metadata?.["Image formation application"] ===
+        "Nova CPU backprojection"
+    ) {
+        try {
+            const sidecar = `${filePath}.formation.json`;
+            if ((await stat(sidecar)).size > 4 * 1024 * 1024) {
+                throw new Error("Formation previews exceed the size limit.");
+            }
+            const data = JSON.parse(await readFile(sidecar, "utf8"));
+            if (data.version !== 1) {
+                throw new Error("Unsupported formation preview version.");
+            }
+            if (!Array.isArray(data.products) || data.products.length > 12) {
+                throw new Error("Invalid formation products.");
+            }
+            result.formationProducts = data.products;
+        } catch (cause) {
+            if ((cause as NodeJS.ErrnoException).code !== "ENOENT") {
+                result.metadata["Formation previews"] =
+                    "Unavailable: the diagnostic preview file could not be read.";
+            }
+        }
     }
     return result;
 }
@@ -189,7 +218,24 @@ export async function readImageRegion(
         String(peakPower)
     ])) as RegionStatistics;
 }
+export async function formSicd(
+    filePath: string,
+    outputPath: string,
+    settings: FormationSettings,
+    parameters: PluginParameters = {},
+    run: Runner = execute
+): Promise<void> {
+    await executeReader(
+        filePath,
+        parameters,
+        run,
+        ["--form-sicd", outputPath, JSON.stringify(settings)],
+        600_000
+    );
+}
 export default {
+    formSicd: (filePath, outputPath, settings, parameters) =>
+        formSicd(filePath, outputPath, settings, parameters),
     readRegion: (filePath, polygon, parameters, scaling, peakPower) =>
         readImageRegion(
             filePath,

@@ -1,275 +1,343 @@
 <template>
     <section class="image-workspace" aria-label="Image workspace">
-        <div ref="canvas" class="image-canvas">
-            <div v-if="!windows.length" class="canvas-empty">
-                <q-icon
-                    :name="activeScenario ? 'image' : 'description'"
-                    size="48px" />
-                <p v-if="!activeScenario">
-                    Create or open a scenario from the File group to begin.
-                </p>
-                <p v-else>Open an image from the ribbon to begin.</p>
-            </div>
-            <article
-                v-for="widget in windows"
-                v-show="!widget.minimized"
-                :key="widget.id"
-                class="image-window"
-                :class="{ active: activeId === widget.id }"
-                :style="windowStyle(widget)"
-                :aria-label="widget.image.name"
-                @pointerdown="activate(widget)"
-                @focusin="activate(widget)">
-                <div
-                    class="widget-titlebar"
-                    tabindex="0"
-                    :aria-label="`${widget.image.name} window title. Use arrow keys to move.`"
-                    @pointerdown="startGesture($event, widget, 'move')"
-                    @pointermove="moveGesture"
-                    @pointerup="endGesture"
-                    @pointercancel="endGesture"
-                    @lostpointercapture="endGesture"
-                    @dblclick="toggleMaximize(widget)"
-                    @keydown="moveWithKeyboard($event, widget)">
-                    <q-icon name="image" size="16px" />
-                    <span class="widget-title" :title="widget.image.path">
-                        {{ widget.image.name }}
-                    </span>
-                    <div
-                        class="widget-controls"
-                        @pointerdown.stop
-                        @dblclick.stop
-                        @keydown.stop>
-                        <q-btn
-                            flat
-                            dense
-                            icon="remove"
-                            :aria-label="`Minimize ${widget.image.name}`"
-                            title="Minimize"
-                            @click="widget.minimized = true" />
-                        <q-btn
-                            flat
-                            dense
-                            :icon="
-                                widget.maximized ? 'filter_none' : 'crop_square'
-                            "
-                            :aria-label="`${widget.maximized ? 'Restore' : 'Maximize'} ${widget.image.name}`"
-                            :title="widget.maximized ? 'Restore' : 'Maximize'"
-                            @click="toggleMaximize(widget)" />
-                        <q-btn
-                            flat
-                            dense
-                            icon="close"
-                            class="widget-close"
-                            :aria-label="`Close ${widget.image.name}`"
-                            title="Close"
-                            @click="close(widget)" />
-                    </div>
+        <div class="workspace-stage">
+            <FormationNavigator
+                v-if="
+                    formationSidebarOpen &&
+                    formationSource?.formationProducts?.length
+                "
+                :products="formationSource.formationProducts"
+                :selected="selectedFormationProduct"
+                :name="formationSource.name"
+                @close="formationSidebarOpen = false"
+                @select="openFormationProduct" />
+            <button
+                v-if="
+                    !formationSidebarOpen &&
+                    formationSource?.formationProducts?.length
+                "
+                class="show-formation-sidebar"
+                type="button"
+                aria-label="Show formation products"
+                title="Show formation products"
+                @click="formationSidebarOpen = true">
+                <q-icon name="chevron_right" size="20px" />
+                <span>Formation products</span>
+            </button>
+            <div ref="canvas" class="image-canvas">
+                <div v-if="!windows.length" class="canvas-empty">
+                    <q-icon
+                        :name="activeScenario ? 'image' : 'description'"
+                        size="48px" />
+                    <p v-if="!activeScenario">
+                        Create or open a scenario from the File group to begin.
+                    </p>
+                    <p v-else>Open an image from the ribbon to begin.</p>
                 </div>
-                <div class="widget-body">
-                    <div class="image-area">
-                        <div class="widget-content">
-                            <div
-                                v-if="widget.loading"
-                                class="column items-center q-gutter-md"
-                                role="status"
-                                aria-live="polite">
-                                <q-spinner color="primary" size="40px" />
-                                <span>
-                                    {{
-                                        widget.graph
-                                            ? "Loading slice…"
-                                            : "Loading image…"
-                                    }}
-                                </span>
-                            </div>
-                            <LineGraph
-                                v-else-if="widget.graph?.data"
-                                :data="widget.graph.data" />
-                            <ImageSliceView
-                                v-else-if="widget.image.previewDataUrl"
-                                :image="widget.image"
-                                :enabled="!!widget.sliceEnabled"
-                                :inspect="!!widget.pixelValuesEnabled"
-                                :axes="!!widget.axesEnabled"
-                                :drawing="!!widget.polygonDrawing"
-                                :polygon="widget.region"
-                                @region="selectRegion(widget, $event)"
-                                @cancel-region="widget.polygonDrawing = false"
-                                @slice="
-                                    createSliceGraph(widget.image, $event)
-                                " />
-                            <p v-else>
-                                {{
-                                    widget.error ??
-                                    "This plugin did not provide an image preview."
-                                }}
-                            </p>
+                <article
+                    v-for="widget in windows"
+                    v-show="!widget.minimized"
+                    :key="widget.id"
+                    class="image-window"
+                    :class="{ active: activeId === widget.id }"
+                    :style="windowStyle(widget)"
+                    :aria-label="widget.image.name"
+                    @pointerdown="activate(widget)"
+                    @focusin="activate(widget)">
+                    <div
+                        class="widget-titlebar"
+                        tabindex="0"
+                        :aria-label="`${widget.image.name} window title. Use arrow keys to move.`"
+                        @pointerdown="startGesture($event, widget, 'move')"
+                        @pointermove="moveGesture"
+                        @pointerup="endGesture"
+                        @pointercancel="endGesture"
+                        @lostpointercapture="endGesture"
+                        @dblclick="toggleMaximize(widget)"
+                        @keydown="moveWithKeyboard($event, widget)">
+                        <q-icon name="image" size="16px" />
+                        <span class="widget-title" :title="widget.image.path">
+                            {{ widget.image.name }}
+                        </span>
+                        <div
+                            class="widget-controls"
+                            @pointerdown.stop
+                            @dblclick.stop
+                            @keydown.stop>
+                            <q-btn
+                                flat
+                                dense
+                                icon="remove"
+                                :aria-label="`Minimize ${widget.image.name}`"
+                                title="Minimize"
+                                @click="widget.minimized = true" />
+                            <q-btn
+                                flat
+                                dense
+                                :icon="
+                                    widget.maximized
+                                        ? 'filter_none'
+                                        : 'crop_square'
+                                "
+                                :aria-label="`${widget.maximized ? 'Restore' : 'Maximize'} ${widget.image.name}`"
+                                :title="
+                                    widget.maximized ? 'Restore' : 'Maximize'
+                                "
+                                @click="toggleMaximize(widget)" />
+                            <q-btn
+                                flat
+                                dense
+                                icon="close"
+                                class="widget-close"
+                                :aria-label="`Close ${widget.image.name}`"
+                                title="Close"
+                                @click="close(widget)" />
                         </div>
-                        <section
-                            v-if="widget.statisticsOpen"
-                            class="statistics-panel"
-                            aria-label="Image statistics">
-                            <div class="row items-center justify-between">
-                                <strong>
+                    </div>
+                    <div class="widget-body">
+                        <div class="image-area">
+                            <div class="widget-content">
+                                <div
+                                    v-if="widget.loading"
+                                    class="column items-center q-gutter-md"
+                                    role="status"
+                                    aria-live="polite">
+                                    <q-spinner color="primary" size="40px" />
+                                    <span>
+                                        {{
+                                            widget.graph
+                                                ? "Loading slice…"
+                                                : "Loading image…"
+                                        }}
+                                    </span>
+                                </div>
+                                <LineGraph
+                                    v-else-if="widget.graph?.data"
+                                    :data="widget.graph.data" />
+                                <figure
+                                    v-else-if="diagnosticProduct(widget)"
+                                    class="diagnostic-slide"
+                                    aria-label="Intermediate product preview">
+                                    <img
+                                        :src="
+                                            diagnosticProduct(widget)!
+                                                .previewDataUrl
+                                        "
+                                        :alt="
+                                            diagnosticProduct(widget)!.title
+                                        " />
+                                </figure>
+                                <ImageSliceView
+                                    v-else-if="widget.image.previewDataUrl"
+                                    :image="widget.image"
+                                    :enabled="!!widget.sliceEnabled"
+                                    :inspect="!!widget.pixelValuesEnabled"
+                                    :axes="!!widget.axesEnabled"
+                                    :drawing="!!widget.polygonDrawing"
+                                    :polygon="widget.region"
+                                    @region="selectRegion(widget, $event)"
+                                    @cancel-region="
+                                        widget.polygonDrawing = false
+                                    "
+                                    @slice="
+                                        createSliceGraph(widget.image, $event)
+                                    " />
+                                <p v-else>
                                     {{
-                                        widget.region
-                                            ? "Region statistics"
-                                            : "Statistics"
+                                        widget.error ??
+                                        "This plugin did not provide an image preview."
                                     }}
-                                </strong>
+                                </p>
+                            </div>
+                            <section
+                                v-if="
+                                    widget.statisticsOpen &&
+                                    !diagnosticProduct(widget)
+                                "
+                                class="statistics-panel"
+                                aria-label="Image statistics">
+                                <div class="row items-center justify-between">
+                                    <strong>
+                                        {{
+                                            widget.region
+                                                ? "Region statistics"
+                                                : "Statistics"
+                                        }}
+                                    </strong>
+                                    <q-btn
+                                        flat
+                                        dense
+                                        round
+                                        icon="close"
+                                        aria-label="Close statistics"
+                                        @click="
+                                            widget.statisticsOpen = false
+                                        " />
+                                </div>
+                                <p
+                                    v-if="
+                                        widget.loading ||
+                                        widget.regionBusy ||
+                                        (!widget.region &&
+                                            widget.wholeStatisticsBusy)
+                                    "
+                                    role="status">
+                                    Loading statistics…
+                                </p>
+                                <template v-else>
+                                    <p v-if="widget.regionResult">
+                                        {{ widget.regionResult.valueLabel }} ·
+                                        {{ widget.regionResult.sampleCount }}
+                                        finite samples{{
+                                            widget.regionResult.sampled
+                                                ? " (sampled)"
+                                                : ""
+                                        }}
+                                    </p>
+                                    <p
+                                        v-if="
+                                            widget.regionResult?.sampleCount ===
+                                            0
+                                        ">
+                                        No finite pixel samples fall inside this
+                                        region.
+                                    </p>
+                                    <p
+                                        v-if="
+                                            !widget.region &&
+                                            statisticsLabel(widget)
+                                        ">
+                                        {{ statisticsLabel(widget) }}
+                                    </p>
+                                    <dl
+                                        v-if="
+                                            displayStatistics(widget) &&
+                                            Object.keys(
+                                                visibleStatistics(
+                                                    displayStatistics(widget)
+                                                )
+                                            ).length
+                                        ">
+                                        <div
+                                            v-for="(
+                                                value, label
+                                            ) in visibleStatistics(
+                                                displayStatistics(widget)
+                                            )"
+                                            :key="label">
+                                            <dt>{{ label }}</dt>
+                                            <dd>
+                                                {{
+                                                    typeof value === "number"
+                                                        ? Number(
+                                                              value.toPrecision(
+                                                                  7
+                                                              )
+                                                          )
+                                                        : (value ??
+                                                          "Not available")
+                                                }}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                    <p v-else>
+                                        {{
+                                            widget.regionError ??
+                                            widget.previewStatisticsError ??
+                                            widget.error ??
+                                            (Object.keys(
+                                                displayStatistics(widget)
+                                            ).length
+                                                ? "The selected percentiles are not available for this image."
+                                                : "This plugin does not provide image statistics.")
+                                        }}
+                                    </p>
+                                </template>
+                            </section>
+                        </div>
+                        <aside
+                            v-if="
+                                widget.metadataOpen &&
+                                !diagnosticProduct(widget)
+                            "
+                            class="metadata-panel"
+                            aria-label="Image metadata">
+                            <div class="row items-center justify-between">
+                                <strong>Metadata</strong>
                                 <q-btn
                                     flat
                                     dense
                                     round
                                     icon="close"
-                                    aria-label="Close statistics"
-                                    @click="widget.statisticsOpen = false" />
+                                    aria-label="Close metadata"
+                                    @click="widget.metadataOpen = false" />
                             </div>
-                            <p
-                                v-if="
-                                    widget.loading ||
-                                    widget.regionBusy ||
-                                    (!widget.region &&
-                                        widget.wholeStatisticsBusy)
-                                "
-                                role="status">
-                                Loading statistics…
+                            <p v-if="widget.loading" role="status">
+                                Loading metadata…
                             </p>
-                            <template v-else>
-                                <p v-if="widget.regionResult">
-                                    {{ widget.regionResult.valueLabel }} ·
-                                    {{ widget.regionResult.sampleCount }} finite
-                                    samples{{
-                                        widget.regionResult.sampled
-                                            ? " (sampled)"
-                                            : ""
-                                    }}
-                                </p>
-                                <p
-                                    v-if="
-                                        widget.regionResult?.sampleCount === 0
-                                    ">
-                                    No finite pixel samples fall inside this
-                                    region.
-                                </p>
-                                <p
-                                    v-if="
-                                        !widget.region &&
-                                        statisticsLabel(widget)
-                                    ">
-                                    {{ statisticsLabel(widget) }}
-                                </p>
-                                <dl
-                                    v-if="
-                                        displayStatistics(widget) &&
-                                        Object.keys(
-                                            visibleStatistics(
-                                                displayStatistics(widget)
-                                            )
-                                        ).length
-                                    ">
-                                    <div
-                                        v-for="(
-                                            value, label
-                                        ) in visibleStatistics(
-                                            displayStatistics(widget)
-                                        )"
-                                        :key="label">
-                                        <dt>{{ label }}</dt>
-                                        <dd>
-                                            {{
-                                                typeof value === "number"
-                                                    ? Number(
-                                                          value.toPrecision(7)
-                                                      )
-                                                    : (value ?? "Not available")
-                                            }}
-                                        </dd>
-                                    </div>
-                                </dl>
-                                <p v-else>
-                                    {{
-                                        widget.regionError ??
-                                        widget.previewStatisticsError ??
-                                        widget.error ??
-                                        (Object.keys(displayStatistics(widget))
-                                            .length
-                                            ? "The selected percentiles are not available for this image."
-                                            : "This plugin does not provide image statistics.")
-                                    }}
-                                </p>
-                            </template>
-                        </section>
+                            <dl>
+                                <template
+                                    v-for="(
+                                        [label, value], index
+                                    ) in metadataEntries(widget)"
+                                    :key="index">
+                                    <dt>{{ label }}</dt>
+                                    <dd>
+                                        {{
+                                            typeof value === "number"
+                                                ? Number(value.toPrecision(7))
+                                                : (value ?? "Not available")
+                                        }}
+                                    </dd>
+                                </template>
+                            </dl>
+                            <AttachedMetadata
+                                :attachments="
+                                    widget.image.attachedMetadata ?? []
+                                "
+                                :candidates="
+                                    metadataAxesCandidates(widget.image)
+                                "
+                                :axes-source="
+                                    widget.image.axesSource ?? 'pixel'
+                                "
+                                :has-embedded-axes="!!widget.image.embeddedAxes"
+                                :notice="widget.image.axesNotice"
+                                :axes-preference="widget.metadataAxesSource"
+                                @select-axes="
+                                    selectMetadataAxes(widget, $event)
+                                " />
+                        </aside>
                     </div>
-                    <aside
-                        v-if="widget.metadataOpen"
-                        class="metadata-panel"
-                        aria-label="Image metadata">
-                        <div class="row items-center justify-between">
-                            <strong>Metadata</strong>
-                            <q-btn
-                                flat
-                                dense
-                                round
-                                icon="close"
-                                aria-label="Close metadata"
-                                @click="widget.metadataOpen = false" />
-                        </div>
-                        <p v-if="widget.loading" role="status">
-                            Loading metadata…
-                        </p>
-                        <dl>
-                            <template
-                                v-for="(
-                                    [label, value], index
-                                ) in metadataEntries(widget)"
-                                :key="index">
-                                <dt>{{ label }}</dt>
-                                <dd>
-                                    {{
-                                        typeof value === "number"
-                                            ? Number(value.toPrecision(7))
-                                            : (value ?? "Not available")
-                                    }}
-                                </dd>
-                            </template>
-                        </dl>
-                        <AttachedMetadata
-                            :attachments="widget.image.attachedMetadata ?? []"
-                            :candidates="metadataAxesCandidates(widget.image)"
-                            :axes-source="widget.image.axesSource ?? 'pixel'"
-                            :has-embedded-axes="!!widget.image.embeddedAxes"
-                            :notice="widget.image.axesNotice"
-                            :axes-preference="widget.metadataAxesSource"
-                            @select-axes="selectMetadataAxes(widget, $event)" />
-                    </aside>
-                </div>
-                <div class="widget-status" :title="widget.image.path">
-                    {{ widget.image.pluginName }}
-                    <span v-if="widget.image.width && widget.image.height">
-                        · {{ widget.image.width }} × {{ widget.image.height }}
-                    </span>
-                </div>
-                <template v-if="!widget.maximized">
-                    <div
-                        v-for="edge in edges"
-                        :key="edge"
-                        class="resize-handle"
-                        :class="`resize-${edge}`"
-                        @pointerdown.stop="startGesture($event, widget, edge)"
-                        @pointermove="moveGesture"
-                        @pointerup="endGesture"
-                        @pointercancel="endGesture"
-                        @lostpointercapture="endGesture" />
-                    <button
-                        class="resize-keyboard"
-                        :aria-label="`Resize ${widget.image.name} with arrow keys`"
-                        @keydown="resizeWithKeyboard($event, widget)">
-                        ⌟
-                    </button>
-                </template>
-            </article>
+                    <div class="widget-status" :title="widget.image.path">
+                        {{ widget.image.pluginName }}
+                        <span v-if="widget.image.width && widget.image.height">
+                            · {{ widget.image.width }} ×
+                            {{ widget.image.height }}
+                        </span>
+                    </div>
+                    <template v-if="!widget.maximized">
+                        <div
+                            v-for="edge in edges"
+                            :key="edge"
+                            class="resize-handle"
+                            :class="`resize-${edge}`"
+                            @pointerdown.stop="
+                                startGesture($event, widget, edge)
+                            "
+                            @pointermove="moveGesture"
+                            @pointerup="endGesture"
+                            @pointercancel="endGesture"
+                            @lostpointercapture="endGesture" />
+                        <button
+                            class="resize-keyboard"
+                            :aria-label="`Resize ${widget.image.name} with arrow keys`"
+                            @keydown="resizeWithKeyboard($event, widget)">
+                            ⌟
+                        </button>
+                    </template>
+                </article>
+            </div>
         </div>
         <div class="window-tray" aria-label="Minimized image windows">
             <q-btn
@@ -313,10 +381,12 @@ import type {
 } from "@/types/region";
 import AttachedMetadata from "./AttachedMetadata.vue";
 import type { MetadataAttachment } from "@/types/metadata";
+import FormationNavigator from "./FormationNavigator.vue";
 import ImageSliceView from "./ImageSliceView.vue";
 import LineGraph from "./LineGraph.vue";
 import { sliceAxes, slicePosition } from "@/utils/slice-axes";
 import { previewSlice } from "@/utils/image-slice";
+import { formationSettings } from "@/composables/useSettings";
 import type { Scaling, ScalingState } from "@/types/scaling";
 import type { SliceData, SliceSelection } from "@/types/slice";
 import type { ImageInfo } from "@/types/image";
@@ -327,6 +397,9 @@ import {
     resizeWindow,
     type WindowRect
 } from "../utils/window-geometry.ts";
+const formationSidebarOpen = ref(true);
+const formationSource = ref<ImageInfo>();
+const selectedFormationProduct = ref("final");
 interface ImageWindow {
     id: number;
     image: ImageInfo;
@@ -351,6 +424,7 @@ interface ImageWindow {
     previewWholeSampled?: boolean;
     wholeStatisticsBusy?: boolean;
     previewStatisticsError?: string;
+    formationProductId?: string;
     metadataAxesSource?: string;
     graph?: {
         data?: SliceData;
@@ -365,6 +439,62 @@ const activeWidget = computed(() =>
         widget => widget.id === activeId.value && !widget.minimized
     )
 );
+function pinFormationSource(image: ImageInfo) {
+    if (!image.formationProducts?.length) {
+        return;
+    }
+    if (formationSource.value?.path !== image.path) {
+        selectedFormationProduct.value = "final";
+    }
+    formationSource.value = {
+        ...image,
+        name: image.path.split(/[\\/]/).pop() || image.name
+    };
+}
+function openFormationProduct(id: string) {
+    const source = formationSource.value;
+    const product = source?.formationProducts?.find(item => item.id === id);
+    if (!source || !product) {
+        return;
+    }
+    selectedFormationProduct.value = id;
+    const existing = windows.value.find(
+        widget =>
+            !widget.graph &&
+            widget.image.path === source.path &&
+            (id === "final"
+                ? !widget.formationProductId ||
+                  widget.formationProductId === "final"
+                : widget.formationProductId === id)
+    );
+    if (existing) {
+        restore(existing);
+        return;
+    }
+    const windowId = add({ ...source });
+    const widget = windows.value.find(item => item.id === windowId)!;
+    if (id !== "final") {
+        widget.formationProductId = id;
+        widget.image.name = `${product.title} · ${source.name}`;
+    }
+}
+function productWindowImage(image: ImageInfo, id?: string): ImageInfo {
+    const product = image.formationProducts?.find(
+        item => item.id === id && id !== "final"
+    );
+    return product
+        ? {
+              ...image,
+              name: `${product.title} · ${image.path.split(/[\\/]/).pop() || image.name}`
+          }
+        : image;
+}
+function diagnosticProduct(widget: ImageWindow) {
+    return widget.image.formationProducts?.find(
+        product =>
+            product.id === widget.formationProductId && product.id !== "final"
+    );
+}
 function toggleMetadata() {
     if (activeWidget.value && !activeWidget.value.graph) {
         activeWidget.value.metadataOpen = !activeWidget.value.metadataOpen;
@@ -445,6 +575,7 @@ const canSlice = computed(
         !!activeWidget.value &&
         !activeWidget.value.loading &&
         !activeWidget.value.graph &&
+        !diagnosticProduct(activeWidget.value) &&
         !!activeWidget.value.image.previewDataUrl
 );
 function toggleSlice() {
@@ -666,6 +797,40 @@ async function createSliceGraph(
     }
 }
 
+async function formSicd() {
+    const widget = activeWidget.value;
+    if (
+        !widget ||
+        widget.loading ||
+        widget.graph ||
+        widget.image.metadata?.Format !== "CPHD"
+    ) {
+        return;
+    }
+    const source = widget.image;
+    const id = add(
+        {
+            name: `${source.name} — forming SICD`,
+            path: "",
+            pluginId: "",
+            pluginName: "Scientific Imagery"
+        },
+        true
+    );
+    try {
+        const result = await window.images!.formSicd(
+            source.path,
+            source.pluginId,
+            { ...formationSettings.value }
+        );
+        complete(id, result);
+    } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        fail(id, message);
+        emit("scalingError", message);
+    }
+}
+
 async function setScaling(scaling: Scaling) {
     const widget = activeWidget.value;
     if (
@@ -780,7 +945,17 @@ function complete(id: number, image: ImageInfo) {
     if (!widget) {
         return;
     }
-    widget.image = resolveMetadataAxes(image, widget.metadataAxesSource);
+    widget.image = productWindowImage(
+        resolveMetadataAxes(image, widget.metadataAxesSource),
+        widget.formationProductId
+    );
+    if (!formationSource.value || widget.id === activeId.value) {
+        pinFormationSource(image);
+        if (widget.id === activeId.value && image.formationProducts?.length) {
+            selectedFormationProduct.value =
+                widget.formationProductId ?? "final";
+        }
+    }
     widget.loading = false;
     void initializePreviewStatistics(widget);
     if (widget.region) {
@@ -801,6 +976,9 @@ function snapshot(): SavedImageWindow[] {
         .filter(widget => widget.image.pluginId && !widget.graph)
         .map(widget => ({
             id: widget.id,
+            ...(widget.formationProductId
+                ? { formationProductId: widget.formationProductId }
+                : {}),
             ...(widget.region
                 ? { region: widget.region.map(point => ({ ...point })) }
                 : {}),
@@ -824,9 +1002,16 @@ function snapshot(): SavedImageWindow[] {
         }));
 }
 function hydrate(saved: RestoredImageWindow[]) {
+    formationSource.value = undefined;
     windows.value = saved.map(widget => ({
         id: widget.id,
-        image: resolveMetadataAxes(widget.image, widget.metadataAxesSource),
+        image: productWindowImage(
+            resolveMetadataAxes(widget.image, widget.metadataAxesSource),
+            widget.formationProductId
+        ),
+        ...(widget.formationProductId
+            ? { formationProductId: widget.formationProductId }
+            : {}),
         ...(widget.metadataAxesSource !== undefined
             ? { metadataAxesSource: widget.metadataAxesSource }
             : {}),
@@ -846,6 +1031,14 @@ function hydrate(saved: RestoredImageWindow[]) {
     sequence = Math.max(0, ...saved.map(widget => widget.id));
     zIndex = Math.max(0, ...saved.map(widget => widget.z));
     activeId.value = windows.value.find(widget => widget.z === zIndex)?.id;
+    const restoredFormation = [...windows.value]
+        .reverse()
+        .find(widget => widget.image.formationProducts?.length);
+    if (restoredFormation) {
+        pinFormationSource(restoredFormation.image);
+        selectedFormationProduct.value =
+            restoredFormation.formationProductId ?? "final";
+    }
     for (const widget of windows.value) {
         void initializePreviewStatistics(widget);
         if (widget.region && !widget.loading) {
@@ -853,6 +1046,14 @@ function hydrate(saved: RestoredImageWindow[]) {
         }
     }
 }
+watch(
+    () => activeWidget.value?.image,
+    image => {
+        if (image) {
+            pinFormationSource(image);
+        }
+    }
+);
 const emit = defineEmits<{
     change: [windows: SavedImageWindow[]];
     activeChange: [available: boolean];
@@ -882,7 +1083,13 @@ watch(
         const source = widget?.graph?.source ?? widget?.image;
         return {
             available: !!widget,
-            scientific: source?.pluginId === "nova.sicd"
+            scientific: source?.pluginId === "nova.sicd",
+            canFormSicd:
+                !!widget &&
+                !widget.graph &&
+                !widget.loading &&
+                source?.pluginId === "nova.sicd" &&
+                source.metadata?.Format === "CPHD"
         };
     },
     context => emit("imageContextChange", context),
@@ -891,7 +1098,10 @@ watch(
 watch(
     () =>
         ({
-            options: activeWidget.value?.image.scalingOptions ?? [],
+            options:
+                activeWidget.value && diagnosticProduct(activeWidget.value)
+                    ? []
+                    : (activeWidget.value?.image.scalingOptions ?? []),
             value: activeWidget.value?.image.scaling ?? "amplitude",
             loading: !!activeWidget.value?.loading
         }) as ScalingState,
@@ -922,6 +1132,7 @@ const hasStatistics = computed(() => {
         !!widget &&
         !widget.graph &&
         !widget.loading &&
+        !diagnosticProduct(widget) &&
         (!!widget.region ||
             !!widget.wholeStatisticsBusy ||
             !!widget.previewStatisticsError ||
@@ -933,7 +1144,10 @@ watch(hasStatistics, available => emit("statisticsChange", available), {
     immediate: true
 });
 watch(
-    () => !!activeWidget.value && !activeWidget.value.graph,
+    () =>
+        !!activeWidget.value &&
+        !activeWidget.value.graph &&
+        !diagnosticProduct(activeWidget.value),
     available => emit("activeChange", available),
     {
         immediate: true
@@ -962,7 +1176,8 @@ defineExpose({
     toggleAxes,
     togglePolygon,
     clearRegion,
-    setScaling
+    setScaling,
+    formSicd
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;
@@ -1088,7 +1303,51 @@ onBeforeUnmount(() => {
     min-height: 0;
     min-width: 0;
 }
+.show-formation-sidebar {
+    flex: 0 0 30px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+    writing-mode: vertical-rl;
+    background: #f6f8fa;
+    color: #243447;
+    border: 0;
+    border-right: 1px solid #ccd4de;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+}
+.show-formation-sidebar:hover {
+    background: #eaf3fc;
+}
+.show-formation-sidebar:focus-visible {
+    outline: 2px solid #1976d2;
+    outline-offset: -2px;
+}
+.workspace-stage {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+}
+.diagnostic-slide {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 10px;
+    color: #e2e8f0;
+}
+.diagnostic-slide img {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    object-fit: contain;
+}
 .image-canvas {
+    min-width: 0;
     position: relative;
     flex: 1;
     min-height: 0;

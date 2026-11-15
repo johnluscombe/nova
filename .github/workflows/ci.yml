@@ -52,6 +52,7 @@ jobs:
                   python src-electron/sidd-reader.test.py
                   python src-electron/tiff-reader.test.py
                   python src-electron/cphd-reader.test.py
+                  python src-electron/formation.test.py
             - name: Run unit and Electron tests with combined coverage
               run: npm run test:coverage:all
             - name: Summarize coverage and prepare badge

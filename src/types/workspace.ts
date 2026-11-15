@@ -2,6 +2,7 @@ import { validatePolygon, type PolygonPoint } from "./region";
 import { isScaling, type Scaling } from "./scaling";
 import type { ImageInfo } from "./image";
 export interface SavedImageWindow {
+    formationProductId?: string;
     region?: PolygonPoint[];
     metadataAxesSource?: string;
     metadataFiles?: string[];
@@ -27,6 +28,9 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
     for (const item of value) {
         if (
             !item ||
+            (item.formationProductId !== undefined &&
+                (typeof item.formationProductId !== "string" ||
+                    !/^[a-z][a-z0-9-]{0,40}$/.test(item.formationProductId))) ||
             (item.metadataFiles !== undefined &&
                 (!Array.isArray(item.metadataFiles) ||
                     item.metadataFiles.length > 32 ||
@@ -94,10 +98,12 @@ export interface ImageWorkspaceAPI {
     toggleAxes(): void;
     togglePolygon(): void;
     clearRegion(): Promise<void>;
+    formSicd(): Promise<void>;
     setScaling(scaling: Scaling): Promise<void>;
 }
 
 export interface ImageContext {
+    canFormSicd?: boolean;
     available: boolean;
     scientific: boolean;
 }

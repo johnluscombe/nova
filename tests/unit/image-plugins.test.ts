@@ -762,3 +762,66 @@ test("source regions validate polygon geometry, scaling and percentile results",
             /inside/
         );
     }));
+
+test("image formation requires an opened source, validates settings, and opens the generated product", () =>
+    fixture(async (directory, host) => {
+        const { defaultFormationSettings } =
+            await import("../../src/types/formation.ts");
+        await plugin(
+            directory,
+            "formation",
+            `import {writeFile} from 'node:fs/promises'; export default {
+            open() { return {width: 64, height: 64}; },
+            async formSicd(source, output, options, parameters) { await writeFile(output, JSON.stringify({source, options, parameters})); }
+        };`,
+            { parameters: { python: "custom" } }
+        );
+        await host.reload();
+        const source = path.join(directory, "source.test"),
+            output = path.join(directory, "output.test");
+        await assert.rejects(
+            host.formSicd(
+                source,
+                "formation",
+                output,
+                defaultFormationSettings
+            ),
+            /Open a CPHD/
+        );
+        await host.open(source);
+        await assert.rejects(
+            host.formSicd(source, "formation", output, {
+                ...defaultFormationSettings,
+                imageSize: 3
+            }),
+            /valid image size/
+        );
+        const result = await host.formSicd(
+            source,
+            "formation",
+            output,
+            defaultFormationSettings
+        );
+        assert.equal(result.path, output);
+        const { readFile } = await import("node:fs/promises");
+        const written = JSON.parse(await readFile(output, "utf8"));
+        assert.equal(written.parameters.python, "custom");
+        assert.equal(written.options.algorithm, "backprojection");
+    }));
+
+test("invalid optional formation previews do not prevent opening the final image", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "previews",
+            `export default {open() {return {width: 64, height: 64, formationProducts: [{id: 'bad'}]};}};`
+        );
+        await host.reload();
+        const image = await host.open("formed.test");
+        assert.equal(image.width, 64);
+        assert.equal(image.formationProducts, undefined);
+        assert.match(
+            String(image.metadata?.["Formation previews"]),
+            /Unavailable/
+        );
+    }));

@@ -1,4 +1,9 @@
 import {
+    validateFormationProducts,
+    validateFormationSettings,
+    type FormationSettings
+} from "../src/types/formation";
+import {
     validatePolygon,
     type PolygonPoint,
     type RegionStatistics
@@ -24,6 +29,12 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
+    formSicd?(
+        filePath: string,
+        outputPath: string,
+        settings: FormationSettings,
+        parameters: PluginParameters
+    ): Promise<void>;
     readRegion?(
         filePath: string,
         polygon: PolygonPoint[],
@@ -222,6 +233,8 @@ export class ImagePlugins {
                     ) &&
                         typeof module.default.executeRibbonAction !==
                             "function") ||
+                    (module.default.formSicd !== undefined &&
+                        typeof module.default.formSicd !== "function") ||
                     (module.default.readRegion !== undefined &&
                         typeof module.default.readRegion !== "function") ||
                     (module.default.readPixel !== undefined &&
@@ -487,6 +500,31 @@ export class ImagePlugins {
         return result;
     }
 
+    async formSicd(
+        filePath: string,
+        pluginId: string,
+        outputPath: string,
+        settings: FormationSettings
+    ): Promise<ImageInfo> {
+        const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+        if (
+            !this.openedImages.has(JSON.stringify([filePath, pluginId])) ||
+            !plugin?.implementation.formSicd
+        ) {
+            throw new Error(
+                "Open a CPHD image with image formation support first."
+            );
+        }
+        const options = validateFormationSettings(settings);
+        await plugin.implementation.formSicd(
+            filePath,
+            outputPath,
+            options,
+            plugin.manifest.parameters ?? {}
+        );
+        return this.open(outputPath, pluginId);
+    }
+
     async rescale(
         filePath: string,
         pluginId: string,
@@ -615,7 +653,22 @@ export class ImagePlugins {
                         throw new Error("Invalid image axis dimensions.");
                     }
                 }
+                let formationProducts;
+                if (result.formationProducts !== undefined) {
+                    try {
+                        formationProducts = validateFormationProducts(
+                            result.formationProducts
+                        );
+                    } catch {
+                        result.metadata = {
+                            ...result.metadata,
+                            "Formation previews":
+                                "Unavailable: invalid diagnostic preview data."
+                        };
+                    }
+                }
                 const info: ImageInfo = {
+                    ...(formationProducts ? { formationProducts } : {}),
                     ...(implementation.readRegion
                         ? { supportsSourceRegions: true }
                         : {}),

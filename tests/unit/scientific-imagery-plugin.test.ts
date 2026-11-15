@@ -294,3 +294,74 @@ test("Scientific Imagery forwards polygon coordinates and scaling to the worker"
         expected
     );
 });
+
+test("image formation forwards explicit output and settings with a longer timeout", async () => {
+    const { formSicd } =
+        await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts");
+    const { defaultFormationSettings } =
+        await import("../../src/types/formation.ts");
+    await formSicd(
+        "input.cphd",
+        "output.sicd",
+        defaultFormationSettings,
+        { python: "python-test" },
+        async (python, args, options) => {
+            assert.equal(python, "python-test");
+            assert.deepEqual(args.slice(1), [
+                "input.cphd",
+                "--form-sicd",
+                "output.sicd",
+                JSON.stringify(defaultFormationSettings)
+            ]);
+            assert.equal(options.timeout, 600_000);
+            return { stdout: '{"path":"output.sicd"}' };
+        }
+    );
+});
+
+test("formed SICDs load durable diagnostic previews and tolerate damaged sidecars", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const directory = await mkdtemp(
+        path.join(tmpdir(), "nova-formation-preview-")
+    );
+    try {
+        const file = path.join(directory, "formed.sicd");
+        const products = [
+            {
+                id: "final",
+                title: "Final",
+                description: "Uncalibrated",
+                previewDataUrl: "data:image/png;base64,eA=="
+            }
+        ];
+        const run = async () => ({
+            stdout: JSON.stringify({
+                width: 64,
+                height: 64,
+                previewDataUrl: "data:image/png;base64,eA==",
+                metadata: {
+                    "Image formation application": "Nova CPU backprojection"
+                }
+            })
+        });
+        await writeFile(
+            `${file}.formation.json`,
+            JSON.stringify({ version: 1, products })
+        );
+        assert.deepEqual(
+            (await openScientificImage(file, {}, run)).formationProducts,
+            products
+        );
+        await writeFile(`${file}.formation.json`, "invalid json");
+        const image = await openScientificImage(file, {}, run);
+        assert.equal(image.width, 64);
+        assert.equal(image.formationProducts, undefined);
+        assert.match(
+            String(image.metadata?.["Formation previews"]),
+            /Unavailable/
+        );
+    } finally {
+        await rm(directory, { recursive: true, force: true });
+    }
+});

@@ -66,3 +66,42 @@ test("reloads saved settings and falls back safely for corrupt storage", async (
             .value
     ).toEqual(defaultPercentiles);
 });
+
+test("validates and persists image formation settings", async () => {
+    const { validateFormationSettings, defaultFormationSettings } =
+        await import("../../src/types/formation");
+    const { saveFormationSettings, formationSettings } =
+        await import("../../src/composables/useSettings");
+    for (const patch of [
+        { imageSize: 0 },
+        { pixelSpacing: NaN },
+        { maxVectors: 1 },
+        { maxVectors: 8.5 },
+        { window: "bad" },
+        { algorithm: "pfa" }
+    ]) {
+        expect(() =>
+            validateFormationSettings({ ...defaultFormationSettings, ...patch })
+        ).toThrow();
+    }
+    saveFormationSettings({
+        ...defaultFormationSettings,
+        imageSize: 128,
+        window: "uniform"
+    });
+    expect(formationSettings.value.imageSize).toBe(128);
+    expect(
+        JSON.parse(localStorage.getItem("nova.settings.formation")!).window
+    ).toBe("uniform");
+    vi.resetModules();
+    expect(
+        (await import("../../src/composables/useSettings")).formationSettings
+            .value.imageSize
+    ).toBe(128);
+    localStorage.setItem("nova.settings.formation", "{}");
+    vi.resetModules();
+    expect(
+        (await import("../../src/composables/useSettings")).formationSettings
+            .value
+    ).toEqual(defaultFormationSettings);
+});

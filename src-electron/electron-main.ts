@@ -1,3 +1,5 @@
+import type { FormationSettings } from "../src/types/formation";
+import { randomUUID } from "node:crypto";
 import type { PolygonPoint } from "../src/types/region";
 import { prepareImport, readMetadata } from "./image-import";
 import type { ImageImportUpdate } from "../src/types/image-import";
@@ -8,7 +10,7 @@ import { BrowserWindow, app, dialog } from "electron";
 import { ImagePlugins } from "./image-plugins";
 import { ScenarioDatabase } from "./scenario-database";
 import path from "node:path";
-import { readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import type { ScenarioInfo, RestoredImageUpdate } from "../src/types/scenario";
 import os from "node:os";
 import {
@@ -315,6 +317,36 @@ async function createWindow() {
                     row,
                     column,
                     scaling
+                );
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:form-sicd",
+        (
+            _event,
+            filePath: string,
+            pluginId: string,
+            settings: FormationSettings
+        ) =>
+            documentAction(async () => {
+                if (!scenario.current) {
+                    throw new Error("Open a scenario before forming an image.");
+                }
+                const directory = path.join(
+                    app.getPath("userData"),
+                    "formed-images",
+                    randomUUID()
+                );
+                await mkdir(directory, { recursive: true });
+                const outputPath = path.join(
+                    directory,
+                    `${path.parse(filePath).name}-formed.sicd`
+                );
+                return imagePlugins.formSicd(
+                    filePath,
+                    pluginId,
+                    outputPath,
+                    settings
                 );
             })
     );

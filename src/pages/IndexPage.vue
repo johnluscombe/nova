@@ -178,6 +178,15 @@
                                 label="Attach Metadata"
                                 :disable="busy || !hasActiveWidget"
                                 @click="workspace?.attachMetadata()" />
+                            <q-btn
+                                v-if="imageContext.scientific"
+                                flat
+                                stack
+                                no-caps
+                                icon="auto_fix_high"
+                                label="Form SICD"
+                                :disable="busy || !imageContext.canFormSicd"
+                                @click="formSicd" />
                         </div>
                         <div id="data-group-label" class="ribbon-group-label">
                             Data
@@ -682,6 +691,18 @@ onBeforeUnmount(() => {
     window.removeEventListener("dragover", allowFileDrop);
     window.removeEventListener("drop", dropFiles);
 });
+
+async function formSicd() {
+    if (busy.value || !imageContext.value.canFormSicd) {
+        return;
+    }
+    busy.value = true;
+    try {
+        await workspace.value?.formSicd();
+    } finally {
+        busy.value = false;
+    }
+}
 
 async function openImage(paths?: string | string[]) {
     if (!scenario.value || busy.value) {

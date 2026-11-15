@@ -33,6 +33,7 @@ export async function chooseFile(
 export async function selectRibbonFor(page: Page, label: string) {
     const imageTools = [
         "Attach Metadata",
+        "Form SICD",
         "Statistics",
         "Scaling",
         "Slice",

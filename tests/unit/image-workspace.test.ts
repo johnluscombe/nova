@@ -245,3 +245,201 @@ test("clearing a region ignores late statistics and restores the whole-image pan
         delete window.images;
     }
 });
+
+test("CPHD image formation opens a loading widget and keeps the source", async () => {
+    const api = workspace();
+    let resolve!: (value: typeof image) => void;
+    const formSicd = vi.fn(
+        () =>
+            new Promise<typeof image>(done => {
+                resolve = done;
+            })
+    );
+    window.images = { formSicd } as unknown as NonNullable<Window["images"]>;
+    api.add({
+        ...image,
+        name: "source.cphd",
+        path: "/source.cphd",
+        pluginId: "nova.sicd",
+        metadata: { Format: "CPHD" }
+    });
+    await nextTick();
+    const forming = api.formSicd();
+    await nextTick();
+    expect(wrapper.text()).toContain("Loading image");
+    expect(api.snapshot()).toHaveLength(1);
+    resolve({
+        ...image,
+        name: "formed.sicd",
+        path: "/formed.sicd",
+        pluginId: "nova.sicd",
+        metadata: { Collector: "Radar" }
+    });
+    await forming;
+    await nextTick();
+    expect(api.snapshot().map(item => item.path)).toEqual([
+        "/source.cphd",
+        "/formed.sicd"
+    ]);
+    expect(wrapper.text()).not.toContain("Loading image");
+    expect(formSicd).toHaveBeenCalledWith(
+        "/source.cphd",
+        "nova.sicd",
+        expect.objectContaining({ algorithm: "backprojection" })
+    );
+});
+
+test("failed image formation keeps the source and excludes the failed placeholder from saved state", async () => {
+    const api = workspace();
+    window.images = {
+        formSicd: vi
+            .fn()
+            .mockRejectedValue(new Error("Unsupported CPHD geometry"))
+    } as unknown as NonNullable<Window["images"]>;
+    api.add({
+        ...image,
+        name: "source.cphd",
+        path: "/source.cphd",
+        pluginId: "nova.sicd",
+        metadata: { Format: "CPHD" }
+    });
+    await nextTick();
+    await api.formSicd();
+    await nextTick();
+    expect(api.snapshot()).toHaveLength(1);
+    expect(wrapper.text()).toContain("Unsupported CPHD geometry");
+    expect(wrapper.emitted("scalingError")?.at(-1)).toEqual([
+        "Unsupported CPHD geometry"
+    ]);
+});
+
+test("formation slides select diagnostic previews, disable image tools, and restore their selection", async () => {
+    const api = workspace();
+    const products = ["input", "windowed", "final"].map(id => ({
+        id,
+        title: id === "final" ? "Uncalibrated SICD" : id,
+        description: `${id} description`,
+        previewDataUrl: image.previewDataUrl
+    }));
+    const formed = {
+        ...image,
+        pluginId: "nova.sicd",
+        formationProducts: products,
+        scalingOptions: ["amplitude" as const]
+    };
+    api.add(formed);
+    await nextTick();
+    const navigator = wrapper.get('[aria-label="Formation products"]');
+    await navigator.get('[aria-label="1. input"]').trigger("click");
+    expect(
+        wrapper
+            .get('[aria-label="Intermediate product preview"] img')
+            .attributes("alt")
+    ).toBe("input");
+    expect(wrapper.emitted("sliceChange")?.at(-1)).toEqual([false]);
+    expect(wrapper.emitted("statisticsChange")?.at(-1)).toEqual([false]);
+    expect(
+        api.snapshot().find(item => item.formationProductId === "input")
+    ).toBeDefined();
+    const savedProducts = api.snapshot();
+    api.hydrate(savedProducts.map(item => ({ ...item, image, loading: true })));
+    for (const saved of savedProducts) {
+        api.complete(saved.id, formed);
+    }
+    await nextTick();
+    expect(
+        wrapper.get('[aria-label="1. input"]').attributes("aria-current")
+    ).toBe("step");
+    await wrapper
+        .get('[aria-label="1. input"]')
+        .trigger("keydown", { key: "End" });
+    await nextTick();
+    expect(
+        wrapper.find('[aria-label="Intermediate product preview"]').exists()
+    ).toBe(true);
+    expect(api.snapshot()).toHaveLength(2);
+    expect(api.snapshot()[0]!.formationProductId).toBeUndefined();
+    expect(wrapper.emitted("sliceChange")?.at(-1)).toEqual([true]);
+    expect(
+        wrapper
+            .get('[aria-label="3. Uncalibrated SICD"]')
+            .attributes("aria-current")
+    ).toBe("step");
+});
+
+test("formation sidebar closes and reopens independently of the image and selected slide", async () => {
+    const api = workspace();
+    api.add({
+        ...image,
+        formationProducts: [
+            {
+                id: "input",
+                title: "Input phase history",
+                description: "Source samples",
+                previewDataUrl: image.previewDataUrl
+            },
+            {
+                id: "final",
+                title: "Uncalibrated SICD",
+                description: "Final image",
+                previewDataUrl: image.previewDataUrl
+            }
+        ]
+    });
+    await nextTick();
+    await wrapper.get('[aria-label="1. Input phase history"]').trigger("click");
+    await wrapper
+        .get('[aria-label="Close formation products"]')
+        .trigger("click");
+    expect(wrapper.find('[aria-label="Formation products"]').exists()).toBe(
+        false
+    );
+    expect(api.snapshot()).toHaveLength(2);
+    expect(
+        api.snapshot().find(item => item.formationProductId === "input")
+    ).toBeDefined();
+    expect(
+        wrapper
+            .get('[aria-label="Intermediate product preview"] img')
+            .attributes("alt")
+    ).toBe("Input phase history");
+    await wrapper
+        .get('[aria-label="Show formation products"]')
+        .trigger("click");
+    expect(
+        wrapper
+            .get('[aria-label="1. Input phase history"]')
+            .attributes("aria-current")
+    ).toBe("step");
+});
+
+test("formation navigator stays available on other windows and opens distinct product windows", async () => {
+    const api = workspace();
+    const products = ["input", "windowed", "final"].map(id => ({
+        id,
+        title: id,
+        description: id,
+        previewDataUrl: image.previewDataUrl
+    }));
+    api.add({ ...image, formationProducts: products });
+    await nextTick();
+    await wrapper.get('[aria-label="1. input"]').trigger("click");
+    await wrapper.get('[aria-label="2. windowed"]').trigger("click");
+    expect(api.snapshot()).toHaveLength(3);
+    api.add({ ...image, name: "other.png", path: "/other.png" });
+    await nextTick();
+    expect(wrapper.find('[aria-label="Formation products"]').exists()).toBe(
+        true
+    );
+    await wrapper.get('[aria-label="1. input"]').trigger("click");
+    expect(api.snapshot()).toHaveLength(4);
+    expect(
+        wrapper.findAll('[aria-label="Intermediate product preview"]')
+    ).toHaveLength(2);
+    await wrapper.get('[aria-label="Close image.test"]').trigger("click");
+    expect(wrapper.find('[aria-label="Formation products"]').exists()).toBe(
+        true
+    );
+    await wrapper.get('[aria-label="3. final"]').trigger("click");
+    expect(api.snapshot()).toHaveLength(4);
+});

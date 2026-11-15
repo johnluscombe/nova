@@ -1,4 +1,10 @@
 import { ref } from "vue";
+import {
+    defaultFormationSettings,
+    validateFormationSettings,
+    type FormationSettings
+} from "@/types/formation";
+export { defaultFormationSettings };
 
 export const defaultPercentiles = [1, 5, 25, 50, 75, 95, 99];
 const storageKey = "nova.settings.percentiles";
@@ -51,4 +57,22 @@ export function visibleStatistics(
             );
         })
     );
+}
+
+const formationStorageKey = "nova.settings.formation";
+function loadFormationSettings(): FormationSettings {
+    try {
+        const saved = localStorage.getItem(formationStorageKey);
+        return saved
+            ? validateFormationSettings(JSON.parse(saved))
+            : { ...defaultFormationSettings };
+    } catch {
+        return { ...defaultFormationSettings };
+    }
+}
+export const formationSettings = ref(loadFormationSettings());
+export function saveFormationSettings(value: FormationSettings): void {
+    const settings = validateFormationSettings(value);
+    localStorage.setItem(formationStorageKey, JSON.stringify(settings));
+    formationSettings.value = settings;
 }

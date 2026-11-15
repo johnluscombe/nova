@@ -1,3 +1,4 @@
+import type { FormationProduct, FormationSettings } from "./formation";
 import type { PolygonPoint, RegionStatistics } from "./region";
 import type { ImageImportUpdate, ImageImportResult } from "./image-import";
 import type { MetadataAttachment } from "./metadata";
@@ -21,6 +22,7 @@ export interface ImagePluginManifest {
 }
 
 export interface ImagePluginResult {
+    formationProducts?: FormationProduct[];
     axes?: ImageAxes;
     peakPower?: number;
     scalingOptions?: Scaling[];
@@ -53,6 +55,11 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    formSicd(
+        filePath: string,
+        pluginId: string,
+        settings: FormationSettings
+    ): Promise<ImageInfo>;
     region(
         filePath: string,
         pluginId: string,

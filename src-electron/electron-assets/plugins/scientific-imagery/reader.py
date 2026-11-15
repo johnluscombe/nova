@@ -268,6 +268,8 @@ def image_metadata(metadata):
         "Collection time (UTC)": "Timeline.CollectStart",
         "Duration (seconds)": "Timeline.CollectDuration",
         "Pixel type": "ImageData.PixelType",
+        "Image formation algorithm": "ImageFormation.ImageFormAlgo",
+        "Image formation application": "ImageCreation.Application",
         "Image plane": "Grid.ImagePlane",
         "Grid type": "Grid.Type",
         "Row spacing (m)": "Grid.Row.SS",
@@ -610,7 +612,10 @@ def main():
             argv = argv[:-2]
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(argv) == 6 and argv[2] == "--region":
+            if len(argv) == 5 and argv[2] == "--form-sicd":
+                from formation import form_sicd
+                result = form_sicd(argv[1], argv[3], json.loads(argv[4]))
+            elif len(argv) == 6 and argv[2] == "--region":
                 result = region_image(argv[1], json.loads(argv[3]), argv[4], float(argv[5]))
             elif len(argv) == 7 and argv[2] == "--pixel":
                 result = pixel_image(argv[1], int(argv[3]), int(argv[4]), argv[5], float(argv[6]))

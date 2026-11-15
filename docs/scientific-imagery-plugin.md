@@ -210,3 +210,72 @@ RCS and other image radiometric calibrations are unavailable for CPHD. SarPy's
 formatted complex samples include its supported per-vector amplitude scaling.
 Previews and statistics use the same bounded sampling as SICD previews. CPHD uses
 the existing Python interpreter and SarPy installation; no extra dependency is needed.
+
+## Forming a SICD from CPHD
+
+Open a CPHD, select its image window, then choose **Scientific Imagery → Data →
+Form SICD**. A new widget opens immediately while CPU backprojection runs. The
+source phase history stays open. Completed products are stored under Nova's
+application-data `formed-images` directory and reopen with the saved scenario.
+The source and existing products are never overwritten.
+
+Configure **Home → Settings → CPHD image formation** before starting:
+
+- **Algorithm:** CPU backprojection, the initially supported algorithm.
+- **Output size:** 64, 128, 256, or 512 pixels per side.
+- **Pixel spacing:** meters, or zero to choose spacing from the selected aperture's
+  sampled spatial bandwidth. Coarse spacing that would alias that bandwidth is rejected.
+- **Maximum aperture vectors:** 8–4096 contiguous vectors centered on the first
+  channel. A longer aperture can improve cross-range resolution but increases runtime.
+- **Window:** Hann reduces sidelobes; uniform preserves the unapodized response.
+
+The first implementation supports uncompressed, monostatic **FX-domain CPHD 1.x**
+with finite sample coordinates, frequency support, antenna positions, scene
+reference positions, and increasing pulse times. It forms a square image on the
+local WGS-84 tangent plane at the IARP. It uses each vector's frequency grid and
+reference point, respects frequency support and phase sign, and reads one signal
+vector at a time. Output must fit the unambiguous delay interval. Formation has a
+ten-minute timeout; reduce aperture length or image size if needed.
+
+The result retains complex values in `RE32F_IM32F` SICD/NITF with physical grid
+spacing, scene corners, a fitted monostatic trajectory, source classification,
+and processing provenance. Metadata is checked against the SICD XML schema before
+writing. Backprojection is represented as `ImageFormAlgo=OTHER`; some tools,
+including SarPy's detailed consistency checker, flag all OTHER algorithms because
+they cannot validate their image-formation model.
+
+This is an experimental image former with synthetic point-target validation.
+Output is **uncalibrated** and does not perform autofocus, terrain correction, or
+SIDD generation. Source amplitude scaling is applied by SarPy, but no RCS or
+sigma-zero calibration is inferred. Validate results against a trusted image
+former before quantitative use. TOA-domain and bistatic collections are rejected.
+
+Image formation additionally requires `lxml`; reinstall this plugin's
+`requirements.txt` in the configured Python environment if it is missing.
+
+### Formation product slides
+
+Selecting a newly formed SICD opens a slide navigator on the left of the workspace.
+It remains available when other windows are active and includes:
+
+1. Input phase history from the selected aperture.
+2. Windowed phase history with frequency support and aperture weights applied.
+3. Range-compressed profiles on a shared relative-delay grid.
+4. Partial coherent images after 25%, 50%, and 75% of the aperture.
+5. The final uncalibrated SICD.
+
+Click a thumbnail, or use arrow keys and Home/End, to open a product in its own
+window. Selecting an already open product brings that window forward; the final
+SICD remains unchanged. Activating another formation set updates the navigator. Close the
+navigator with its × control; the current image stays open. Use the Formation
+products tab on the left edge to reopen it with the same selected slide. Diagnostic
+windows display their product image without captions. They are bounded,
+display-only log-amplitude previews with independent contrast stretching; they
+are not calibrated data products. Image analysis controls apply to the final SICD
+and are disabled while an intermediate slide is displayed.
+
+Previews are stored in `<image>.sicd.formation.json` alongside the generated SICD.
+Keep that file with the image when moving it. Open product windows are saved in the
+scenario. Existing SICDs without a preview file continue to open normally;
+regenerate a product to obtain its intermediate slides. A missing or corrupt
+preview file does not prevent the final image from opening.
