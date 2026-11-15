@@ -15,6 +15,14 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    region: (filePath, pluginId, polygon, scaling) =>
+        ipcRenderer.invoke(
+            "image:region",
+            filePath,
+            pluginId,
+            polygon,
+            scaling
+        ),
     attachMetadata: imagePath =>
         ipcRenderer.invoke("image:attach-metadata", imagePath),
     importFiles: async (onUpdate, paths) => {

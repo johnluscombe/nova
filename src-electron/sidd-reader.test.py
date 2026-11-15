@@ -87,6 +87,10 @@ class SiddReaderTests(unittest.TestCase):
                     self.assertAlmostEqual(pixel["value"], 19000 if encoding == "MONO16I" else 54.213)
                     self.assertEqual(pixel["valueLabel"], row["valueLabel"])
                     self.assertEqual(pixel["value"], row["points"][3]["value"])
+                    polygon=[{"row":1,"column":2},{"row":1,"column":4},{"row":3,"column":4},{"row":3,"column":2}]
+                    region=reader.region_image(str(file),polygon)
+                    self.assertEqual(region["sampleCount"],4)
+                    self.assertAlmostEqual(region["statistics"]["50th percentile"],14500 if encoding == "MONO16I" else 54.213)
                     for operation in (lambda: reader.render(str(file), "real"),
                                       lambda: reader.slice_image(str(file), "horizontal", 0, "power"),
                                       lambda: reader.pixel_image(str(file), 0, 0, "rcs"),

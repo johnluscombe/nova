@@ -252,6 +252,30 @@
                                 flat
                                 stack
                                 no-caps
+                                icon="polyline"
+                                label="Polygon"
+                                :disable="!regionState.available"
+                                :aria-pressed="regionState.drawing"
+                                :color="
+                                    regionState.drawing ? 'primary' : undefined
+                                "
+                                @click="workspace?.togglePolygon()" />
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="deselect"
+                                label="Clear Region"
+                                :disable="
+                                    !regionState.available ||
+                                    (!regionState.selected &&
+                                        !regionState.drawing)
+                                "
+                                @click="workspace?.clearRegion()" />
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
                                 icon="content_cut"
                                 label="Slice"
                                 :disable="!hasSliceImage"
@@ -387,6 +411,7 @@
             <ImageWorkspace
                 @active-change="hasActiveWidget = $event"
                 @image-context-change="imageContext = $event"
+                @region-change="regionState = $event"
                 @statistics-change="hasActiveStatistics = $event"
                 @slice-change="hasSliceImage = $event"
                 @slice-mode-change="sliceModeActive = $event"
@@ -421,6 +446,7 @@ import type {
 } from "../types/workspace";
 import type { ScenarioInfo } from "../types/scenario";
 import { activeScenario as scenario } from "@/composables/useScenario";
+import type { RegionState } from "@/types/region";
 import { scalingOptions, type ScalingState } from "@/types/scaling";
 const scalingState = ref<ScalingState>({
     options: [],
@@ -434,6 +460,11 @@ const workspace = ref<ImageWorkspaceAPI>();
 const sliceModeActive = ref(false);
 const pixelValuesActive = ref(false);
 const axesActive = ref(false);
+const regionState = ref<RegionState>({
+    available: false,
+    drawing: false,
+    selected: false
+});
 const hasSliceImage = ref(false);
 const hasActiveWidget = ref(false);
 const hasActiveStatistics = ref(false);

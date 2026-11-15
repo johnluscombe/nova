@@ -356,6 +356,18 @@ Home's View group contains Metadata, Axes, and Pixel Values. The
 contextual Scientific Imagery tab appears for active widgets opened with
 `nova.sicd`, including their slice graphs. Other image widgets use a contextual
 Image tab. Both provide a Data group (Attach Metadata) and an Analysis group
-(Statistics, Scaling, and Slice), enabling actions according to the active widget's
+(Statistics, Scaling, Polygon, Clear Region, and Slice), enabling actions according to the active widget's
 capabilities. Plugin-contributed tabs keep their own contents. The ribbon returns
 to Home if its contextual tab loses the active widget.
+
+Plugins can implement `readRegion` to compute polygon percentiles from source
+samples. Otherwise Nova uses preview luminance. See the
+[region statistics API](regions.md#plugin-api).
+
+The built-in PNG/JPG and SVG readers get whole-image preview-luminance percentiles
+automatically in the workspace, without drawing a polygon. Calculations are
+bounded to 1600 preview pixels per dimension, exclude fully transparent pixels,
+and are repeated on scenario restoration. Statistics can be opened while this
+initial calculation is pending; its pane shows a loading indicator. A closed
+polygon replaces these with regional percentiles, and clearing it restores the
+cached whole-preview values. Reader-provided source statistics remain preferred.

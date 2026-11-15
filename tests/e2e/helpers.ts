@@ -35,7 +35,9 @@ export async function selectRibbonFor(page: Page, label: string) {
         "Attach Metadata",
         "Statistics",
         "Scaling",
-        "Slice"
+        "Slice",
+        "Polygon",
+        "Clear Region"
     ].includes(label);
     await page
         .getByRole("tab", {

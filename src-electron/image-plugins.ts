@@ -1,3 +1,8 @@
+import {
+    validatePolygon,
+    type PolygonPoint,
+    type RegionStatistics
+} from "../src/types/region";
 import { validateImageAxes, axisCoordinate } from "../src/types/axes";
 import type { PixelData } from "../src/types/pixel";
 import { isScaling, type Scaling } from "../src/types/scaling";
@@ -19,6 +24,13 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
+    readRegion?(
+        filePath: string,
+        polygon: PolygonPoint[],
+        parameters: PluginParameters,
+        scaling?: Scaling,
+        peakPower?: number
+    ): RegionStatistics | Promise<RegionStatistics>;
     readPixel?(
         filePath: string,
         row: number,
@@ -210,6 +222,8 @@ export class ImagePlugins {
                     ) &&
                         typeof module.default.executeRibbonAction !==
                             "function") ||
+                    (module.default.readRegion !== undefined &&
+                        typeof module.default.readRegion !== "function") ||
                     (module.default.readPixel !== undefined &&
                         typeof module.default.readPixel !== "function") ||
                     (module.default.readSlice !== undefined &&
@@ -290,6 +304,67 @@ export class ImagePlugins {
             throw new Error("Invalid plugin action result.");
         }
         return result.message === undefined ? {} : { message: result.message };
+    }
+
+    async readRegion(
+        filePath: string,
+        pluginId: string,
+        polygon: PolygonPoint[],
+        scaling?: Scaling
+    ): Promise<RegionStatistics> {
+        const image = this.openedImages.get(
+            JSON.stringify([filePath, pluginId])
+        );
+        const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+        if (
+            !image?.width ||
+            !image.height ||
+            !plugin?.implementation.readRegion
+        ) {
+            throw new Error("Open an image with source region support first.");
+        }
+        const points = validatePolygon(polygon, image.width, image.height);
+        if (
+            scaling !== undefined &&
+            (!isScaling(scaling) || !image.scalingOptions?.includes(scaling))
+        ) {
+            throw new Error("Scaling is unavailable for this image.");
+        }
+        const result = await plugin.implementation.readRegion(
+            filePath,
+            points,
+            plugin.manifest.parameters ?? {},
+            scaling,
+            image.peakPower
+        );
+        const validStatistics = (statistics: unknown) =>
+            statistics &&
+            typeof statistics === "object" &&
+            !Array.isArray(statistics) &&
+            Object.keys(statistics).length > 0 &&
+            Object.keys(statistics).length <= 200 &&
+            Object.entries(statistics).every(
+                ([key, value]) =>
+                    key.length <= 100 &&
+                    (value === null ||
+                        (typeof value === "number" && Number.isFinite(value)))
+            );
+        if (
+            !result ||
+            !validStatistics(result.statistics) ||
+            typeof result.valueLabel !== "string" ||
+            !result.valueLabel.length ||
+            result.valueLabel.length > 100 ||
+            !Number.isSafeInteger(result.sampleCount) ||
+            result.sampleCount < 0 ||
+            result.sampleCount > 2560000 ||
+            typeof result.sampled !== "boolean" ||
+            (result.wholeImageStatistics !== undefined &&
+                !validStatistics(result.wholeImageStatistics))
+        ) {
+            throw new Error("Plugin returned invalid region statistics.");
+        }
+        return result;
     }
 
     async readPixel(
@@ -541,6 +616,9 @@ export class ImagePlugins {
                     }
                 }
                 const info: ImageInfo = {
+                    ...(implementation.readRegion
+                        ? { supportsSourceRegions: true }
+                        : {}),
                     ...(result.axes ? { axes: result.axes } : {}),
                     ...(implementation.readPixel
                         ? { supportsSourcePixels: true }

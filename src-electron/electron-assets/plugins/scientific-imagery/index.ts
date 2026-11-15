@@ -1,3 +1,7 @@
+import type {
+    PolygonPoint,
+    RegionStatistics
+} from "../../../../src/types/region.ts";
 import type { PixelData } from "../../../../src/types/pixel.ts";
 import type { Scaling } from "../../../../src/types/scaling.ts";
 import type {
@@ -170,7 +174,31 @@ export async function readImagePixel(
         String(peakPower)
     ])) as PixelData;
 }
+export async function readImageRegion(
+    filePath: string,
+    polygon: PolygonPoint[],
+    parameters: PluginParameters = {},
+    run: Runner = execute,
+    scaling: Scaling = "amplitude",
+    peakPower = 0
+): Promise<RegionStatistics> {
+    return (await executeReader(filePath, parameters, run, [
+        "--region",
+        JSON.stringify(polygon),
+        scaling,
+        String(peakPower)
+    ])) as RegionStatistics;
+}
 export default {
+    readRegion: (filePath, polygon, parameters, scaling, peakPower) =>
+        readImageRegion(
+            filePath,
+            polygon,
+            parameters,
+            execute,
+            scaling,
+            peakPower
+        ),
     readPixel: (filePath, row, column, parameters, scaling, peakPower) =>
         readImagePixel(
             filePath,

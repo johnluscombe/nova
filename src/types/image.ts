@@ -1,3 +1,4 @@
+import type { PolygonPoint, RegionStatistics } from "./region";
 import type { ImageImportUpdate, ImageImportResult } from "./image-import";
 import type { MetadataAttachment } from "./metadata";
 import type { ImageAxes } from "./axes";
@@ -42,6 +43,7 @@ export interface ImageInfo extends ImagePluginResult {
     pluginName: string;
     supportsSourceSlices?: boolean;
     supportsSourcePixels?: boolean;
+    supportsSourceRegions?: boolean;
 }
 
 export interface ImagePluginStatus {
@@ -51,6 +53,12 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    region(
+        filePath: string,
+        pluginId: string,
+        polygon: PolygonPoint[],
+        scaling?: Scaling
+    ): Promise<RegionStatistics>;
     importFiles(
         onUpdate: (update: ImageImportUpdate) => void,
         paths?: string | string[]

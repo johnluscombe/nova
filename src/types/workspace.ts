@@ -1,6 +1,8 @@
+import { validatePolygon, type PolygonPoint } from "./region";
 import { isScaling, type Scaling } from "./scaling";
 import type { ImageInfo } from "./image";
 export interface SavedImageWindow {
+    region?: PolygonPoint[];
     metadataAxesSource?: string;
     metadataFiles?: string[];
     scaling?: Scaling;
@@ -66,6 +68,13 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
         ) {
             throw new Error("Invalid scenario window state.");
         }
+        if (item.region !== undefined) {
+            validatePolygon(
+                item.region,
+                Number.MAX_SAFE_INTEGER,
+                Number.MAX_SAFE_INTEGER
+            );
+        }
         ids.add(item.id);
     }
     return value as SavedImageWindow[];
@@ -83,6 +92,8 @@ export interface ImageWorkspaceAPI {
     toggleSlice(): void;
     togglePixelValues(): void;
     toggleAxes(): void;
+    togglePolygon(): void;
+    clearRegion(): Promise<void>;
     setScaling(scaling: Scaling): Promise<void>;
 }
 

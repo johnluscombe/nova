@@ -118,6 +118,33 @@ class TiffReaderTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stderr)
                         self.assertIsInstance(json.loads(result.stdout), dict)
 
+    def test_polygon_statistics_preserve_uint16_values_and_exclude_transparency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "region.tif"
+            self.fixture(file,np.arange(32,dtype="uint16").reshape(4,8)*1000)
+            polygon = [{"row":1,"column":2},{"row":1,"column":4},{"row":3,"column":4},{"row":3,"column":2}]
+            result = reader.region_image(str(file),polygon)
+            self.assertEqual(result["sampleCount"],4)
+            self.assertEqual(result["statistics"]["50th percentile"],14500)
+            rgba=np.tile(np.array([255,0,0,255],dtype="uint8"),(4,8,1));rgba[1,2,3]=0
+            self.fixture(file,rgba)
+            result=reader.region_image(str(file),polygon)
+            self.assertEqual(result["sampleCount"],3)
+            self.assertAlmostEqual(result["statistics"]["50th percentile"],54.213)
+            with self.assertRaises(ValueError):
+                reader.region_image(str(file),polygon,"real")
+
+    def test_large_polygon_statistics_are_bounded_and_marked_sampled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "sampled.tif"
+            width = 2560001
+            self.fixture(file,np.ones((1,width),dtype="uint8"))
+            polygon=[{"row":0,"column":0},{"row":0,"column":width},{"row":1,"column":width},{"row":1,"column":0}]
+            result=reader.region_image(str(file),polygon)
+            self.assertTrue(result["sampled"])
+            self.assertLessEqual(result["sampleCount"],2560000)
+            self.assertEqual(result["statistics"]["50th percentile"],1)
+
     def test_bounded_preview_and_invalid_files(self):
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "long.tif"

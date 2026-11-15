@@ -31,14 +31,46 @@
         <div
             ref="viewport"
             class="slice-viewport"
-            :class="{ inspecting: inspect }"
+            :class="{ inspecting: inspect || drawing }"
+            :tabindex="drawing ? 0 : undefined"
+            @click="polygonClick"
+            @dblclick.prevent="finishPolygon"
+            @keydown="polygonKeyboard"
             @pointermove="inspectPixel"
-            @pointerleave="leavePixel">
+            @pointerleave="
+                leavePixel();
+                cursor = undefined;
+            ">
             <img
                 :src="image.previewDataUrl"
                 :alt="image.name"
                 draggable="false"
                 @load="loaded" />
+            <svg
+                v-if="polygon?.length || (drawing && draft.length)"
+                class="polygon-overlay"
+                aria-label="Selected image region">
+                <polygon
+                    v-if="polygon?.length && !(drawing && draft.length)"
+                    :points="polygonPixels(polygon)"
+                    class="closed-polygon" />
+                <polyline
+                    v-if="drawing && draft.length"
+                    :points="polygonPixels(cursor ? [...draft, cursor] : draft)"
+                    class="draft-polygon" />
+                <circle
+                    v-for="(point, index) in drawing ? draft : []"
+                    :key="index"
+                    :cx="rect.left + (point.column / sourceWidth) * rect.width"
+                    :cy="rect.top + (point.row / sourceHeight) * rect.height"
+                    :r="index === 0 ? 5 : 3" />
+            </svg>
+            <div v-if="drawing" class="polygon-hint">
+                {{
+                    polygonError ||
+                    "Click vertices; click the first point, double-click, or press Enter to close. Esc cancels; Backspace undoes."
+                }}
+            </div>
             <div
                 v-if="enabled && selection"
                 class="slice-line"
@@ -122,10 +154,18 @@
 </template>
 
 <script setup lang="ts">
+import { validatePolygon, type PolygonPoint } from "@/types/region";
 import { slicePosition } from "@/utils/slice-axes";
 import ImageAxes from "./ImageAxes.vue";
 import { axisCoordinate } from "@/types/axes";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+    nextTick,
+    computed,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch
+} from "vue";
 import type { ImageInfo } from "@/types/image";
 import type { SliceOrientation, SliceSelection } from "@/types/slice";
 import { sliceAtOffset } from "@/utils/image-slice";
@@ -136,14 +176,131 @@ const props = defineProps<{
     enabled: boolean;
     inspect?: boolean;
     axes?: boolean;
+    drawing?: boolean;
+    polygon?: PolygonPoint[] | undefined;
 }>();
-const emit = defineEmits<{ slice: [selection: SliceSelection] }>();
+const emit = defineEmits<{
+    slice: [selection: SliceSelection];
+    region: [polygon: PolygonPoint[]];
+    cancelRegion: [];
+}>();
 const viewport = ref<HTMLDivElement>();
 const width = ref(0);
 const height = ref(0);
 const naturalWidth = ref(0);
 const naturalHeight = ref(0);
 const selection = ref<SliceSelection>();
+const draft = ref<PolygonPoint[]>([]);
+const cursor = ref<PolygonPoint>();
+const polygonError = ref("");
+function imagePoint(event: MouseEvent): PolygonPoint | undefined {
+    if (!viewport.value || !rect.value.width || !rect.value.height) {
+        return;
+    }
+    const bounds = viewport.value.getBoundingClientRect();
+    const x = event.clientX - bounds.left - rect.value.left,
+        y = event.clientY - bounds.top - rect.value.top;
+    if (x < 0 || y < 0 || x > rect.value.width || y > rect.value.height) {
+        return;
+    }
+    return {
+        row: (y / rect.value.height) * sourceHeight.value,
+        column: (x / rect.value.width) * sourceWidth.value
+    };
+}
+function polygonPixels(points: PolygonPoint[]) {
+    return points
+        .map(
+            point =>
+                `${rect.value.left + (point.column / sourceWidth.value) * rect.value.width},${rect.value.top + (point.row / sourceHeight.value) * rect.value.height}`
+        )
+        .join(" ");
+}
+function polygonClick(event: MouseEvent) {
+    if (!props.drawing || event.detail > 1) {
+        return;
+    }
+    viewport.value?.focus({ preventScroll: true });
+    const point = imagePoint(event);
+    if (!point) {
+        return;
+    }
+    polygonError.value = "";
+    const first = draft.value[0];
+    if (
+        draft.value.length >= 3 &&
+        first &&
+        Math.hypot(
+            ((first.column - point.column) / sourceWidth.value) *
+                rect.value.width,
+            ((first.row - point.row) / sourceHeight.value) * rect.value.height
+        ) <= 8
+    ) {
+        finishPolygon();
+        return;
+    }
+    const last = draft.value.at(-1);
+    if (
+        last &&
+        Math.hypot(last.row - point.row, last.column - point.column) < 1e-8
+    ) {
+        return;
+    }
+    if (draft.value.length === 256) {
+        polygonError.value =
+            "Close the polygon or undo a vertex (maximum 256).";
+        return;
+    }
+    draft.value.push(point);
+}
+function finishPolygon() {
+    if (!props.drawing) {
+        return;
+    }
+    try {
+        const points = validatePolygon(
+            draft.value,
+            sourceWidth.value,
+            sourceHeight.value
+        );
+        emit("region", points);
+        draft.value = [];
+        cursor.value = undefined;
+    } catch (cause) {
+        polygonError.value =
+            cause instanceof Error ? cause.message : "Invalid polygon.";
+    }
+}
+function polygonKeyboard(event: KeyboardEvent) {
+    if (
+        !props.drawing ||
+        !["Enter", "Escape", "Backspace", "Delete"].includes(event.key)
+    ) {
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Enter") {
+        finishPolygon();
+    } else if (event.key === "Escape") {
+        emit("cancelRegion");
+    } else {
+        draft.value.pop();
+        polygonError.value = "";
+    }
+}
+watch(
+    () => props.drawing,
+    () => {
+        draft.value = [];
+        cursor.value = undefined;
+        polygonError.value = "";
+        leavePixel();
+        if (props.drawing) {
+            void nextTick(() => viewport.value?.focus({ preventScroll: true }));
+        }
+    }
+);
 const pixelPosition = ref<PixelPosition>();
 const pixelData = ref<PixelData>();
 const pixelError = ref("");
@@ -167,11 +324,15 @@ function leavePixel() {
     clearPixel();
 }
 function inspectPixel(event: PointerEvent) {
+    if (props.drawing) {
+        cursor.value = imagePoint(event);
+        return;
+    }
     lastPointer = { clientX: event.clientX, clientY: event.clientY };
     refreshPixel();
 }
 function refreshPixel() {
-    if (!props.inspect || !viewport.value || !lastPointer) {
+    if (!props.inspect || props.drawing || !viewport.value || !lastPointer) {
         return;
     }
     const event = lastPointer;
@@ -501,5 +662,40 @@ onBeforeUnmount(() => {
     font-size: 11px;
     pointer-events: none;
     overflow-wrap: anywhere;
+}
+
+.polygon-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+.closed-polygon {
+    fill: #26c6da28;
+    stroke: #26c6da;
+    stroke-width: 2;
+}
+.draft-polygon {
+    fill: none;
+    stroke: #ffca28;
+    stroke-width: 2;
+    stroke-dasharray: 5 3;
+}
+.polygon-overlay circle {
+    fill: #ffca28;
+    stroke: #111b27;
+    stroke-width: 1;
+}
+.polygon-hint {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 5px 8px;
+    background: #162330ed;
+    color: white;
+    font-size: 11px;
+    pointer-events: none;
 }
 </style>

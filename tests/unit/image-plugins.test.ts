@@ -711,3 +711,54 @@ test("plugin axes preserve physical coordinates and reject invalid metadata", ()
         });
         await assert.rejects(host.open("invalid.test"), /Invalid image axes/);
     }));
+
+test("source regions validate polygon geometry, scaling and percentile results", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "regions",
+            `export default {
+        open() {return {width: 8,height:4,scaling:'amplitude',scalingOptions:['amplitude','real'],peakPower:100};},
+        readRegion(file,polygon,parameters,scaling,peakPower) {
+            return {statistics:{'50th percentile':scaling === 'real' ? -3 : peakPower},valueLabel:'Source value',sampleCount:4,sampled:false};
+        }
+    };`
+        );
+        await host.reload();
+        const points = [
+            { row: 0, column: 0 },
+            { row: 0, column: 2 },
+            { row: 2, column: 2 },
+            { row: 2, column: 0 }
+        ];
+        await assert.rejects(
+            host.readRegion("file.test", "regions", points),
+            /Open an image/
+        );
+        assert.equal(
+            (await host.open("file.test")).supportsSourceRegions,
+            true
+        );
+        assert.equal(
+            (await host.readRegion("file.test", "regions", points)).statistics[
+                "50th percentile"
+            ],
+            100
+        );
+        assert.equal(
+            (await host.readRegion("file.test", "regions", points, "real"))
+                .statistics["50th percentile"],
+            -3
+        );
+        await assert.rejects(
+            host.readRegion("file.test", "regions", points, "rcs"),
+            /unavailable/
+        );
+        await assert.rejects(
+            host.readRegion("file.test", "regions", [
+                { row: -1, column: 0 },
+                ...points.slice(1)
+            ]),
+            /inside/
+        );
+    }));

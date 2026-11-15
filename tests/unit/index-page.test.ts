@@ -78,6 +78,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        region: vi.fn(),
         attachMetadata: vi.fn(),
         importFiles: vi.fn(async (onUpdate, paths) => {
             const selected = Array.isArray(paths) ? paths : [paths];

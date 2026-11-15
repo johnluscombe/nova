@@ -10,10 +10,11 @@ import unittest
 import warnings
 import zlib
 from types import SimpleNamespace
+from unittest.mock import patch
 from sarpy.io.complex.sicd_elements.blocks import Poly2DType
 from sarpy.io.complex.sicd_elements.Grid import GridType
 import numpy as np
-from sarpy.io.complex.sicd import SICDWriter
+from sarpy.io.complex.sicd import SICDWriter, SICDWritingDetails
 from sarpy.io.complex.sicd_elements.SICD import SICDType
 from sarpy.io.complex.sicd_elements.ImageData import ImageDataType
 
@@ -23,7 +24,7 @@ spec.loader.exec_module(reader)
 
 
 class SicdPreviewTests(unittest.TestCase):
-    def fixture(self, file, data, encoding="RE32F_IM32F", grid=None):
+    def fixture(self, file, data, encoding="RE32F_IM32F", grid=None, row_limit=None):
         height, width = data.shape
         image = ImageDataType(PixelType=encoding, NumRows=height, NumCols=width, FirstRow=0, FirstCol=0,
                               FullImage={"NumRows": height, "NumCols": width}, SCPPixel={"Row": height // 2, "Col": width // 2},
@@ -32,7 +33,8 @@ class SicdPreviewTests(unittest.TestCase):
         metadata.NITF["FTITLE"] = "Nova synthetic test"
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            with SICDWriter(str(file), metadata, check_existence=False) as writer:
+            writer_args = {"sicd_meta": metadata} if row_limit is None else {"sicd_writing_details": SICDWritingDetails(metadata, row_limit=row_limit)}
+            with SICDWriter(str(file), check_existence=False, **writer_args) as writer:
                 if encoding == "AMP8I_PHS8I":
                     # Avoid SarPy's AMP8 inverse-write broadcasting bug; write valid
                     # interleaved amplitude/phase samples directly to the fixture.
@@ -221,6 +223,44 @@ class SicdPreviewTests(unittest.TestCase):
             self.assertEqual(axes["row"], {"label": "Down-range", "unit": "m", "origin": -4, "spacing": 2})
             self.assertEqual(axes["column"], {"label": "Cross-range", "unit": "m", "origin": -2, "spacing": 0.5})
             self.assertEqual(reader.render(str(file), "real")["axes"], axes)
+
+    def test_polygon_statistics_use_source_values_scaling_and_concave_mask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "region.nitf"
+            data = np.arange(12, dtype=np.float32).reshape(3,4) + 1j
+            self.fixture(file, data)
+            polygon = [{"row":0,"column":0},{"row":0,"column":4},{"row":1,"column":4},{"row":1,"column":1},{"row":3,"column":1},{"row":3,"column":0}]
+            result = reader.region_image(str(file),polygon)
+            expected = np.abs(data).reshape(-1)[[0,1,2,3,4,8]]
+            self.assertEqual(result["sampleCount"],6)
+            self.assertFalse(result["sampled"])
+            self.assertAlmostEqual(result["statistics"]["50th percentile"],float(np.percentile(expected,50)),places=6)
+            real = reader.region_image(str(file),polygon,"real")
+            self.assertEqual(real["statistics"]["50th percentile"],2.5)
+            pixel = [{"row":0,"column":0},{"row":0,"column":1},{"row":1,"column":1},{"row":1,"column":0}]
+            relative = reader.region_image(str(file),pixel,"relative-power",100)
+            self.assertAlmostEqual(relative["statistics"]["50th percentile"],-20)
+            empty = [{"row":0.1,"column":0.1},{"row":0.1,"column":0.2},{"row":0.2,"column":0.1}]
+            self.assertEqual(reader.region_image(str(file),empty)["sampleCount"],0)
+            for invalid in (polygon[:2],[{"row":-1,"column":0},*polygon[1:]], [{"row":0,"column":0},{"row":2,"column":2},{"row":0,"column":2},{"row":2,"column":0}]):
+                with self.assertRaises(ValueError):
+                    reader.region_image(str(file),invalid)
+
+    def test_sampled_polygon_reads_partial_strides_and_segment_boundaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = np.arange(35*35,dtype=np.float32).reshape(35,35) + 1j
+            polygon = [{"row":5,"column":7},{"row":5,"column":32},{"row":30,"column":32},{"row":30,"column":7}]
+            for row_limit in (None, 8):
+                with self.subTest(row_limit=row_limit):
+                    file=pathlib.Path(directory)/f"sampled-{row_limit}.nitf"
+                    self.fixture(file,data,row_limit=row_limit)
+                    with patch.object(reader,"MAX_REGION_SAMPLES",9):
+                        result=reader.region_image(str(file),polygon)
+                    expected=np.abs(data[5:30:9,7:32:9]).astype(np.float64)
+                    self.assertTrue(result["sampled"])
+                    self.assertEqual(result["sampleCount"],9)
+                    self.assertAlmostEqual(result["statistics"]["50th percentile"],float(np.percentile(expected,50)),places=4)
+                    self.assertAlmostEqual(result["statistics"]["100th percentile"],float(expected.max()),places=4)
 
     def test_invalid_file(self):
         with tempfile.TemporaryDirectory() as directory:

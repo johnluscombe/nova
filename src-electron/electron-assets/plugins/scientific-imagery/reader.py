@@ -18,6 +18,7 @@ def png_preview(pixels):
 
 
 MAX_TIFF_PIXELS = 1_000_000_000
+MAX_REGION_SAMPLES = 2_560_000
 
 TIFF_SIGNATURES = (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")
 
@@ -452,6 +453,110 @@ def pixel_image(file_path, row, column, scaling="amplitude", peak_power=None):
         reader.close()
 
 
+def validate_polygon(polygon, width, height):
+    if not isinstance(polygon, list) or not 3 <= len(polygon) <= 256:
+        raise ValueError("A polygon needs 3–256 vertices")
+    for point in polygon:
+        if not isinstance(point, dict):
+            raise ValueError("Invalid polygon vertex")
+        for key, limit in (("row", height), ("column", width)):
+            value = point.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= limit:
+                raise ValueError("Polygon vertices must be inside the image")
+    def cross(a, b, c):
+        return (b["column"]-a["column"])*(c["row"]-a["row"]) - (b["row"]-a["row"])*(c["column"]-a["column"])
+    def on_segment(a, b, p):
+        return abs(cross(a,b,p)) < 1e-8 and min(a["row"],b["row"]) <= p["row"] <= max(a["row"],b["row"]) and min(a["column"],b["column"]) <= p["column"] <= max(a["column"],b["column"])
+    area = 0
+    for i, a in enumerate(polygon):
+        b = polygon[(i+1) % len(polygon)]
+        if a == b:
+            raise ValueError("Polygon vertices must be distinct")
+        area += a["column"]*b["row"] - b["column"]*a["row"]
+        for j in range(i+1, len(polygon)):
+            if j == i+1 or (i == 0 and j == len(polygon)-1):
+                continue
+            c, d = polygon[j], polygon[(j+1) % len(polygon)]
+            if (((cross(a,b,c)>0) != (cross(a,b,d)>0) and (cross(c,d,a)>0) != (cross(c,d,b)>0)) or
+                    any((on_segment(a,b,c), on_segment(a,b,d), on_segment(c,d,a), on_segment(c,d,b)))):
+                raise ValueError("Polygon edges must not cross")
+    if abs(area) < 1e-8:
+        raise ValueError("Polygon must enclose an area")
+
+
+def polygon_row_mask(row, columns, polygon):
+    import numpy as np
+    x = columns + 0.5
+    y = row + 0.5
+    inside = np.zeros(x.shape, dtype=bool)
+    boundary = np.zeros(x.shape, dtype=bool)
+    for i, a in enumerate(polygon):
+        b = polygon[(i+1) % len(polygon)]
+        ax, ay, bx, by = a["column"], a["row"], b["column"], b["row"]
+        cross = (bx-ax)*(y-ay) - (by-ay)*(x-ax)
+        boundary |= (np.abs(cross) < 1e-8) & (x >= min(ax,bx)) & (x <= max(ax,bx)) & (y >= min(ay,by)) & (y <= max(ay,by))
+        if (ay > y) != (by > y):
+            inside ^= x < (bx-ax)*(y-ay)/(by-ay)+ax
+    return inside | boundary
+
+
+def region_image(file_path, polygon, scaling="amplitude", peak_power=0):
+    import numpy as np
+    reader = open_image_reader(file_path)
+    try:
+        derived = reader.reader_type in ("SIDD", "TIFF")
+        metadata = None if derived else reader.get_sicds_as_tuple()[0]
+        height, width = reader.get_data_size_as_tuple()[0][:2] if derived else (int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols))
+        validate_polygon(polygon, width, height)
+        if derived and scaling != "amplitude":
+            raise ValueError("Derived image pixels do not support complex scaling")
+        if not derived and scaling not in scaling_options(metadata):
+            raise ValueError("Scaling is unavailable for this image")
+        top = max(0, math.floor(min(p["row"] for p in polygon)))
+        bottom = min(height, math.ceil(max(p["row"] for p in polygon)))
+        left = max(0, math.floor(min(p["column"] for p in polygon)))
+        right = min(width, math.ceil(max(p["column"] for p in polygon)))
+        row_span, col_span = bottom-top, right-left
+        step = max(1, math.ceil(math.sqrt(row_span*col_span/MAX_REGION_SAMPLES)))
+        while math.ceil(row_span/step)*math.ceil(col_span/step) > MAX_REGION_SAMPLES:
+            count = math.ceil(row_span/step)*math.ceil(col_span/step)
+            step = max(step+1, math.ceil(step*math.sqrt(count/MAX_REGION_SAMPLES)))
+        columns = np.arange(left, right, step)
+        selected = []
+        if derived:
+            mode = reader.image.mode if reader.reader_type == "TIFF" else reader.get_sidds_as_tuple()[0].Display.PixelType
+            label = "Source RGB luminance (0–255)" if mode in ("RGB", "RGBA", "P", "CMYK", "YCbCr", "RGBX", "LA") or "RGB" in mode else ("Source intensity" if reader.reader_type == "TIFF" else "Derived image intensity")
+        else:
+            label = SCALING_LABELS[scaling]
+        block_rows = 64 if step == 1 else 1
+        for row in range(top, bottom, step*block_rows):
+            stop = min(bottom, row+step*block_rows)
+            rows = np.arange(row, stop, step)
+            mask = np.stack([polygon_row_mask(int(r), columns, polygon) for r in rows])
+            if not mask.any():
+                continue
+            # SarPy's segmented readers can turn a strided intersection into
+            # an empty slice when a segment contains no sampled pixel. Keep
+            # source reads contiguous; apply the identical stride in NumPy.
+            read_stop = row+1 if step > 1 else stop
+            samples = reader.read(slice(row,read_stop), slice(left,right), index=0, squeeze=False)[:, ::step]
+            if derived:
+                values, label = derived_values(samples, reader.reader_type)
+            elif scaling == "relative-power":
+                power = scale_samples(samples, metadata, rows, columns, "power")
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    values = np.where(power > 0, 10*np.log10(power/peak_power), np.nan) if peak_power > 0 else np.full(power.shape,np.nan)
+            else:
+                values = scale_samples(samples, metadata, rows, columns, scaling)
+            values = values[mask]
+            selected.append(values[np.isfinite(values)])
+        values = np.concatenate(selected) if selected else np.array([],dtype=np.float64)
+        return {"statistics": image_statistics(values), "valueLabel": label,
+                "sampleCount": int(values.size), "sampled": step > 1}
+    finally:
+        reader.close()
+
+
 def main():
     global MAX_TIFF_PIXELS
     try:
@@ -464,7 +569,9 @@ def main():
             argv = argv[:-2]
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(argv) == 7 and argv[2] == "--pixel":
+            if len(argv) == 6 and argv[2] == "--region":
+                result = region_image(argv[1], json.loads(argv[3]), argv[4], float(argv[5]))
+            elif len(argv) == 7 and argv[2] == "--pixel":
                 result = pixel_image(argv[1], int(argv[3]), int(argv[4]), argv[5], float(argv[6]))
             elif len(argv) in (5, 6) and argv[2] == "--slice":
                 result = slice_image(argv[1], argv[3], int(argv[4]), argv[5] if len(argv) == 6 else "amplitude")

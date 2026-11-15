@@ -258,3 +258,39 @@ test("Scientific Imagery forwards and validates the TIFF pixel limit", async () 
         );
     }
 });
+
+test("Scientific Imagery forwards polygon coordinates and scaling to the worker", async () => {
+    const { readImageRegion } =
+        await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts");
+    const polygon = [
+        { row: 0, column: 0 },
+        { row: 0, column: 2 },
+        { row: 2, column: 0 }
+    ];
+    const expected = {
+        statistics: { "50th percentile": -3 },
+        valueLabel: "Real component",
+        sampleCount: 3,
+        sampled: false
+    };
+    assert.deepEqual(
+        await readImageRegion(
+            "scene.nitf",
+            polygon,
+            {},
+            async (_python, args) => {
+                assert.deepEqual(args.slice(1), [
+                    "scene.nitf",
+                    "--region",
+                    JSON.stringify(polygon),
+                    "real",
+                    "100"
+                ]);
+                return { stdout: JSON.stringify(expected) };
+            },
+            "real",
+            100
+        ),
+        expected
+    );
+});

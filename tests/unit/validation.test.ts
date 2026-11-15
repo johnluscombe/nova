@@ -76,6 +76,15 @@ test("workspace validation rejects oversized layouts, duplicate IDs and invalid 
         [window, window],
         [null],
         [{ ...window, id: 0 }],
+        [
+            {
+                ...window,
+                region: [
+                    { row: 0, column: 0 },
+                    { row: 1, column: 1 }
+                ]
+            }
+        ],
         [{ ...window, metadataFiles: [false] }],
         [{ ...window, metadataAxesSource: "/missing.json" }],
         [{ ...window, scaling: "invalid" }],

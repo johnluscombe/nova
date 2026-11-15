@@ -193,3 +193,55 @@ test("pointer gestures distinguish move and resize and ignore wrong pointers", a
     await pointer(handle, "pointercancel");
     expect(api.snapshot()[0]!.rect.width).toBe(width + 20);
 });
+
+test("clearing a region ignores late statistics and restores the whole-image panel", async () => {
+    const api = workspace();
+    let finish:
+        | ((result: import("../../src/types/region").RegionStatistics) => void)
+        | undefined;
+    const region = vi.fn(
+        () =>
+            new Promise<import("../../src/types/region").RegionStatistics>(
+                resolve => {
+                    finish = resolve;
+                }
+            )
+    );
+    window.images = {
+        region
+    } as unknown as import("../../src/types/image").ImageAPI;
+    try {
+        api.add({ ...image, supportsSourceRegions: true });
+        await nextTick();
+        const points = [
+            { row: 0, column: 0 },
+            { row: 0, column: 2 },
+            { row: 2, column: 2 },
+            { row: 2, column: 0 }
+        ];
+        wrapper
+            .getComponent({ name: "ImageSliceView" })
+            .vm.$emit("region", points);
+        await nextTick();
+        expect(api.snapshot()[0]?.region).toEqual(points);
+        expect(region).toHaveBeenCalledOnce();
+        await api.clearRegion();
+        finish!({
+            statistics: { "50th percentile": 999 },
+            valueLabel: "Source amplitude",
+            sampleCount: 4,
+            sampled: false
+        });
+        await Promise.resolve();
+        await nextTick();
+        expect(api.snapshot()[0]?.region).toBeUndefined();
+        expect(
+            wrapper.get('[aria-label="Image statistics"]').text()
+        ).not.toContain("999");
+        expect(
+            wrapper.get('[aria-label="Image statistics"]').text()
+        ).not.toContain("Region statistics");
+    } finally {
+        delete window.images;
+    }
+});

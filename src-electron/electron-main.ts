@@ -1,3 +1,4 @@
+import type { PolygonPoint } from "../src/types/region";
 import { prepareImport, readMetadata } from "./image-import";
 import type { ImageImportUpdate } from "../src/types/image-import";
 import type { ImageInfo } from "../src/types/image";
@@ -267,6 +268,29 @@ async function createWindow() {
                 return imagePlugins.executeRibbonAction(pluginId, actionId, {
                     scenarioPath: scenario.current?.path ?? null
                 });
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:region",
+        (
+            _event,
+            filePath: string,
+            pluginId: string,
+            polygon: PolygonPoint[],
+            scaling?: Scaling
+        ) =>
+            documentAction(() => {
+                if (!scenario.current) {
+                    throw new Error(
+                        "Open a scenario before selecting image regions."
+                    );
+                }
+                return imagePlugins.readRegion(
+                    filePath,
+                    pluginId,
+                    polygon,
+                    scaling
+                );
             })
     );
     mainWindow.webContents.ipc.handle(

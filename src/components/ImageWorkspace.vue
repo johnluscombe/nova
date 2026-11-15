@@ -92,6 +92,10 @@
                                 :enabled="!!widget.sliceEnabled"
                                 :inspect="!!widget.pixelValuesEnabled"
                                 :axes="!!widget.axesEnabled"
+                                :drawing="!!widget.polygonDrawing"
+                                :polygon="widget.region"
+                                @region="selectRegion(widget, $event)"
+                                @cancel-region="widget.polygonDrawing = false"
                                 @slice="
                                     createSliceGraph(widget.image, $event)
                                 " />
@@ -107,7 +111,13 @@
                             class="statistics-panel"
                             aria-label="Image statistics">
                             <div class="row items-center justify-between">
-                                <strong>Statistics</strong>
+                                <strong>
+                                    {{
+                                        widget.region
+                                            ? "Region statistics"
+                                            : "Statistics"
+                                    }}
+                                </strong>
                                 <q-btn
                                     flat
                                     dense
@@ -116,30 +126,46 @@
                                     aria-label="Close statistics"
                                     @click="widget.statisticsOpen = false" />
                             </div>
-                            <p v-if="widget.loading" role="status">
+                            <p
+                                v-if="
+                                    widget.loading ||
+                                    widget.regionBusy ||
+                                    (!widget.region &&
+                                        widget.wholeStatisticsBusy)
+                                "
+                                role="status">
                                 Loading statistics…
                             </p>
                             <template v-else>
+                                <p v-if="widget.regionResult">
+                                    {{ widget.regionResult.valueLabel }} ·
+                                    {{ widget.regionResult.sampleCount }} finite
+                                    samples{{
+                                        widget.regionResult.sampled
+                                            ? " (sampled)"
+                                            : ""
+                                    }}
+                                </p>
                                 <p
                                     v-if="
-                                        widget.image.metadata?.Scaling ??
-                                        widget.image.metadata?.[
-                                            'Statistics quantity'
-                                        ]
+                                        widget.regionResult?.sampleCount === 0
                                     ">
-                                    {{
-                                        widget.image.metadata?.Scaling ??
-                                        widget.image.metadata?.[
-                                            "Statistics quantity"
-                                        ]
-                                    }}
+                                    No finite pixel samples fall inside this
+                                    region.
+                                </p>
+                                <p
+                                    v-if="
+                                        !widget.region &&
+                                        statisticsLabel(widget)
+                                    ">
+                                    {{ statisticsLabel(widget) }}
                                 </p>
                                 <dl
                                     v-if="
-                                        widget.image.statistics &&
+                                        displayStatistics(widget) &&
                                         Object.keys(
                                             visibleStatistics(
-                                                widget.image.statistics
+                                                displayStatistics(widget)
                                             )
                                         ).length
                                     ">
@@ -147,17 +173,28 @@
                                         v-for="(
                                             value, label
                                         ) in visibleStatistics(
-                                            widget.image.statistics
+                                            displayStatistics(widget)
                                         )"
                                         :key="label">
                                         <dt>{{ label }}</dt>
-                                        <dd>{{ value ?? "Not available" }}</dd>
+                                        <dd>
+                                            {{
+                                                typeof value === "number"
+                                                    ? Number(
+                                                          value.toPrecision(7)
+                                                      )
+                                                    : (value ?? "Not available")
+                                            }}
+                                        </dd>
                                     </div>
                                 </dl>
                                 <p v-else>
                                     {{
+                                        widget.regionError ??
+                                        widget.previewStatisticsError ??
                                         widget.error ??
-                                        (widget.image.statistics
+                                        (Object.keys(displayStatistics(widget))
+                                            .length
                                             ? "The selected percentiles are not available for this image."
                                             : "This plugin does not provide image statistics.")
                                     }}
@@ -189,7 +226,13 @@
                                 ) in metadataEntries(widget)"
                                 :key="index">
                                 <dt>{{ label }}</dt>
-                                <dd>{{ value ?? "Not available" }}</dd>
+                                <dd>
+                                    {{
+                                        typeof value === "number"
+                                            ? Number(value.toPrecision(7))
+                                            : (value ?? "Not available")
+                                    }}
+                                </dd>
                             </template>
                         </dl>
                         <AttachedMetadata
@@ -262,6 +305,12 @@ import {
     metadataAxesCandidates,
     resolveMetadataAxes
 } from "@/utils/metadata-axes";
+import { previewRegionStatistics } from "@/utils/region-statistics";
+import type {
+    PolygonPoint,
+    RegionStatistics,
+    RegionState
+} from "@/types/region";
 import AttachedMetadata from "./AttachedMetadata.vue";
 import type { MetadataAttachment } from "@/types/metadata";
 import ImageSliceView from "./ImageSliceView.vue";
@@ -292,6 +341,16 @@ interface ImageWindow {
     sliceEnabled?: boolean;
     pixelValuesEnabled?: boolean;
     axesEnabled?: boolean;
+    polygonDrawing?: boolean;
+    region?: PolygonPoint[];
+    regionResult?: RegionStatistics;
+    regionBusy?: boolean;
+    regionError?: string;
+    regionVersion?: number;
+    previewWholeStatistics?: Record<string, number | null>;
+    previewWholeSampled?: boolean;
+    wholeStatisticsBusy?: boolean;
+    previewStatisticsError?: string;
     metadataAxesSource?: string;
     graph?: {
         data?: SliceData;
@@ -391,6 +450,154 @@ const canSlice = computed(
 function toggleSlice() {
     if (canSlice.value && activeWidget.value) {
         activeWidget.value.sliceEnabled = !activeWidget.value.sliceEnabled;
+    }
+}
+function statisticsLabel(widget: ImageWindow) {
+    return (
+        widget.image.metadata?.Scaling ??
+        widget.image.metadata?.["Statistics quantity"] ??
+        (widget.previewWholeStatistics
+            ? `Preview luminance (0–255)${widget.previewWholeSampled ? " (sampled)" : ""}`
+            : undefined)
+    );
+}
+function displayStatistics(
+    widget: ImageWindow
+): Record<string, string | number | boolean | null> {
+    return (
+        (widget.region
+            ? widget.regionResult?.statistics
+            : (widget.image.statistics ?? widget.previewWholeStatistics)) ?? {}
+    );
+}
+
+async function initializePreviewStatistics(widget: ImageWindow) {
+    const image = widget.image;
+    if (
+        widget.loading ||
+        !!widget.region ||
+        !["nova.raster", "nova.vector"].includes(image.pluginId) ||
+        !image.previewDataUrl ||
+        image.statistics ||
+        widget.previewWholeStatistics ||
+        widget.wholeStatisticsBusy
+    ) {
+        return;
+    }
+    widget.wholeStatisticsBusy = true;
+    delete widget.previewStatisticsError;
+    try {
+        const result = await previewRegionStatistics(image);
+        if (
+            windows.value.includes(widget) &&
+            widget.image.previewDataUrl === image.previewDataUrl
+        ) {
+            widget.previewWholeStatistics = result.statistics;
+            widget.previewWholeSampled = result.sampled;
+        }
+    } catch (cause) {
+        if (windows.value.includes(widget)) {
+            widget.previewStatisticsError =
+                cause instanceof Error
+                    ? cause.message
+                    : "Unable to calculate raster statistics.";
+        }
+    } finally {
+        widget.wholeStatisticsBusy = false;
+    }
+}
+async function refreshRegion(widget: ImageWindow) {
+    if (!widget.region) {
+        return;
+    }
+    const version = (widget.regionVersion ?? 0) + 1;
+    widget.regionVersion = version;
+    widget.regionBusy = true;
+    delete widget.regionResult;
+    delete widget.regionError;
+    try {
+        const result = widget.image.supportsSourceRegions
+            ? await window.images!.region(
+                  widget.image.path,
+                  widget.image.pluginId,
+                  widget.region.map(point => ({
+                      row: point.row,
+                      column: point.column
+                  })),
+                  widget.image.scaling
+              )
+            : await previewRegionStatistics(widget.image, widget.region);
+        if (
+            widget.regionVersion === version &&
+            windows.value.includes(widget)
+        ) {
+            widget.regionResult = result;
+            if (result.wholeImageStatistics) {
+                widget.previewWholeStatistics = result.wholeImageStatistics;
+                widget.previewWholeSampled = result.sampled;
+            }
+        }
+    } catch (cause) {
+        if (widget.regionVersion === version) {
+            widget.regionError =
+                cause instanceof Error
+                    ? cause.message
+                    : "Unable to calculate region statistics.";
+        }
+    } finally {
+        if (widget.regionVersion === version) {
+            widget.regionBusy = false;
+        }
+    }
+}
+function togglePolygon() {
+    const widget = activeWidget.value;
+    if (canSlice.value && widget) {
+        widget.polygonDrawing = !widget.polygonDrawing;
+    }
+}
+function selectRegion(widget: ImageWindow, polygon: PolygonPoint[]) {
+    widget.region = polygon;
+    widget.polygonDrawing = false;
+    widget.statisticsOpen = true;
+    void refreshRegion(widget);
+}
+async function clearRegion() {
+    const widget = activeWidget.value;
+    if (!widget || widget.graph) {
+        return;
+    }
+    widget.polygonDrawing = false;
+    widget.regionVersion = (widget.regionVersion ?? 0) + 1;
+    delete widget.region;
+    delete widget.regionResult;
+    delete widget.regionError;
+    widget.regionBusy = false;
+    if (
+        !widget.image.statistics &&
+        !widget.previewWholeStatistics &&
+        !widget.wholeStatisticsBusy &&
+        widget.image.previewDataUrl
+    ) {
+        const version = widget.regionVersion;
+        widget.regionBusy = true;
+        try {
+            const result = await previewRegionStatistics(widget.image);
+            if (widget.regionVersion === version) {
+                widget.previewWholeStatistics = result.statistics;
+            }
+        } catch (cause) {
+            if (widget.regionVersion === version) {
+                widget.regionError =
+                    cause instanceof Error
+                        ? cause.message
+                        : "Unable to read preview statistics.";
+            }
+        } finally {
+            if (widget.regionVersion === version) {
+                widget.regionBusy = false;
+            }
+        }
     }
 }
 function toggleAxes() {
@@ -498,6 +705,9 @@ async function setScaling(scaling: Scaling) {
             }
             widget.image = image;
             refreshMetadataAxes(widget);
+            if (widget.region) {
+                void refreshRegion(widget);
+            }
         }
         delete widget.error;
     } catch (cause) {
@@ -559,6 +769,9 @@ function add(image: ImageInfo, loading = false) {
         z: ++zIndex
     };
     windows.value.push(widget);
+    void initializePreviewStatistics(
+        windows.value.find(item => item.id === widget.id)!
+    );
     activeId.value = widget.id;
     return widget.id;
 }
@@ -569,6 +782,10 @@ function complete(id: number, image: ImageInfo) {
     }
     widget.image = resolveMetadataAxes(image, widget.metadataAxesSource);
     widget.loading = false;
+    void initializePreviewStatistics(widget);
+    if (widget.region) {
+        void refreshRegion(widget);
+    }
 }
 function fail(id: number, message: string) {
     const widget = windows.value.find(item => item.id === id);
@@ -584,6 +801,9 @@ function snapshot(): SavedImageWindow[] {
         .filter(widget => widget.image.pluginId && !widget.graph)
         .map(widget => ({
             id: widget.id,
+            ...(widget.region
+                ? { region: widget.region.map(point => ({ ...point })) }
+                : {}),
             ...(widget.metadataAxesSource !== undefined
                 ? { metadataAxesSource: widget.metadataAxesSource }
                 : {}),
@@ -610,6 +830,12 @@ function hydrate(saved: RestoredImageWindow[]) {
         ...(widget.metadataAxesSource !== undefined
             ? { metadataAxesSource: widget.metadataAxesSource }
             : {}),
+        ...(widget.region
+            ? {
+                  region: widget.region.map(point => ({ ...point })),
+                  statisticsOpen: true
+              }
+            : {}),
         loading: widget.loading ?? false,
         rect: fitWindow(widget.rect, bounds),
         minimized: widget.minimized,
@@ -620,11 +846,18 @@ function hydrate(saved: RestoredImageWindow[]) {
     sequence = Math.max(0, ...saved.map(widget => widget.id));
     zIndex = Math.max(0, ...saved.map(widget => widget.z));
     activeId.value = windows.value.find(widget => widget.z === zIndex)?.id;
+    for (const widget of windows.value) {
+        void initializePreviewStatistics(widget);
+        if (widget.region && !widget.loading) {
+            void refreshRegion(widget);
+        }
+    }
 }
 const emit = defineEmits<{
     change: [windows: SavedImageWindow[]];
     activeChange: [available: boolean];
     imageContextChange: [context: ImageContext];
+    regionChange: [state: RegionState];
     statisticsChange: [available: boolean];
     sliceChange: [available: boolean];
     sliceModeChange: [enabled: boolean];
@@ -634,6 +867,15 @@ const emit = defineEmits<{
     scalingError: [message: string];
     metadataError: [message: string];
 }>();
+watch(
+    () => ({
+        available: canSlice.value,
+        drawing: !!activeWidget.value?.polygonDrawing,
+        selected: !!activeWidget.value?.region
+    }),
+    state => emit("regionChange", state),
+    { immediate: true }
+);
 watch(
     () => {
         const widget = activeWidget.value;
@@ -680,8 +922,11 @@ const hasStatistics = computed(() => {
         !!widget &&
         !widget.graph &&
         !widget.loading &&
-        !!widget.image.statistics &&
-        Object.keys(widget.image.statistics).length > 0
+        (!!widget.region ||
+            !!widget.wholeStatisticsBusy ||
+            !!widget.previewStatisticsError ||
+            (!!displayStatistics(widget) &&
+                Object.keys(displayStatistics(widget)!).length > 0))
     );
 });
 watch(hasStatistics, available => emit("statisticsChange", available), {
@@ -715,6 +960,8 @@ defineExpose({
     toggleSlice,
     togglePixelValues,
     toggleAxes,
+    togglePolygon,
+    clearRegion,
     setScaling
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {

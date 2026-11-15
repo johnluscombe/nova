@@ -194,3 +194,80 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
         source.getByRole("img", { name: "intensity.tif", exact: true })
     ).toBeVisible();
 });
+
+test("scientific polygon statistics use source values, follow scaling and restore", async ({
+    application,
+    profile
+}) => {
+    try {
+        await execute(python, ["-c", "import sarpy, numpy"]);
+    } catch {
+        test.skip(
+            true,
+            "Scientific region integration requires the Python image dependencies."
+        );
+    }
+    const file = path.join(profile, "region.nitf");
+    await execute(python, [
+        "-c",
+        `import importlib.util, pathlib, sys, numpy as np
+sys.dont_write_bytecode = True
+spec = importlib.util.spec_from_file_location('fixtures', sys.argv[1])
+fixtures = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fixtures)
+data = np.full((8,8),100+0j,dtype='complex64')
+data[:3,:3] = 3+4j
+fixtures.SicdPreviewTests().fixture(pathlib.Path(sys.argv[2]),data)`,
+        path.resolve("src-electron/sicd-reader.test.py"),
+        file
+    ]);
+    const page = await application.firstWindow();
+    const scenario = await createScenario(application, page, profile);
+    await chooseFile(application, file);
+    await clickRibbon(page, "Add Image");
+    const source = page.getByRole("article", {
+        name: "region.nitf",
+        exact: true
+    });
+    await expect(
+        source.getByRole("img", { name: "region.nitf", exact: true })
+    ).toBeVisible();
+    await clickRibbon(page, "Polygon");
+    const viewport = (await source.locator(".slice-viewport").boundingBox())!;
+    const scale = Math.min(viewport.width / 8, viewport.height / 8);
+    const left = viewport.x + (viewport.width - 8 * scale) / 2,
+        top = viewport.y + (viewport.height - 8 * scale) / 2;
+    for (const [column, row] of [
+        [0.1, 0.1],
+        [2.9, 0.1],
+        [2.9, 2.9],
+        [0.1, 2.9],
+        [0.1, 0.1]
+    ]) {
+        await page.mouse.click(left + column! * scale, top + row! * scale);
+    }
+    const pane = source.getByRole("region", {
+        name: "Image statistics",
+        exact: true
+    });
+    await expect(pane).toContainText("Region statistics");
+    await expect(pane).toContainText("9 finite samples");
+    const median = pane
+        .getByText("50th percentile", { exact: true })
+        .locator("..")
+        .locator("dd");
+    await expect(median).toHaveText("5");
+    await clickRibbon(page, "Scaling");
+    await page
+        .getByRole("menuitemradio", { name: "Real", exact: true })
+        .click();
+    await expect(median).toHaveText("3");
+    await clickRibbon(page, "Close");
+    await chooseFile(application, scenario);
+    await clickRibbon(page, "Open");
+    await expect(median).toHaveText("3");
+    await expect(source.locator(".closed-polygon")).toBeVisible();
+    await clickRibbon(page, "Clear Region");
+    await expect(median).toHaveText("100");
+    await expect(source.locator(".closed-polygon")).toHaveCount(0);
+});

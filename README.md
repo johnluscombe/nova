@@ -76,6 +76,14 @@ embedded axes. See [metadata and axis sources](docs/metadata.md).
 
 The contextual tab is named **Scientific Imagery** for SICD, SIDD, and TIFF, or
 **Image** for ordinary images. It contains **Data** (Attach Metadata) and
-**Analysis** (Statistics, Scaling, and Slice). Home’s **View** group retains Metadata,
+**Analysis** (Statistics, Scaling, Polygon, Clear Region, and Slice). Home’s **View** group retains Metadata,
 Axes, and Pixel Values. Image tools remain available for slice graphs
 where applicable, and the ribbon returns to Home when no widget is active.
+
+Use **Analysis → Polygon** to select an image region. Closing it updates Statistics
+with regional percentiles; **Clear Region** restores whole-image statistics.
+Selections follow scaling changes and are saved in scenarios. See
+[polygon regions](docs/regions.md).
+
+PNG/JPG/SVG images provide whole-image preview-luminance percentiles automatically,
+so Statistics is available immediately without a polygon selection.
