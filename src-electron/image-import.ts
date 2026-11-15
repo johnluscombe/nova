@@ -35,7 +35,7 @@ function stem(file: string) {
         .toLowerCase()
         .replace(/\.[^.]+$/, "")
         .replace(
-            /(?:[._-](?:sicd|sidd|tiff?|nitf|ntf|metadata|meta|catalog|extended|stac|gec|grd))+$/g,
+            /(?:[._-](?:cphd|sicd|sidd|tiff?|nitf|ntf|metadata|meta|catalog|extended|stac|gec|grd))+$/g,
             ""
         );
 }

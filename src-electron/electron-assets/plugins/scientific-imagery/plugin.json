@@ -3,7 +3,7 @@
     "id": "nova.sicd",
     "name": "Scientific Imagery",
     "main": "index.ts",
-    "extensions": ["sicd", "sidd", "nitf", "ntf", "tif", "tiff"],
+    "extensions": ["cphd", "sicd", "sidd", "nitf", "ntf", "tif", "tiff"],
     "parameters": {
         "python": "~/.nova/bin/python3",
         "maxTiffPixels": 0

@@ -90,7 +90,15 @@ class TiffReader:
 
 def open_image_reader(file_path):
     with open(file_path, "rb") as source:
-        if source.read(4) in TIFF_SIGNATURES:
+        signature = source.read(4)
+        if signature == b"CPHD":
+            from sarpy.io.phase_history.cphd import CPHDReader
+            reader = CPHDReader(file_path)
+            if getattr(reader.cphd_meta.Data, "SignalCompressionID", None):
+                reader.close()
+                raise ValueError("Compressed CPHD signal arrays are not supported")
+            return reader
+        if signature in TIFF_SIGNATURES:
             return TiffReader(file_path)
     from sarpy.io.product.sidd import SIDDReader, SIDDDetails
     from sarpy.io.complex.sicd import SICDReader
@@ -223,7 +231,35 @@ def derived_pixel(reader, row, column, scaling):
     return {"value": value if np.isfinite(value) else None, "valueLabel": label}
 
 
+def complex_metadata(reader):
+    if reader.reader_type != "CPHD":
+        return reader.get_sicds_as_tuple()[0]
+    from types import SimpleNamespace
+    height, width = reader.get_data_size_as_tuple()[0]
+    return SimpleNamespace(ImageData=SimpleNamespace(NumRows=height, NumCols=width),
+                           phase_history=reader.cphd_meta)
+
+
+def cphd_metadata(metadata):
+    result = {"Format": "CPHD", "Preview data": "First channel phase history (not a formed image)"}
+    fields = {"Collector": "CollectionID.CollectorName", "Collection": "CollectionID.CoreName",
+              "Classification": "CollectionID.Classification", "Domain": "Global.DomainType",
+              "Signal format": "Data.SignalArrayFormat", "Channels": "Data.NumCPHDChannels"}
+    for label, path in fields.items():
+        value = metadata
+        for part in path.split("."):
+            value = getattr(value, part, None)
+        if value is not None:
+            result[label] = str(value)
+    channels = getattr(getattr(metadata, "Data", None), "Channels", None)
+    if channels:
+        result["Channel"] = str(channels[0].Identifier)
+    return result
+
+
 def image_metadata(metadata):
+    if hasattr(metadata, "phase_history"):
+        return cphd_metadata(metadata.phase_history)
     fields = {
         "Collector": "CollectionInfo.CollectorName",
         "Collection": "CollectionInfo.CoreName",
@@ -251,6 +287,9 @@ def image_metadata(metadata):
 
 
 def image_axes(metadata):
+    if hasattr(metadata, "phase_history"):
+        return {key: {"label": label, "unit": "pixel", "origin": 0, "spacing": 1}
+                for key, label in (("row", "Vector"), ("column", "Sample"))}
     grid, image = getattr(metadata, "Grid", None), getattr(metadata, "ImageData", None)
     center = getattr(image, "SCPPixel", None)
     if grid is None or center is None:
@@ -358,18 +397,18 @@ def render(file_path, scaling="amplitude"):
 
     with open(file_path, "rb") as source:
         header = source.read(9)
-        if header != b"NITF02.10" and header[:4] not in TIFF_SIGNATURES:
-            raise ValueError("Expected a SICD/SIDD NITF 2.1 file or a TIFF image")
+        if header != b"NITF02.10" and header[:4] not in (*TIFF_SIGNATURES, b"CPHD"):
+            raise ValueError("Expected a SICD/SIDD NITF 2.1, CPHD, or TIFF file")
     reader = open_image_reader(file_path)
     try:
         if reader.reader_type in ("SIDD", "TIFF"):
             if scaling != "amplitude":
                 raise ValueError("Derived image pixels do not support complex scaling")
             return render_derived(reader)
-        metadata = reader.get_sicds_as_tuple()[0]
+        metadata = complex_metadata(reader)
         height, width = int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols)
         if width <= 0 or height <= 0:
-            raise ValueError("Invalid SICD dimensions")
+            raise ValueError("Invalid signal dimensions")
         step = max(1, math.ceil(max(width, height) / 1600))
         # Read one sampled row at a time, keeping complex sample memory bounded.
         complex_samples = np.empty((math.ceil(height / step), math.ceil(width / step)), dtype=np.complex64)
@@ -412,7 +451,7 @@ def slice_image(file_path, orientation, index, scaling="amplitude"):
     try:
         if reader.reader_type in ("SIDD", "TIFF"):
             return derived_slice(reader, orientation, index, scaling)
-        metadata = reader.get_sicds_as_tuple()[0]
+        metadata = complex_metadata(reader)
         height, width = int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols)
         limit, length = (height, width) if orientation == "horizontal" else (width, height)
         if index < 0 or index >= limit:
@@ -426,7 +465,9 @@ def slice_image(file_path, orientation, index, scaling="amplitude"):
         return {
             "points": [{"position": int(position), "value": float(value) if np.isfinite(value) else None}
                        for position, value in zip(range(0, length, step), values)],
-            "positionLabel": "Column (pixel)" if orientation == "horizontal" else "Row (pixel)",
+            "positionLabel": (("Sample (pixel)" if orientation == "horizontal" else "Vector (pixel)")
+                              if reader.reader_type == "CPHD" else
+                              ("Column (pixel)" if orientation == "horizontal" else "Row (pixel)")),
             "valueLabel": SCALING_LABELS[scaling],
         }
     finally:
@@ -439,7 +480,7 @@ def pixel_image(file_path, row, column, scaling="amplitude", peak_power=None):
     try:
         if reader.reader_type in ("SIDD", "TIFF"):
             return derived_pixel(reader, row, column, scaling)
-        metadata = reader.get_sicds_as_tuple()[0]
+        metadata = complex_metadata(reader)
         if not (0 <= row < metadata.ImageData.NumRows and 0 <= column < metadata.ImageData.NumCols):
             raise ValueError("Pixel is outside the image")
         samples = reader.read(slice(row, row + 1), slice(column, column + 1), index=0, squeeze=False)
@@ -505,7 +546,7 @@ def region_image(file_path, polygon, scaling="amplitude", peak_power=0):
     reader = open_image_reader(file_path)
     try:
         derived = reader.reader_type in ("SIDD", "TIFF")
-        metadata = None if derived else reader.get_sicds_as_tuple()[0]
+        metadata = None if derived else complex_metadata(reader)
         height, width = reader.get_data_size_as_tuple()[0][:2] if derived else (int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols))
         validate_polygon(polygon, width, height)
         if derived and scaling != "amplitude":

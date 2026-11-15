@@ -195,3 +195,18 @@ before pixel decoding and applies to previews, source slices, pixel inspection,
 and scenario restoration. This does not change the 1600-pixel preview limit.
 Pillow can still decode the full TIFF internally, so larger files require more
 memory even when their preview is small.
+
+## CPHD phase history
+
+Open `.cphd` files through Add Image, drag and drop, or ZIP import. The first channel
+is displayed as a complex phase-history matrix: rows are vectors and columns are
+samples. This is not a formed SAR image. Axes show zero-based Vector and Sample
+indices, not down-range or cross-range distances. The metadata panel identifies
+the channel, signal format, and domain when available.
+
+Amplitude, real, imaginary, phase, linear power, log power, and relative power are
+available, together with source pixel values, slices, and polygon percentiles.
+RCS and other image radiometric calibrations are unavailable for CPHD. SarPy's
+formatted complex samples include its supported per-vector amplitude scaling.
+Previews and statistics use the same bounded sampling as SICD previews. CPHD uses
+the existing Python interpreter and SarPy installation; no extra dependency is needed.
