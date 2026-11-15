@@ -66,6 +66,19 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        attachMetadata: vi.fn(),
+        importFiles: vi.fn(async (onUpdate, paths) => {
+            const selected = Array.isArray(paths) ? paths : [paths];
+            for (const [index, file] of selected.entries()) {
+                const image = await imagesMock.open(image => {
+                    onUpdate({ key: String(index), status: "loading", image });
+                }, file);
+                if (image) {
+                    onUpdate({ key: String(index), status: "ready", image });
+                }
+            }
+            return { errors: [] };
+        }),
         pixel: vi.fn(),
         rescale: vi.fn(),
         pathForFile: vi.fn(file => file.name),

@@ -1,6 +1,8 @@
 import { isScaling, type Scaling } from "./scaling";
 import type { ImageInfo } from "./image";
 export interface SavedImageWindow {
+    metadataAxesSource?: string;
+    metadataFiles?: string[];
     scaling?: Scaling;
     id: number;
     path: string;
@@ -23,6 +25,21 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
     for (const item of value) {
         if (
             !item ||
+            (item.metadataFiles !== undefined &&
+                (!Array.isArray(item.metadataFiles) ||
+                    item.metadataFiles.length > 32 ||
+                    !item.metadataFiles.every(
+                        (file: unknown) =>
+                            typeof file === "string" &&
+                            file.length > 0 &&
+                            file.length < 8192
+                    ))) ||
+            (item.metadataAxesSource !== undefined &&
+                (typeof item.metadataAxesSource !== "string" ||
+                    (item.metadataAxesSource !== "embedded" &&
+                        !item.metadataFiles?.includes(
+                            item.metadataAxesSource
+                        )))) ||
             (item.scaling !== undefined && !isScaling(item.scaling)) ||
             !Number.isSafeInteger(item.id) ||
             item.id < 1 ||
@@ -61,6 +78,7 @@ export interface ImageWorkspaceAPI {
     snapshot(): SavedImageWindow[];
     hydrate(saved: RestoredImageWindow[]): void;
     toggleMetadata(): void;
+    attachMetadata(): Promise<void>;
     toggleStatistics(): void;
     toggleSlice(): void;
     togglePixelValues(): void;

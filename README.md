@@ -68,3 +68,8 @@ SIDD and TIFF read source intensity or RGB luminance. Other formats report previ
 Enable **View → Axes** to display image coordinates. SICD range grids show
 cross-range and down-range in meters relative to the scene center; ordinary
 images use pixel coordinates.
+
+Add Image supports multi-file selection and ZIP imports. JSON metadata can be
+associated during import or added later using **View → Attach Metadata**.
+Recognized JSON axes can supply physical coordinates or explicitly override
+embedded axes. See [metadata and axis sources](docs/metadata.md).

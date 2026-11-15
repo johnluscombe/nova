@@ -1,3 +1,5 @@
+import type { ImageImportUpdate, ImageImportResult } from "./image-import";
+import type { MetadataAttachment } from "./metadata";
 import type { ImageAxes } from "./axes";
 import type { PixelData } from "./pixel";
 import type { Scaling } from "./scaling";
@@ -30,6 +32,10 @@ export interface ImagePluginResult {
 }
 
 export interface ImageInfo extends ImagePluginResult {
+    embeddedAxes?: ImageAxes;
+    axesSource?: string;
+    axesNotice?: string;
+    attachedMetadata?: MetadataAttachment[];
     name: string;
     path: string;
     pluginId: string;
@@ -45,6 +51,11 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    importFiles(
+        onUpdate: (update: ImageImportUpdate) => void,
+        paths?: string | string[]
+    ): Promise<ImageImportResult>;
+    attachMetadata(imagePath: string): Promise<MetadataAttachment[] | null>;
     pixel(
         filePath: string,
         pluginId: string,

@@ -132,6 +132,14 @@
                             flat
                             stack
                             no-caps
+                            icon="attach_file"
+                            label="Attach Metadata"
+                            :disable="busy || !hasActiveWidget"
+                            @click="workspace?.attachMetadata()" />
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
                             icon="bar_chart"
                             label="Statistics"
                             :disable="!hasActiveStatistics"
@@ -346,6 +354,7 @@
                 @axes-change="axesActive = $event"
                 @scaling-change="scalingState = $event"
                 @scaling-error="error = $event"
+                @metadata-error="error = $event"
                 :key="workspaceSession"
                 ref="workspace"
                 @change="saveLayout" />
@@ -558,16 +567,14 @@ async function dropFiles(event: DragEvent) {
         if (error.value) {
             return;
         }
-        for (const file of paths.filter(file => !/\.scenario$/i.test(file))) {
+        const images = paths.filter(file => !/\.scenario$/i.test(file));
+        if (images.length) {
             if (!scenario.value) {
                 throw new Error(
                     "Open or create a scenario before opening images."
                 );
             }
-            await openImage(file);
-            if (error.value) {
-                break;
-            }
+            await openImage(images);
         }
     } catch (cause) {
         error.value =
@@ -585,32 +592,46 @@ onBeforeUnmount(() => {
     window.removeEventListener("drop", dropFiles);
 });
 
-async function openImage(filePath?: string) {
+async function openImage(paths?: string | string[]) {
     if (!scenario.value || busy.value) {
         return;
     }
     busy.value = true;
     error.value = "";
-    let loadingId: number | undefined;
+    const loading = new Map<string, number>();
     try {
         if (!window.images) {
             throw new Error("Open images in the Nova desktop app.");
         }
-        const opened = await window.images.open(image => {
-            loadingId = workspace.value?.add(image, true);
-        }, filePath);
-        if (opened) {
-            if (loadingId !== undefined) {
-                workspace.value?.complete(loadingId, opened);
-            } else {
-                workspace.value?.add(opened);
+        const result = await window.images.importFiles(update => {
+            if (update.status === "loading" && update.image) {
+                const id = workspace.value?.add(update.image, true);
+                if (id !== undefined) {
+                    loading.set(update.key, id);
+                }
+            } else if (update.status === "ready" && update.image) {
+                const id = loading.get(update.key);
+                if (id !== undefined) {
+                    workspace.value?.complete(id, update.image);
+                } else {
+                    workspace.value?.add(update.image);
+                }
+            } else if (update.status === "error") {
+                const id = loading.get(update.key);
+                if (id !== undefined) {
+                    workspace.value?.fail(
+                        id,
+                        update.error ?? "Unable to open image."
+                    );
+                }
             }
-        }
+        }, paths);
+        error.value = result.errors.join("\n");
     } catch (cause) {
         error.value =
             cause instanceof Error ? cause.message : "Unable to open image.";
-        if (loadingId !== undefined) {
-            workspace.value?.fail(loadingId, error.value);
+        for (const id of loading.values()) {
+            workspace.value?.fail(id, error.value);
         }
     } finally {
         busy.value = false;

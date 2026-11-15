@@ -341,3 +341,11 @@ TIFF (`.tif` / `.tiff`) is decoded by the Scientific Imagery plugin using Pillow
 the interpreter configured for SICD/SIDD. It supports higher-depth source values,
 RGB/RGBA previews, source inspection/slicing, and first-page selection. See
 [TIFF support](scientific-imagery-plugin.md#tiff-images).
+
+## Attached metadata and coordinate sources
+
+JSON sidecars are managed by Nova rather than individual image plugins. Image
+results retain their embedded axes; the workspace resolves any validated sidecar
+axes for display. Plugin slice handlers continue to return source pixel indices,
+so selected coordinate sources also apply consistently to slice graphs. See
+[metadata association and supported axis schemas](metadata.md).

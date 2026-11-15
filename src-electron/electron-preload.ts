@@ -1,3 +1,4 @@
+import type { ImageImportUpdate } from "../src/types/image-import";
 import type { RestoredImageUpdate } from "../src/types/scenario";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { quasarRuntime } from "#q-app/electron/preload";
@@ -14,6 +15,42 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    attachMetadata: imagePath =>
+        ipcRenderer.invoke("image:attach-metadata", imagePath),
+    importFiles: async (onUpdate, paths) => {
+        const seen = new Set<string>();
+        const deliver = (update: ImageImportUpdate) => {
+            const key = `${update.key}:${update.status}`;
+            if (seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            onUpdate(update);
+        };
+        const listener = (
+            _event: Electron.IpcRendererEvent,
+            update: ImageImportUpdate
+        ) => deliver(update);
+        ipcRenderer.on("image:import-update", listener);
+        try {
+            const result = await ipcRenderer.invoke("image:import", paths);
+            // The invoke reply and progress events can arrive on separate queues.
+            // Reconcile final results before removing the progress listener.
+            for (const update of result.updates ?? []) {
+                if (
+                    update.status === "loading" &&
+                    (seen.has(`${update.key}:ready`) ||
+                        seen.has(`${update.key}:error`))
+                ) {
+                    continue;
+                }
+                deliver(update);
+            }
+            return { errors: result.errors };
+        } finally {
+            ipcRenderer.removeListener("image:import-update", listener);
+        }
+    },
     pixel: (filePath, pluginId, row, column, scaling) =>
         ipcRenderer.invoke(
             "image:pixel",
@@ -71,13 +108,24 @@ contextBridge.exposeInMainWorld("windowControls", {
 
 contextBridge.exposeInMainWorld("scenario", {
     loadImages: async (onRestored: (update: RestoredImageUpdate) => void) => {
+        const seen = new Set<number>();
+        const deliver = (update: RestoredImageUpdate) => {
+            if (seen.has(update.id)) {
+                return;
+            }
+            seen.add(update.id);
+            onRestored(update);
+        };
         const listener = (
             _event: Electron.IpcRendererEvent,
             update: RestoredImageUpdate
-        ) => onRestored(update);
+        ) => deliver(update);
         ipcRenderer.on("scenario:image-restored", listener);
         try {
-            await ipcRenderer.invoke("scenario:load-images");
+            const updates = await ipcRenderer.invoke("scenario:load-images");
+            for (const update of updates ?? []) {
+                deliver(update);
+            }
         } finally {
             ipcRenderer.removeListener("scenario:image-restored", listener);
         }

@@ -30,6 +30,7 @@
     "dependencies": {
         "@quasar/extras": "^2.1.0",
         "drizzle-orm": "^1.0.0-rc.5",
+        "fflate": "^0.8.3",
         "quasar": "^2.35.2",
         "vue": "^3.5.22",
         "vue-router": "^5.0.6"

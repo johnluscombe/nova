@@ -1,3 +1,6 @@
+import { prepareImport, readMetadata } from "./image-import";
+import type { ImageImportUpdate } from "../src/types/image-import";
+import type { ImageInfo } from "../src/types/image";
 import type { Scaling } from "../src/types/scaling";
 import type { SliceOrientation } from "../src/types/slice";
 import { BrowserWindow, app, dialog } from "electron";
@@ -5,7 +8,7 @@ import { ImagePlugins } from "./image-plugins";
 import { ScenarioDatabase } from "./scenario-database";
 import path from "node:path";
 import { readFile, writeFile, rename } from "node:fs/promises";
-import type { ScenarioInfo } from "../src/types/scenario";
+import type { ScenarioInfo, RestoredImageUpdate } from "../src/types/scenario";
 import os from "node:os";
 import {
     registerQuasarRuntime,
@@ -130,24 +133,38 @@ async function createWindow() {
                     name: path.basename(saved.path),
                     path: saved.path,
                     pluginId: saved.pluginId,
-                    pluginName: saved.pluginId
+                    pluginName: saved.pluginId,
+                    ...(saved.metadataFiles?.length
+                        ? {
+                              attachedMetadata: saved.metadataFiles.map(
+                                  file => ({
+                                      path: file,
+                                      name: path.basename(file)
+                                  })
+                              )
+                          }
+                        : {})
                 }
             }))
         };
     }
     mainWindow.webContents.ipc.handle("scenario:load-images", () =>
         documentAction(async () => {
+            const updates: RestoredImageUpdate[] = [];
             for (const saved of scenario.readWorkspace()) {
                 let update;
                 try {
-                    update = {
-                        id: saved.id,
-                        image: await imagePlugins.open(
-                            saved.path,
-                            saved.pluginId,
-                            saved.scaling
-                        )
-                    };
+                    const image = await imagePlugins.open(
+                        saved.path,
+                        saved.pluginId,
+                        saved.scaling
+                    );
+                    if (saved.metadataFiles?.length) {
+                        image.attachedMetadata = await Promise.all(
+                            saved.metadataFiles.map(readMetadata)
+                        );
+                    }
+                    update = { id: saved.id, image };
                 } catch (cause) {
                     update = {
                         id: saved.id,
@@ -157,6 +174,7 @@ async function createWindow() {
                                 : "Unable to restore image."
                     };
                 }
+                updates.push(update);
                 if (!mainWindow.webContents.isDestroyed()) {
                     mainWindow.webContents.send(
                         "scenario:image-restored",
@@ -164,6 +182,7 @@ async function createWindow() {
                     );
                 }
             }
+            return updates;
         })
     );
     mainWindow.webContents.ipc.handle(
@@ -306,6 +325,140 @@ async function createWindow() {
                     index,
                     scaling
                 );
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:attach-metadata",
+        (_event, imagePath: string) =>
+            documentAction(async () => {
+                if (!scenario.current) {
+                    throw new Error(
+                        "Open a scenario before attaching metadata."
+                    );
+                }
+                const result = await dialog.showOpenDialog(mainWindow, {
+                    title: "Attach JSON metadata",
+                    defaultPath: path.dirname(imagePath),
+                    filters: [{ name: "JSON metadata", extensions: ["json"] }],
+                    properties: ["openFile", "multiSelections"]
+                });
+                if (result.canceled || !result.filePaths.length) {
+                    return null;
+                }
+                if (result.filePaths.length > 32) {
+                    throw new Error(
+                        "Attach at most 32 metadata files per image."
+                    );
+                }
+                const attachments = await Promise.all(
+                    result.filePaths.map(readMetadata)
+                );
+                const failures = attachments.filter(item => item.error);
+                if (failures.length) {
+                    throw new Error(
+                        failures
+                            .map(item => `${item.name}: ${item.error}`)
+                            .join("\n")
+                    );
+                }
+                return attachments;
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:import",
+        (_event, paths?: string | string[]) =>
+            documentAction(async () => {
+                if (!scenario.current) {
+                    throw new Error(
+                        "Open or create a scenario before opening images."
+                    );
+                }
+                const extensions = new Set(
+                    imagePlugins.filters.flatMap(filter => filter.extensions)
+                );
+                if (!extensions.size) {
+                    throw new Error(
+                        "Install an image plugin before opening images."
+                    );
+                }
+                const selected =
+                    paths === undefined
+                        ? await dialog.showOpenDialog(mainWindow, {
+                              title: "Add images or ZIP",
+                              filters: [
+                                  {
+                                      name: "Images, ZIP and metadata",
+                                      extensions: [...extensions, "zip", "json"]
+                                  },
+                                  ...imagePlugins.filters,
+                                  { name: "ZIP archives", extensions: ["zip"] },
+                                  {
+                                      name: "JSON metadata",
+                                      extensions: ["json"]
+                                  }
+                              ],
+                              properties: ["openFile", "multiSelections"]
+                          })
+                        : {
+                              canceled: false,
+                              filePaths:
+                                  typeof paths === "string" ? [paths] : paths
+                          };
+                if (selected.canceled || !selected.filePaths.length) {
+                    return { errors: [] };
+                }
+                if (
+                    !Array.isArray(selected.filePaths) ||
+                    selected.filePaths.length > 1000 ||
+                    !selected.filePaths.every(
+                        file => typeof file === "string" && file.length > 0
+                    )
+                ) {
+                    throw new Error("Invalid image selection.");
+                }
+                const batch = await prepareImport(
+                    selected.filePaths,
+                    path.join(app.getPath("userData"), "imports"),
+                    extensions
+                );
+                if (batch.entries.length > 1000) {
+                    throw new Error("Import at most 1,000 images at a time.");
+                }
+                const updates: ImageImportUpdate[] = [];
+                const send = (update: ImageImportUpdate) => {
+                    updates.push(update);
+                    if (!mainWindow.webContents.isDestroyed()) {
+                        mainWindow.webContents.send(
+                            "image:import-update",
+                            update
+                        );
+                    }
+                };
+                for (const [index, entry] of batch.entries.entries()) {
+                    const key = `${index}:${entry.filePath}`;
+                    const loading: ImageInfo = {
+                        name: path.basename(entry.filePath),
+                        path: entry.filePath,
+                        pluginId: "",
+                        pluginName: "Loading…"
+                    };
+                    send({ key, status: "loading", image: loading });
+                    try {
+                        const image = await imagePlugins.open(entry.filePath);
+                        if (entry.metadata.length) {
+                            image.attachedMetadata = entry.metadata;
+                        }
+                        send({ key, status: "ready", image });
+                    } catch (cause) {
+                        const error =
+                            cause instanceof Error
+                                ? cause.message
+                                : String(cause);
+                        batch.errors.push(`${loading.name}: ${error}`);
+                        send({ key, status: "error", error });
+                    }
+                }
+                return { errors: batch.errors, updates };
             })
     );
     mainWindow.webContents.ipc.handle(

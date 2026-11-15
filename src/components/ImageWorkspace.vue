@@ -192,6 +192,14 @@
                                 <dd>{{ value ?? "Not available" }}</dd>
                             </template>
                         </dl>
+                        <AttachedMetadata
+                            :attachments="widget.image.attachedMetadata ?? []"
+                            :candidates="metadataAxesCandidates(widget.image)"
+                            :axes-source="widget.image.axesSource ?? 'pixel'"
+                            :has-embedded-axes="!!widget.image.embeddedAxes"
+                            :notice="widget.image.axesNotice"
+                            :axes-preference="widget.metadataAxesSource"
+                            @select-axes="selectMetadataAxes(widget, $event)" />
                     </aside>
                 </div>
                 <div class="widget-status" :title="widget.image.path">
@@ -249,6 +257,12 @@ import type {
     RestoredImageWindow,
     SavedImageWindow
 } from "@/types/workspace";
+import {
+    metadataAxesCandidates,
+    resolveMetadataAxes
+} from "@/utils/metadata-axes";
+import AttachedMetadata from "./AttachedMetadata.vue";
+import type { MetadataAttachment } from "@/types/metadata";
 import ImageSliceView from "./ImageSliceView.vue";
 import LineGraph from "./LineGraph.vue";
 import { sliceAxes, slicePosition } from "@/utils/slice-axes";
@@ -277,7 +291,14 @@ interface ImageWindow {
     sliceEnabled?: boolean;
     pixelValuesEnabled?: boolean;
     axesEnabled?: boolean;
-    graph?: { data?: SliceData; source: ImageInfo; selection: SliceSelection };
+    metadataAxesSource?: string;
+    graph?: {
+        data?: SliceData;
+        rawData?: SliceData;
+        source: ImageInfo;
+        sourceId?: number | undefined;
+        selection: SliceSelection;
+    };
 }
 const activeWidget = computed(() =>
     windows.value.find(
@@ -287,6 +308,71 @@ const activeWidget = computed(() =>
 function toggleMetadata() {
     if (activeWidget.value && !activeWidget.value.graph) {
         activeWidget.value.metadataOpen = !activeWidget.value.metadataOpen;
+    }
+}
+function refreshMetadataAxes(widget: ImageWindow) {
+    widget.image = resolveMetadataAxes(widget.image, widget.metadataAxesSource);
+    for (const item of windows.value) {
+        if (item.graph?.sourceId === widget.id) {
+            item.graph.source = widget.image;
+            if (item.graph.rawData) {
+                item.graph.data = sliceAxes(
+                    item.graph.rawData,
+                    widget.image,
+                    item.graph.selection.orientation
+                );
+            }
+            const { orientation, index } = item.graph.selection;
+            item.image.name = `${orientation === "horizontal" ? "Horizontal" : "Vertical"} slice: ${widget.image.name} · ${slicePosition(widget.image, orientation, index)}`;
+        }
+    }
+}
+function selectMetadataAxes(widget: ImageWindow, source: string) {
+    if (
+        source !== "embedded" &&
+        !metadataAxesCandidates(widget.image).some(
+            item => item.path === source && item.axes
+        )
+    ) {
+        return;
+    }
+    widget.metadataAxesSource = source;
+    refreshMetadataAxes(widget);
+    widget.axesEnabled = true;
+}
+let attachingMetadata = false;
+async function attachMetadata() {
+    const widget = activeWidget.value;
+    if (!widget || widget.graph || widget.loading || attachingMetadata) {
+        return;
+    }
+    attachingMetadata = true;
+    try {
+        const incoming = await window.images!.attachMetadata(widget.image.path);
+        if (incoming) {
+            const merged = [
+                ...new Map(
+                    [...(widget.image.attachedMetadata ?? []), ...incoming].map(
+                        item => [item.path, item]
+                    )
+                ).values()
+            ] as MetadataAttachment[];
+            if (merged.length > 32) {
+                throw new Error("Attach at most 32 metadata files per image.");
+            }
+            widget.image.attachedMetadata = merged;
+            refreshMetadataAxes(widget);
+            widget.metadataOpen = true;
+        }
+    } catch (cause) {
+        emit(
+            "metadataError",
+            cause instanceof Error
+                ? cause.message
+                : "Unable to attach metadata."
+        );
+    } finally {
+        attachingMetadata = false;
     }
 }
 function toggleStatistics() {
@@ -339,6 +425,7 @@ async function createSliceGraph(
     );
     windows.value.find(widget => widget.id === id)!.graph = {
         source,
+        sourceId: windows.value.find(item => item.image === source)?.id,
         selection: { orientation, index }
     };
     try {
@@ -353,7 +440,12 @@ async function createSliceGraph(
             : await previewSlice(source, orientation, index);
         const widget = windows.value.find(widget => widget.id === id);
         if (widget?.graph) {
-            widget.graph.data = sliceAxes(data, source, orientation);
+            widget.graph.rawData = data;
+            widget.graph.data = sliceAxes(
+                data,
+                widget.graph.source,
+                orientation
+            );
             widget.loading = false;
         }
     } catch (cause) {
@@ -387,7 +479,12 @@ async function setScaling(scaling: Scaling) {
                 selection.index,
                 scaling
             );
-            widget.graph.data = sliceAxes(data, source, selection.orientation);
+            widget.graph.rawData = data;
+            widget.graph.data = sliceAxes(
+                data,
+                widget.graph.source,
+                selection.orientation
+            );
             widget.image.scaling = scaling;
         } else {
             const image = await window.images!.rescale(
@@ -395,7 +492,11 @@ async function setScaling(scaling: Scaling) {
                 widget.image.pluginId,
                 scaling
             );
+            if (widget.image.attachedMetadata) {
+                image.attachedMetadata = widget.image.attachedMetadata;
+            }
             widget.image = image;
+            refreshMetadataAxes(widget);
         }
         delete widget.error;
     } catch (cause) {
@@ -446,7 +547,7 @@ function add(image: ImageInfo, loading = false) {
     const position = (windows.value.length % 8) * 28 + 16;
     const widget: ImageWindow = {
         id: ++sequence,
-        image,
+        image: resolveMetadataAxes(image),
         loading,
         rect: fitWindow(
             { x: position, y: position, width: 520, height: 360 },
@@ -465,7 +566,7 @@ function complete(id: number, image: ImageInfo) {
     if (!widget) {
         return;
     }
-    widget.image = image;
+    widget.image = resolveMetadataAxes(image, widget.metadataAxesSource);
     widget.loading = false;
 }
 function fail(id: number, message: string) {
@@ -482,7 +583,17 @@ function snapshot(): SavedImageWindow[] {
         .filter(widget => widget.image.pluginId && !widget.graph)
         .map(widget => ({
             id: widget.id,
+            ...(widget.metadataAxesSource !== undefined
+                ? { metadataAxesSource: widget.metadataAxesSource }
+                : {}),
             ...(widget.image.scaling ? { scaling: widget.image.scaling } : {}),
+            ...(widget.image.attachedMetadata?.length
+                ? {
+                      metadataFiles: widget.image.attachedMetadata.map(
+                          item => item.path
+                      )
+                  }
+                : {}),
             path: widget.image.path,
             pluginId: widget.image.pluginId,
             rect: { ...widget.rect },
@@ -494,7 +605,10 @@ function snapshot(): SavedImageWindow[] {
 function hydrate(saved: RestoredImageWindow[]) {
     windows.value = saved.map(widget => ({
         id: widget.id,
-        image: widget.image,
+        image: resolveMetadataAxes(widget.image, widget.metadataAxesSource),
+        ...(widget.metadataAxesSource !== undefined
+            ? { metadataAxesSource: widget.metadataAxesSource }
+            : {}),
         loading: widget.loading ?? false,
         rect: fitWindow(widget.rect, bounds),
         minimized: widget.minimized,
@@ -516,6 +630,7 @@ const emit = defineEmits<{
     axesChange: [enabled: boolean];
     scalingChange: [state: ScalingState];
     scalingError: [message: string];
+    metadataError: [message: string];
 }>();
 watch(
     () =>
@@ -581,6 +696,7 @@ defineExpose({
     hydrate,
     snapshot,
     toggleMetadata,
+    attachMetadata,
     toggleStatistics,
     toggleSlice,
     togglePixelValues,
