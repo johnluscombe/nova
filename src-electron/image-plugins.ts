@@ -1,3 +1,4 @@
+import { validateCrop, type ImageCrop } from "../src/types/crop";
 import { validateSiddSettings, type SiddSettings } from "../src/types/sidd";
 import {
     validateFormationProducts,
@@ -30,6 +31,12 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
+    crop?(
+        filePath: string,
+        directory: string,
+        selection: ImageCrop,
+        parameters: PluginParameters
+    ): Promise<string>;
     createSidd?(
         filePath: string,
         outputPath: string,
@@ -240,6 +247,8 @@ export class ImagePlugins {
                     ) &&
                         typeof module.default.executeRibbonAction !==
                             "function") ||
+                    (module.default.crop !== undefined &&
+                        typeof module.default.crop !== "function") ||
                     (module.default.createSidd !== undefined &&
                         typeof module.default.createSidd !== "function") ||
                     (module.default.formSicd !== undefined &&
@@ -534,6 +543,36 @@ export class ImagePlugins {
         return this.open(outputPath, pluginId);
     }
 
+    async crop(
+        filePath: string,
+        pluginId: string,
+        directory: string,
+        selection: ImageCrop
+    ): Promise<ImageInfo> {
+        const image = this.openedImages.get(
+            JSON.stringify([filePath, pluginId])
+        );
+        const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+        if (!image || !plugin?.implementation.crop) {
+            throw new Error("Open an image with crop support first.");
+        }
+        const crop = validateCrop(selection, image.width, image.height);
+        const output = await plugin.implementation.crop(
+            filePath,
+            directory,
+            crop,
+            plugin.manifest.parameters ?? {}
+        );
+        if (
+            typeof output !== "string" ||
+            path.dirname(path.resolve(output)) !== path.resolve(directory) ||
+            output === filePath
+        ) {
+            throw new Error("Plugin returned an invalid cropped image path.");
+        }
+        return this.open(output, pluginId);
+    }
+
     async createSidd(
         filePath: string,
         pluginId: string,
@@ -702,6 +741,10 @@ export class ImagePlugins {
                     }
                 }
                 const info: ImageInfo = {
+                    ...(implementation.crop &&
+                    result.metadata?.Format !== "CPHD"
+                        ? { supportsCrop: true }
+                        : {}),
                     ...(formationProducts ? { formationProducts } : {}),
                     ...(implementation.readRegion
                         ? { supportsSourceRegions: true }

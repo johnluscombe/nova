@@ -860,3 +860,41 @@ test("SIDD creation validates source readiness and settings before invoking the 
             output
         );
     }));
+
+test("crop requests validate the selected source bounds and generated output location", () =>
+    fixture(async (directory, host) => {
+        await plugin(
+            directory,
+            "crop",
+            `import path from 'node:path'; export default { open() { return {width:16,height:12}; }, async crop(source,directory) { return path.join(directory,'crop.test'); } };`
+        );
+        await host.reload();
+        const selection = {
+            left: 2,
+            top: 3,
+            width: 8,
+            height: 6,
+            sourceWidth: 16,
+            sourceHeight: 12
+        };
+        await assert.rejects(
+            host.crop("source.test", "crop", directory, selection),
+            /Open an image/
+        );
+        await host.open("source.test");
+        await assert.rejects(
+            host.crop("source.test", "crop", directory, {
+                ...selection,
+                width: 20
+            }),
+            /inside the image/
+        );
+        const result = await host.crop(
+            "source.test",
+            "crop",
+            directory,
+            selection
+        );
+        assert.equal(result.path, path.join(directory, "crop.test"));
+        assert.equal(result.supportsCrop, true);
+    }));

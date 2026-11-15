@@ -1,3 +1,4 @@
+import type { ImageCrop } from "./crop";
 import type { SiddSettings } from "./sidd";
 import type { FormationProduct, FormationSettings } from "./formation";
 import type { PolygonPoint, RegionStatistics } from "./region";
@@ -44,6 +45,7 @@ export interface ImageInfo extends ImagePluginResult {
     path: string;
     pluginId: string;
     pluginName: string;
+    supportsCrop?: boolean;
     supportsSourceSlices?: boolean;
     supportsSourcePixels?: boolean;
     supportsSourceRegions?: boolean;
@@ -56,6 +58,11 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    crop(
+        filePath: string,
+        pluginId: string,
+        selection: ImageCrop
+    ): Promise<ImageInfo>;
     createSidd(
         filePath: string,
         pluginId: string,

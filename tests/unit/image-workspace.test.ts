@@ -477,3 +477,39 @@ test("SIDD creation keeps the source SICD and opens the derived image in another
         canCreateSidd: false
     });
 });
+
+test("cropping opens a separate widget and retains the original image", async () => {
+    const api = workspace();
+    const crop = vi.fn().mockResolvedValue({
+        ...image,
+        name: "image-crop.png",
+        path: "/image-crop.png",
+        width: 8,
+        height: 6
+    });
+    window.images = { crop } as unknown as NonNullable<Window["images"]>;
+    api.add({ ...image, supportsCrop: true });
+    await nextTick();
+    api.toggleCrop();
+    await nextTick();
+    expect(wrapper.emitted("cropChange")?.at(-1)).toEqual([
+        { available: true, active: true }
+    ]);
+    const selection = {
+        left: 2,
+        top: 3,
+        width: 8,
+        height: 6,
+        sourceWidth: 80,
+        sourceHeight: 40
+    };
+    wrapper
+        .findComponent({ name: "ImageSliceView" })
+        .vm.$emit("crop", selection);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(crop).toHaveBeenCalledWith(image.path, image.pluginId, selection);
+    expect(api.snapshot().map(item => item.path)).toEqual([
+        image.path,
+        "/image-crop.png"
+    ]);
+});

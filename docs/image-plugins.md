@@ -202,7 +202,7 @@ return {
 };
 ```
 
-Home's View group's Metadata button toggles a panel to the right of the
+The contextual image tab's View group's Metadata button toggles a panel to the right of the
 active widget's image. File details and dimensions are always available; plugin
 fields appear when decoding finishes, including when restoring saved widgets.
 Metadata is displayed as text. Results allow up to 200 fields, labels up to 200
@@ -210,7 +210,7 @@ characters, and string values up to 10,000 characters. Nested objects are reject
 
 ## Image statistics
 
-The contextual image tab's Analysis group's Statistics button toggles a panel below the active
+The contextual image tab's View group's Statistics button toggles a panel below the active
 widget's image, independently of Metadata. Plugins may return a `statistics`
 object using the same scalar values and size limits as `metadata`, for example
 `{ statistics: { "50th percentile": 2.5 } }`.
@@ -352,12 +352,12 @@ so selected coordinate sources also apply consistently to slice graphs. See
 
 ## Built-in image ribbon
 
-Home's View group contains Metadata, Axes, and Pixel Values. The
-contextual Scientific Imagery tab appears for active widgets opened with
+The contextual Scientific Imagery tab appears for active widgets opened with
 `nova.sicd`, including their slice graphs. Other image widgets use a contextual
-Image tab. Both provide a Data group (Attach Metadata) and an Analysis group
-(Statistics, Scaling, Polygon, Clear Region, and Slice), enabling actions according to the active widget's
-capabilities. Plugin-contributed tabs keep their own contents. The ribbon returns
+Image tab. Both provide View (Metadata, Axes, Pixel Values, Statistics),
+Edit (Scaling, Crop), Analysis (Polygon, Clear Region, Slice), and Data
+(Attach Metadata) groups, enabling actions according to the active widget's
+capabilities. Scientific Imagery also provides Form SICD and Create SIDD in Data. Plugin-contributed tabs keep their own contents. The ribbon returns
 to Home if its contextual tab loses the active widget.
 
 Plugins can implement `readRegion` to compute polygon percentiles from source
@@ -391,3 +391,13 @@ Plugins may implement
 requires an opened source, assigns a new output path, and opens the completed
 product using the same plugin. Scientific Imagery exposes this through Create SIDD
 for active SICD image windows. Configuration is global through Settings.
+
+### Cropping
+
+Plugins may implement `crop(filePath, directory, selection, parameters):
+Promise<string>`. `ImageCrop` in `src/types/crop.ts` specifies integer source-pixel
+left/top, width/height, and source dimensions. The host validates the selection
+against known dimensions and requires the returned file to be directly inside
+the assigned output directory. The same plugin opens the result. Plugins choose
+the output format and must preserve source pixels and appropriate spatial
+metadata. ImageInfo exposes `supportsCrop` for capable decoders.

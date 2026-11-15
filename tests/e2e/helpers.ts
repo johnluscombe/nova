@@ -35,10 +35,14 @@ export async function selectRibbonFor(page: Page, label: string) {
         "Attach Metadata",
         "Form SICD",
         "Create SIDD",
+        "Metadata",
+        "Axes",
+        "Pixel Values",
         "Statistics",
         "Scaling",
         "Slice",
         "Polygon",
+        "Crop",
         "Clear Region"
     ].includes(label);
     await page

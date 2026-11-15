@@ -130,10 +130,22 @@
                                 <ImageSliceView
                                     v-else-if="widget.image.previewDataUrl"
                                     :image="widget.image"
-                                    :enabled="!!widget.sliceEnabled"
-                                    :inspect="!!widget.pixelValuesEnabled"
+                                    :enabled="
+                                        !!widget.sliceEnabled &&
+                                        !widget.cropping
+                                    "
+                                    :inspect="
+                                        !!widget.pixelValuesEnabled &&
+                                        !widget.cropping
+                                    "
                                     :axes="!!widget.axesEnabled"
-                                    :drawing="!!widget.polygonDrawing"
+                                    :drawing="
+                                        !!widget.polygonDrawing &&
+                                        !widget.cropping
+                                    "
+                                    :cropping="!!widget.cropping"
+                                    @crop="cropImage(widget, $event)"
+                                    @cancel-crop="widget.cropping = false"
                                     :polygon="widget.region"
                                     @region="selectRegion(widget, $event)"
                                     @cancel-region="
@@ -381,6 +393,7 @@ import type {
 } from "@/types/region";
 import AttachedMetadata from "./AttachedMetadata.vue";
 import type { MetadataAttachment } from "@/types/metadata";
+import type { ImageCrop } from "@/types/crop";
 import FormationNavigator from "./FormationNavigator.vue";
 import ImageSliceView from "./ImageSliceView.vue";
 import LineGraph from "./LineGraph.vue";
@@ -416,6 +429,7 @@ interface ImageWindow {
     pixelValuesEnabled?: boolean;
     axesEnabled?: boolean;
     polygonDrawing?: boolean;
+    cropping?: boolean;
     region?: PolygonPoint[];
     regionResult?: RegionStatistics;
     regionBusy?: boolean;
@@ -682,9 +696,42 @@ async function refreshRegion(widget: ImageWindow) {
         }
     }
 }
+function toggleCrop() {
+    const widget = activeWidget.value;
+    if (canSlice.value && widget?.image.supportsCrop) {
+        widget.cropping = !widget.cropping;
+        widget.polygonDrawing = false;
+    }
+}
+async function cropImage(widget: ImageWindow, selection: ImageCrop) {
+    widget.cropping = false;
+    const source = widget.image;
+    const id = add(
+        {
+            name: `${source.name} — cropping`,
+            path: "",
+            pluginId: "",
+            pluginName: source.pluginName
+        },
+        true
+    );
+    try {
+        complete(
+            id,
+            await window.images!.crop(source.path, source.pluginId, {
+                ...selection
+            })
+        );
+    } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        fail(id, message);
+        emit("scalingError", message);
+    }
+}
 function togglePolygon() {
     const widget = activeWidget.value;
     if (canSlice.value && widget) {
+        widget.cropping = false;
         widget.polygonDrawing = !widget.polygonDrawing;
     }
 }
@@ -1095,6 +1142,7 @@ const emit = defineEmits<{
     activeChange: [available: boolean];
     imageContextChange: [context: ImageContext];
     regionChange: [state: RegionState];
+    cropChange: [state: { available: boolean; active: boolean }];
     statisticsChange: [available: boolean];
     sliceChange: [available: boolean];
     sliceModeChange: [enabled: boolean];
@@ -1104,6 +1152,14 @@ const emit = defineEmits<{
     scalingError: [message: string];
     metadataError: [message: string];
 }>();
+watch(
+    () => ({
+        available: canSlice.value && !!activeWidget.value?.image.supportsCrop,
+        active: !!activeWidget.value?.cropping
+    }),
+    state => emit("cropChange", state),
+    { immediate: true }
+);
 watch(
     () => ({
         available: canSlice.value,
@@ -1217,6 +1273,7 @@ defineExpose({
     toggleSlice,
     togglePixelValues,
     toggleAxes,
+    toggleCrop,
     togglePolygon,
     clearRegion,
     setScaling,

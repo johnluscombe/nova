@@ -1,3 +1,4 @@
+import type { ImageCrop } from "../src/types/crop";
 import type { SiddSettings } from "../src/types/sidd";
 import type { FormationSettings } from "../src/types/formation";
 import { randomUUID } from "node:crypto";
@@ -348,6 +349,27 @@ async function createWindow() {
                     pluginId,
                     outputPath,
                     settings
+                );
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:crop",
+        (_event, filePath: string, pluginId: string, selection: ImageCrop) =>
+            documentAction(async () => {
+                if (!scenario.current) {
+                    throw new Error("Open a scenario before cropping images.");
+                }
+                const directory = path.join(
+                    app.getPath("userData"),
+                    "cropped-images",
+                    randomUUID()
+                );
+                await mkdir(directory, { recursive: true });
+                return imagePlugins.crop(
+                    filePath,
+                    pluginId,
+                    directory,
+                    selection
                 );
             })
     );

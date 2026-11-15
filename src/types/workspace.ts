@@ -96,6 +96,7 @@ export interface ImageWorkspaceAPI {
     toggleSlice(): void;
     togglePixelValues(): void;
     toggleAxes(): void;
+    toggleCrop(): void;
     togglePolygon(): void;
     clearRegion(): Promise<void>;
     createSidd(): Promise<void>;

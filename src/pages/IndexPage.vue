@@ -121,46 +121,6 @@
                         </div>
                     </div>
                 </template>
-                <div
-                    class="ribbon-group"
-                    role="group"
-                    aria-labelledby="view-group-label"
-                    v-if="activeTab === 'home'">
-                    <div class="ribbon-actions">
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="info"
-                            label="Metadata"
-                            :disable="!hasActiveWidget"
-                            @click="workspace?.toggleMetadata()" />
-
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="square_foot"
-                            label="Axes"
-                            :disable="!hasSliceImage"
-                            :aria-pressed="axesActive"
-                            :color="axesActive ? 'primary' : undefined"
-                            @click="workspace?.toggleAxes()" />
-                        <q-btn
-                            flat
-                            stack
-                            no-caps
-                            icon="my_location"
-                            label="Pixel Values"
-                            :disable="!hasSliceImage"
-                            :aria-pressed="pixelValuesActive"
-                            :color="pixelValuesActive ? 'primary' : undefined"
-                            @click="workspace?.togglePixelValues()" />
-                    </div>
-                    <div id="view-group-label" class="ribbon-group-label">
-                        View
-                    </div>
-                </div>
                 <template
                     v-if="
                         activeTab === 'image-tools' && imageContext.available
@@ -168,44 +128,39 @@
                     <div
                         class="ribbon-group"
                         role="group"
-                        aria-labelledby="data-group-label">
+                        aria-labelledby="view-group-label">
                         <div class="ribbon-actions">
                             <q-btn
                                 flat
                                 stack
                                 no-caps
-                                icon="attach_file"
-                                label="Attach Metadata"
-                                :disable="busy || !hasActiveWidget"
-                                @click="workspace?.attachMetadata()" />
+                                icon="info"
+                                label="Metadata"
+                                :disable="!hasActiveWidget"
+                                @click="workspace?.toggleMetadata()" />
+
                             <q-btn
-                                v-if="imageContext.scientific"
                                 flat
                                 stack
                                 no-caps
-                                icon="auto_fix_high"
-                                label="Form SICD"
-                                :disable="busy || !imageContext.canFormSicd"
-                                @click="formSicd" />
+                                icon="square_foot"
+                                label="Axes"
+                                :disable="!hasSliceImage"
+                                :aria-pressed="axesActive"
+                                :color="axesActive ? 'primary' : undefined"
+                                @click="workspace?.toggleAxes()" />
                             <q-btn
-                                v-if="imageContext.scientific"
                                 flat
                                 stack
                                 no-caps
-                                icon="image"
-                                label="Create SIDD"
-                                :disable="busy || !imageContext.canCreateSidd"
-                                @click="createSidd" />
-                        </div>
-                        <div id="data-group-label" class="ribbon-group-label">
-                            Data
-                        </div>
-                    </div>
-                    <div
-                        class="ribbon-group"
-                        role="group"
-                        aria-labelledby="analysis-group-label">
-                        <div class="ribbon-actions">
+                                icon="my_location"
+                                label="Pixel Values"
+                                :disable="!hasSliceImage"
+                                :aria-pressed="pixelValuesActive"
+                                :color="
+                                    pixelValuesActive ? 'primary' : undefined
+                                "
+                                @click="workspace?.togglePixelValues()" />
                             <q-btn
                                 flat
                                 stack
@@ -214,6 +169,16 @@
                                 label="Statistics"
                                 :disable="!hasActiveStatistics"
                                 @click="workspace?.toggleStatistics()" />
+                        </div>
+                        <div id="view-group-label" class="ribbon-group-label">
+                            View
+                        </div>
+                    </div>
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="edit-group-label">
+                        <div class="ribbon-actions">
                             <q-btn
                                 flat
                                 stack
@@ -266,6 +231,64 @@
                                     </q-list>
                                 </q-menu>
                             </q-btn>
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="crop"
+                                label="Crop"
+                                :disable="busy || !cropState.available"
+                                :aria-pressed="cropState.active"
+                                :color="
+                                    cropState.active ? 'primary' : undefined
+                                "
+                                @click="workspace?.toggleCrop()" />
+                        </div>
+                        <div id="edit-group-label" class="ribbon-group-label">
+                            Edit
+                        </div>
+                    </div>
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="data-group-label">
+                        <div class="ribbon-actions">
+                            <q-btn
+                                flat
+                                stack
+                                no-caps
+                                icon="attach_file"
+                                label="Attach Metadata"
+                                :disable="busy || !hasActiveWidget"
+                                @click="workspace?.attachMetadata()" />
+                            <q-btn
+                                v-if="imageContext.scientific"
+                                flat
+                                stack
+                                no-caps
+                                icon="auto_fix_high"
+                                label="Form SICD"
+                                :disable="busy || !imageContext.canFormSicd"
+                                @click="formSicd" />
+                            <q-btn
+                                v-if="imageContext.scientific"
+                                flat
+                                stack
+                                no-caps
+                                icon="image"
+                                label="Create SIDD"
+                                :disable="busy || !imageContext.canCreateSidd"
+                                @click="createSidd" />
+                        </div>
+                        <div id="data-group-label" class="ribbon-group-label">
+                            Data
+                        </div>
+                    </div>
+                    <div
+                        class="ribbon-group"
+                        role="group"
+                        aria-labelledby="analysis-group-label">
+                        <div class="ribbon-actions">
                             <q-btn
                                 flat
                                 stack
@@ -430,6 +453,7 @@
                 @active-change="hasActiveWidget = $event"
                 @image-context-change="imageContext = $event"
                 @region-change="regionState = $event"
+                @crop-change="cropState = $event"
                 @statistics-change="hasActiveStatistics = $event"
                 @slice-change="hasSliceImage = $event"
                 @slice-mode-change="sliceModeActive = $event"
@@ -478,6 +502,7 @@ const workspace = ref<ImageWorkspaceAPI>();
 const sliceModeActive = ref(false);
 const pixelValuesActive = ref(false);
 const axesActive = ref(false);
+const cropState = ref({ available: false, active: false });
 const regionState = ref<RegionState>({
     available: false,
     drawing: false,

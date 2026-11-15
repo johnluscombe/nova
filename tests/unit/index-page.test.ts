@@ -78,6 +78,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        crop: vi.fn(),
         createSidd: vi.fn(),
         formSicd: vi.fn(),
         region: vi.fn(),
@@ -309,11 +310,11 @@ test("image drops keep the existing loading and failure behavior", async () => {
     expect(scenarioMock.open).not.toHaveBeenCalled();
 });
 
-test("contextual image tabs separate data and analysis from Home viewing controls", async () => {
+test("contextual image tabs organize View, Edit, and Analysis controls", async () => {
     await page();
     const labels = () =>
         wrapper!.findAll("button").map(button => button.text());
-    expect(labels()).toContain("Metadata");
+    expect(labels()).not.toContain("Metadata");
     expect(labels()).not.toContain("Slice");
     expect(labels()).not.toContain("Statistics");
     const workspaceComponent = wrapper!.getComponent({
@@ -333,13 +334,26 @@ test("contextual image tabs separate data and analysis from Home viewing control
         wrapper!.get('[aria-labelledby="data-group-label"]').text()
     ).toContain("Attach Metadata");
     expect(
-        wrapper!.get('[aria-labelledby="analysis-group-label"]').text()
+        wrapper!.get('[aria-labelledby="edit-group-label"]').text()
     ).toContain("Scaling");
     expect(labels()).toContain("Slice");
     expect(
-        wrapper!.get('[aria-labelledby="analysis-group-label"]').text()
+        wrapper!.get('[aria-labelledby="view-group-label"]').text()
     ).toContain("Statistics");
-    expect(labels()).not.toContain("Metadata");
+    for (const label of ["Metadata", "Axes", "Pixel Values", "Statistics"]) {
+        expect(
+            wrapper!.get('[aria-labelledby="view-group-label"]').text()
+        ).toContain(label);
+    }
+    expect(
+        wrapper!.get('[aria-labelledby="edit-group-label"]').text()
+    ).toContain("Crop");
+    for (const label of ["Slice", "Polygon", "Clear Region"]) {
+        expect(
+            wrapper!.get('[aria-labelledby="analysis-group-label"]').text()
+        ).toContain(label);
+    }
+    expect(labels()).toContain("Metadata");
     workspaceComponent.vm.$emit("imageContextChange", {
         available: true,
         scientific: false
@@ -356,7 +370,7 @@ test("contextual image tabs separate data and analysis from Home viewing control
         scientific: false
     });
     await flushPromises();
-    expect(labels()).toContain("Metadata");
+    expect(labels()).not.toContain("Metadata");
     expect(labels()).not.toContain("Slice");
     expect(labels()).not.toContain("Statistics");
 });

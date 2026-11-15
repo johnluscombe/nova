@@ -33,6 +33,10 @@ test.use({
             path.join(folder, "index.ts"),
             "utf8"
         ),
+        "scientific-imagery/crop.py": readFileSync(
+            path.join(folder, "crop.py"),
+            "utf8"
+        ),
         "scientific-imagery/sidd_creation.py": readFileSync(
             path.join(folder, "sidd_creation.py"),
             "utf8"
@@ -529,5 +533,66 @@ fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
     await chooseFile(application, scenario);
     await clickRibbon(page, "Open");
     await expect(detected.getByRole("img")).toBeVisible();
+    await expect(source.getByRole("img")).toBeVisible();
+});
+
+test("cropping a SICD preserves a scientific source product and restores it", async ({
+    application,
+    profile
+}) => {
+    try {
+        await execute(python, ["-c", "import sarpy, numpy"]);
+    } catch {
+        test.skip(
+            true,
+            "SICD cropping requires Scientific Imagery Python dependencies."
+        );
+    }
+    await execute(python, [
+        "-c",
+        `import runpy,pathlib,sys
+sys.dont_write_bytecode=True
+fixtures=runpy.run_path(sys.argv[1])
+fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
+        path.resolve("src-electron/sidd-creation.test.py"),
+        profile
+    ]);
+    const page = await application.firstWindow();
+    const scenario = await createScenario(application, page, profile);
+    await chooseFile(application, path.join(profile, "source.sicd"));
+    await clickRibbon(page, "Add Image");
+    const source = page.getByRole("article", {
+        name: "source.sicd",
+        exact: true
+    });
+    await expect(source.getByRole("img")).toBeVisible();
+    await clickRibbon(page, "Crop");
+    const bounds = (await source.locator(".slice-viewport").boundingBox())!;
+    const scale = Math.min(bounds.width / 64, bounds.height / 64);
+    const left = bounds.x + (bounds.width - 64 * scale) / 2;
+    const top = bounds.y + (bounds.height - 64 * scale) / 2;
+    await page.mouse.move(left + 16.1 * scale, top + 16.1 * scale);
+    await page.mouse.down();
+    await page.mouse.move(left + 47.9 * scale, top + 47.9 * scale);
+    await page.mouse.up();
+    await source
+        .getByRole("button", { name: "Create Crop", exact: true })
+        .click();
+    const cropped = page.getByRole("article", {
+        name: "source-crop.sicd",
+        exact: true
+    });
+    await expect(cropped.getByRole("img")).toBeVisible();
+    await expect(cropped).toContainText("32 × 32");
+    await clickRibbon(page, "Metadata");
+    await expect(cropped).toContainText("SICD / NITF");
+    await selectRibbonFor(page, "Create SIDD");
+    await expect(
+        page.getByRole("button", { name: "Create SIDD", exact: true })
+    ).toBeEnabled();
+    await clickRibbon(page, "Close");
+    await chooseFile(application, scenario);
+    await clickRibbon(page, "Open");
+    await expect(cropped.getByRole("img")).toBeVisible();
     await expect(source.getByRole("img")).toBeVisible();
 });

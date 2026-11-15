@@ -69,6 +69,8 @@ contextBridge.exposeInMainWorld("images", {
             scaling
         ),
     pathForFile: (file: File) => webUtils.getPathForFile(file),
+    crop: (filePath, pluginId, selection) =>
+        ipcRenderer.invoke("image:crop", filePath, pluginId, selection),
     createSidd: (filePath, pluginId, settings) =>
         ipcRenderer.invoke("image:create-sidd", filePath, pluginId, settings),
     formSicd: (filePath, pluginId, settings) =>

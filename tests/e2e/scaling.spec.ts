@@ -122,7 +122,7 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
         name: "Pixel Values",
         exact: true
     });
-    await expect(toggle).toBeDisabled();
+    await expect(toggle).toHaveCount(0);
     await createScenario(application, page, profile);
     const file = path.join(profile, "hover.complex");
     await writeFile(file, "complex fixture");
@@ -147,10 +147,19 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
         viewport.x + left + 5.5 * scale,
         viewport.y + top + 3.5 * scale
     );
-    await expect(source.getByRole("status")).toContainText("Row 3 · Column 5");
-    await expect(source.getByRole("status")).toContainText(
-        "Source amplitude: 125"
-    );
+    await expect(async () => {
+        await page.mouse.move(
+            viewport.x + left + 5.5 * scale,
+            viewport.y + top + 3.5 * scale
+        );
+        await expect(source.getByRole("status")).toContainText(
+            "Row 3 · Column 5"
+        );
+        await expect(source.getByRole("status")).toContainText(
+            "Source amplitude: 125",
+            { timeout: 1000 }
+        );
+    }).toPass();
     await page.mouse.move(viewport.x + 1, viewport.y + 1);
     await expect(source.locator(".pixel-readout")).toHaveCount(0);
     await clickRibbon(page, "Scaling");
@@ -184,8 +193,8 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     await expect(
         raster.getByRole("img", { name: "red.svg", exact: true })
     ).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await selectRibbonFor(page, "Pixel Values");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await toggle.click();
     const bounds = (await raster.locator(".slice-viewport").boundingBox())!;
     await page.mouse.move(
@@ -204,7 +213,7 @@ test("image axes display source distances and remain aligned with slicing and ho
 }) => {
     const page = await application.firstWindow();
     const toggle = page.getByRole("button", { name: "Axes", exact: true });
-    await expect(toggle).toBeDisabled();
+    await expect(toggle).toHaveCount(0);
     await createScenario(application, page, profile);
     const file = path.join(profile, "axes.complex");
     await writeFile(file, "fixture");

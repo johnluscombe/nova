@@ -55,7 +55,7 @@ in memory. Source dimensions are retained for slicing.
 
 ## Scaling
 
-**Scientific Imagery → Analysis → Scaling** changes the active image or slice graph. Images update their
+**Scientific Imagery → Edit → Scaling** changes the active image or slice graph. Images update their
 preview and percentile statistics; new slices inherit the image's mode. Each
 existing graph can also be scaled independently. Image modes are saved in the
 scenario; graph windows remain temporary.
@@ -311,3 +311,27 @@ These are display-mapped detected intensities, not complex samples or calibrated
 backscatter values. Creating a SIDD does not calibrate an uncalibrated SICD and
 does not apply a terrain model. The SICD's current preview scaling selection does
 not affect conversion: the operation always reads the original complex samples.
+
+## Cropping images
+
+Select an image window, then choose **Image / Scientific Imagery → Edit →
+Crop**. Drag a rectangle over the image and click **Create Crop** or press Enter.
+The overlay shows the selected dimensions in source pixels. Cancel or Escape
+leaves the source unchanged. A new loading widget opens for the cropped image;
+the completed file is stored in Nova's application-data `cropped-images`
+directory and reopens with the scenario.
+
+Cropping reads original pixels, not the contrast-stretched preview:
+
+- SICD produces a SICD chip, preserving complex samples, calibration metadata,
+  and source-grid offsets used by axes and pixel analysis.
+- Plane-projected SIDD produces a SIDD with adjusted reference pixels, time
+  polynomial, valid-data region, and geographic footprint.
+- TIFF preserves source pixel depth and updates supported GeoTIFF tiepoints or
+  transformations.
+- PNG and JPEG produce lossless PNG crops of their decoded source pixels.
+- SVG produces a clipped SVG containing the source vector image.
+
+CPHD phase history and display-only intermediate products do not expose Crop.
+Original images are never overwritten. Source JSON metadata attachments are not
+copied to the new product; attach metadata to the crop separately if needed.

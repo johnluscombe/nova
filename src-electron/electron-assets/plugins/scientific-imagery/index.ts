@@ -1,3 +1,4 @@
+import type { ImageCrop } from "../../../../src/types/crop.ts";
 import type { SiddSettings } from "../../../../src/types/sidd.ts";
 import { readFile, stat } from "node:fs/promises";
 import type { FormationSettings } from "../../../../src/types/formation.ts";
@@ -250,7 +251,25 @@ export async function createSidd(
         600_000
     );
 }
+export async function cropImage(
+    filePath: string,
+    directory: string,
+    selection: ImageCrop,
+    parameters: PluginParameters = {},
+    run: Runner = execute
+): Promise<string> {
+    const result = (await executeReader(
+        filePath,
+        parameters,
+        run,
+        ["--crop", directory, JSON.stringify(selection)],
+        600_000
+    )) as { path: string };
+    return result.path;
+}
 export default {
+    crop: (filePath, directory, selection, parameters) =>
+        cropImage(filePath, directory, selection, parameters),
     createSidd: (filePath, outputPath, settings, parameters) =>
         createSidd(filePath, outputPath, settings, parameters),
     formSicd: (filePath, outputPath, settings, parameters) =>

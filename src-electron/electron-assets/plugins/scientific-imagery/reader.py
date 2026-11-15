@@ -614,7 +614,10 @@ def main():
             argv = argv[:-2]
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(argv) == 5 and argv[2] == "--create-sidd":
+            if len(argv) == 5 and argv[2] == "--crop":
+                from crop import crop_image
+                result = crop_image(argv[1], argv[3], json.loads(argv[4]), open_image_reader, tiff_decode_guard)
+            elif len(argv) == 5 and argv[2] == "--create-sidd":
                 from sidd_creation import create_sidd
                 result = create_sidd(argv[1], argv[3], json.loads(argv[4]))
             elif len(argv) == 5 and argv[2] == "--form-sicd":
