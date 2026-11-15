@@ -1,3 +1,4 @@
+import type { ImageSaveOptions } from "./image-export";
 import type { ImageCrop } from "./crop";
 import type { SiddSettings } from "./sidd";
 import type { FormationProduct, FormationSettings } from "./formation";
@@ -149,6 +150,13 @@ export interface ImagePluginStatus {
  * Source reads and file writes run through the main process.
  */
 export interface ImageAPI {
+    /**
+     * Save native bytes or convert to the destination raster encoding using the
+     * selected display scaling. Return the destination or null on cancellation.
+     * Always request a destination.
+     */
+    save(filePath: string, options?: ImageSaveOptions): Promise<string | null>;
+
     /**
      * Create a persistent source-pixel crop and return its decoded image
      * information.

@@ -87,6 +87,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        save: vi.fn(),
         crop: vi.fn(),
         createSidd: vi.fn(),
         formSicd: vi.fn(),

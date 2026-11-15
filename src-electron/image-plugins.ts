@@ -35,6 +35,14 @@ import type {
  * operations advertise source-data capabilities.
  */
 export interface ImagePlugin {
+    /** Encode a display raster at source resolution in the requested output format. */
+    exportImage?(
+        filePath: string,
+        outputPath: string,
+        parameters: PluginParameters,
+        scaling?: Scaling
+    ): Promise<void>;
+
     /**
      * Write a crop of original source pixels inside the assigned directory.
      *
@@ -158,6 +166,34 @@ type LoadedPlugin = {
  * boundary.
  */
 export class ImagePlugins {
+    /** Export supported scientific and standard rasters through the configured Python worker. */
+    async exportRaster(
+        filePath: string,
+        outputPath: string,
+        scaling?: Scaling
+    ): Promise<void> {
+        const plugin = this.plugins.find(
+            item => item.manifest.id === "nova.sicd"
+        );
+
+        if (!plugin?.implementation.exportImage) {
+            throw new Error(
+                "This export format requires the Scientific Imagery plugin and its configured Python environment."
+            );
+        }
+
+        if (scaling !== undefined && !isScaling(scaling)) {
+            throw new Error("Invalid export scaling.");
+        }
+
+        await plugin.implementation.exportImage(
+            filePath,
+            outputPath,
+            plugin.manifest.parameters ?? {},
+            scaling
+        );
+    }
+
     private readonly openedImages = new Map<
         string,
         {

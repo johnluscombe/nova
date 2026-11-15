@@ -571,3 +571,35 @@ test("cropping opens a separate widget and retains the original image", async ()
         "/image-crop.png"
     ]);
 });
+
+test("saving targets the active ready image and reports failures without blocking later saves", async () => {
+    let rejectSave: (error: Error) => void = () => {};
+    const save = vi.fn(
+        () =>
+            new Promise<string | null>((_resolve, reject) => {
+                rejectSave = reject;
+            })
+    );
+
+    vi.stubGlobal("images", { save });
+    const api = workspace();
+    const id = api.add(image, true);
+
+    await api.saveImage();
+    expect(save).not.toHaveBeenCalled();
+    api.complete(id, image);
+    const pending = api.saveImage();
+
+    await api.saveImage();
+    expect(save).toHaveBeenCalledExactlyOnceWith(image.path, {
+        pluginId: image.pluginId
+    });
+    rejectSave(new Error("Disk full"));
+    await pending;
+    expect(wrapper.emitted("scalingError")?.at(-1)).toEqual(["Disk full"]);
+    save.mockResolvedValueOnce(null);
+    await api.saveImage();
+    expect(save).toHaveBeenLastCalledWith(image.path, {
+        pluginId: image.pluginId
+    });
+});

@@ -167,6 +167,7 @@ import { useFormationProducts } from "@/composables/useFormationProducts";
 import { previewRegionStatistics } from "@/utils/region-statistics";
 import { useImageProcessing } from "@/composables/useImageProcessing";
 import { useImageStatistics } from "@/composables/useImageStatistics";
+import { rasterizeSvg } from "@/utils/image-export";
 import { useWidgetGestures } from "@/composables/useWidgetGestures";
 import FormationNavigator from "@/components/workspace/FormationNavigator.vue";
 import ImageSliceView from "@/components/image/ImageSliceView.vue";
@@ -176,6 +177,8 @@ import type { ScalingState } from "@/types/scaling";
 import type { ImageInfo } from "@/types/image";
 import { activeScenario } from "@/composables/useScenario";
 import { fitWindow } from "@/utils/window-geometry.ts";
+
+const savingImage = ref(false);
 
 const canvas = ref<HTMLDivElement>();
 const windows = ref<ImageWindow[]>([]);
@@ -228,6 +231,47 @@ const { cropImage, createSliceGraph, formSicd, createSidd, setScaling } =
         diagnosticProduct,
         onError: message => emit("scalingError", message)
     });
+
+/** Save the native source or export its selected display scaling without workspace overlays. */
+async function saveImage() {
+    const widget = activeWidget.value;
+
+    if (
+        !widget ||
+        widget.graph ||
+        widget.loading ||
+        widget.error ||
+        diagnosticProduct(widget) ||
+        !widget.image.path ||
+        savingImage.value ||
+        !window.images
+    ) {
+        return;
+    }
+
+    savingImage.value = true;
+
+    try {
+        const source = widget.image;
+        const svgRaster =
+            source.pluginId === "nova.vector" && source.previewDataUrl
+                ? await rasterizeSvg(source.previewDataUrl)
+                : undefined;
+
+        await window.images.save(source.path, {
+            pluginId: source.pluginId,
+            ...(source.scaling ? { scaling: source.scaling } : {}),
+            ...(svgRaster ? { svgRaster } : {})
+        });
+    } catch (cause) {
+        emit(
+            "scalingError",
+            cause instanceof Error ? cause.message : "Unable to save image."
+        );
+    } finally {
+        savingImage.value = false;
+    }
+}
 
 /**
  * Toggle the active image metadata panel; graph windows do not expose
@@ -705,6 +749,14 @@ watch(
         const source = widget?.graph?.source ?? widget?.image;
 
         return {
+            canSave:
+                !!widget &&
+                !widget.graph &&
+                !widget.loading &&
+                !widget.error &&
+                !diagnosticProduct(widget) &&
+                !!widget.image.path &&
+                !savingImage.value,
             available: !!widget,
             scientific: source?.pluginId === "nova.sicd",
             canCreateSidd:
@@ -812,7 +864,8 @@ defineExpose({
     clearRegion,
     setScaling,
     formSicd,
-    createSidd
+    createSidd,
+    saveImage
 } satisfies ImageWorkspaceAPI);
 
 /**

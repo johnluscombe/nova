@@ -401,3 +401,19 @@ against known dimensions and requires the returned file to be directly inside
 the assigned output directory. The same plugin opens the result. Plugins choose
 the output format and must preserve source pixels and appropriate spatial
 metadata. ImageInfo exposes `supportsCrop` for capable decoders.
+
+## Raster export
+
+The built-in Scientific Imagery plugin implements
+`exportImage(filePath, outputPath, parameters, scaling): Promise<void>` for
+PNG, JPEG, TIFF, BMP, and WebP encoding. The host supplies a temporary output
+path with the requested extension and moves it to the chosen destination only
+after encoding succeeds. Native saves copy source bytes instead.
+
+Scientific exports use the first image/channel at full source resolution with
+the current scaling and the preview's sampled contrast mapping. The resulting
+8-bit display pixels do not preserve complex values or radiometric metadata.
+The configured Python environment and `export_image.py` worker module are needed.
+Standard PNG/JPEG conversion uses Electron directly; other standard raster
+conversions also use the Python exporter. SVGs are rasterized in the renderer
+at their intrinsic size before encoding.

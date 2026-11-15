@@ -1156,7 +1156,13 @@ def main():
 
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(argv) == 5 and argv[2] == "--crop":
+            if len(argv) == 5 and argv[2] == "--export":
+                import export_image
+
+                result = export_image.export_image(
+                    argv[1], argv[3], argv[4], sys.modules[__name__]
+                )
+            elif len(argv) == 5 and argv[2] == "--crop":
                 from crop import crop_image
 
                 result = crop_image(

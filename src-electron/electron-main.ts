@@ -1,3 +1,5 @@
+import type { ImageSaveOptions } from "../src/types/image-export";
+import { ImageSaver, rasterExportExtensions } from "./image-save";
 import type { ImageCrop } from "../src/types/crop";
 import type { SiddSettings } from "../src/types/sidd";
 import type { FormationSettings } from "../src/types/formation";
@@ -8,11 +10,11 @@ import type { ImageImportUpdate } from "../src/types/image-import";
 import type { ImageInfo } from "../src/types/image";
 import type { Scaling } from "../src/types/scaling";
 import type { SliceOrientation } from "../src/types/slice";
-import { BrowserWindow, app, dialog } from "electron";
+import { BrowserWindow, app, dialog, nativeImage } from "electron";
 import { ImagePlugins } from "./image-plugins";
 import { ScenarioDatabase } from "./scenario-database";
 import path from "node:path";
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import type { ScenarioInfo, RestoredImageUpdate } from "../src/types/scenario";
 import os from "node:os";
 import {
@@ -418,6 +420,121 @@ async function createWindow() {
                     settings
                 );
             })
+    );
+    const imageSaver = new ImageSaver();
+
+    mainWindow.webContents.ipc.handle(
+        "image:save",
+        (_event, filePath: string, options: ImageSaveOptions = {}) =>
+            documentAction(() =>
+                imageSaver.save(
+                    filePath,
+                    async suggestedPath => {
+                        const extension = path
+                            .extname(filePath)
+                            .slice(1)
+                            .toLowerCase();
+                        const nativeExtensions = [
+                            "sidd",
+                            "sicd",
+                            "nitf",
+                            "ntf"
+                        ].includes(extension)
+                            ? [...new Set([extension, "nitf", "ntf"])]
+                            : [extension];
+                        const result = await dialog.showSaveDialog(mainWindow, {
+                            title: "Save Image",
+                            defaultPath: suggestedPath,
+                            filters: [
+                                {
+                                    name: "Supported image formats",
+                                    extensions: [
+                                        ...new Set([
+                                            ...nativeExtensions.filter(Boolean),
+                                            ...rasterExportExtensions
+                                        ])
+                                    ]
+                                },
+                                { name: "PNG image", extensions: ["png"] },
+                                {
+                                    name: "JPEG image",
+                                    extensions: ["jpg", "jpeg"]
+                                },
+                                {
+                                    name: "TIFF image",
+                                    extensions: ["tif", "tiff"]
+                                },
+                                { name: "BMP image", extensions: ["bmp"] },
+                                { name: "WebP image", extensions: ["webp"] }
+                            ],
+                            properties: [
+                                "showOverwriteConfirmation",
+                                "createDirectory"
+                            ]
+                        });
+
+                        return result.canceled
+                            ? null
+                            : (result.filePath ?? null);
+                    },
+                    async (source, output) => {
+                        const extension = path.extname(output).toLowerCase();
+                        const vector = options.pluginId === "nova.vector";
+                        const standard = options.pluginId !== "nova.sicd";
+                        const raster =
+                            vector && options.svgRaster
+                                ? nativeImage.createFromDataURL(
+                                      options.svgRaster
+                                  )
+                                : standard
+                                  ? nativeImage.createFromPath(source)
+                                  : undefined;
+
+                        if (
+                            raster &&
+                            !raster.isEmpty() &&
+                            [".png", ".jpg", ".jpeg"].includes(extension)
+                        ) {
+                            await writeFile(
+                                output,
+                                extension === ".png"
+                                    ? raster.toPNG()
+                                    : raster.toJPEG(95),
+                                { flag: "wx" }
+                            );
+                            return;
+                        }
+
+                        if (vector) {
+                            if (!raster || raster.isEmpty()) {
+                                throw new Error(
+                                    "Unable to rasterize the SVG for export."
+                                );
+                            }
+
+                            const intermediate = `${output}.png`;
+
+                            try {
+                                await writeFile(intermediate, raster.toPNG(), {
+                                    flag: "wx"
+                                });
+                                await imagePlugins.exportRaster(
+                                    intermediate,
+                                    output
+                                );
+                            } finally {
+                                await rm(intermediate, { force: true });
+                            }
+                        } else {
+                            await imagePlugins.exportRaster(
+                                source,
+                                output,
+                                options.scaling
+                            );
+                        }
+                    }
+                )
+            )
     );
     mainWindow.webContents.ipc.handle(
         "image:crop",

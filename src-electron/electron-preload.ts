@@ -15,6 +15,8 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    save: (filePath, options) =>
+        ipcRenderer.invoke("image:save", filePath, options),
     region: (filePath, pluginId, polygon, scaling) =>
         ipcRenderer.invoke(
             "image:region",

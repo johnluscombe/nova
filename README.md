@@ -42,6 +42,23 @@ autosave their file references, positions, sizes, and window states. Nova restor
 the last scenario on startup; explicitly closing it clears that preference.
 Source images remain separate from the scenario file.
 
+Use **Home → Image → Save** to save the active image. Save opens a destination
+dialog every time, letting you choose the filename and output format.
+The destination extension selects the output encoding: PNG, JPEG, TIFF, BMP,
+or WebP. Scientific images export the first image/channel at source resolution
+as an 8-bit display raster using the selected scaling and preview contrast
+mapping. SVGs rasterize at their intrinsic dimensions. Scientific raster export,
+and BMP/TIFF/WebP conversions, require the Scientific Imagery plugin's configured
+Python environment. Exported rasters do not retain complex/calibrated sample
+values or scientific metadata; keep the native source for further analysis.
+
+Saving in the original format preserves the file's data and embedded metadata.
+Axes, polygons, and attached JSON sidecars are not baked into exported images.
+SIDD/SICD files already stored in NITF 2.1 can also be saved with a `.nitf` or
+`.ntf` extension; Nova checks the container header before copying. This does not
+convert non-NITF sources into NITF.
+Graphs and intermediate diagnostic previews cannot be saved with these controls.
+
 Drag a `.scenario` file into Nova to open it, or drop images into an open scenario
 to create image widgets. Multiple images can be dropped together. When dropping
 a scenario and images together, Nova opens the scenario first.

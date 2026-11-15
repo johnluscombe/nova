@@ -77,8 +77,11 @@
                         Scenario
                     </div>
                 </div>
-                <div class="ribbon-group" role="group" aria-label="Add image">
-                    <div class="ribbon-actions add-image-action">
+                <div
+                    class="ribbon-group"
+                    role="group"
+                    aria-labelledby="image-group-label">
+                    <div class="ribbon-actions">
                         <q-btn
                             flat
                             stack
@@ -88,14 +91,14 @@
                             aria-label="Add Image"
                             :disable="busy || !hasScenario || !hasImageDecoders"
                             @click="$emit('openImage')" />
-                    </div>
-                </div>
-                <div
-                    class="ribbon-group"
-                    role="group"
-                    aria-labelledby="image-group-label"
-                    v-if="homeButtons('image').length">
-                    <div class="ribbon-actions">
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
+                            icon="save"
+                            label="Save"
+                            :disable="busy || !imageContext.canSave"
+                            @click="$emit('saveImage')" />
                         <q-btn
                             v-for="button in homeButtons('image')"
                             :key="button.key"
@@ -417,6 +420,8 @@ defineEmits<{
 
     openImage: [];
 
+    saveImage: [];
+
     settings: [];
 
     pluginAction: [pluginId: string, actionId: string];
@@ -561,11 +566,6 @@ function homeButtons(groupId: string) {
 
 .ribbon-actions :deep(.q-btn .q-icon) {
     font-size: 22px;
-}
-
-.add-image-action {
-    flex-shrink: 0;
-    align-self: flex-start;
 }
 
 .ribbon-group-label {

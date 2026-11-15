@@ -138,6 +138,9 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
  * active-image actions.
  */
 export interface ImageWorkspaceAPI {
+    /** Save or convert the active source image, always choosing a destination. */
+    saveImage(): Promise<void>;
+
     /**
      * Create and activate an image widget; return its session-local window
      * identifier.
@@ -241,6 +244,9 @@ export interface ImageWorkspaceAPI {
  * enable product creation.
  */
 export interface ImageContext {
+    /** Whether the active widget has a ready source file that can be saved. */
+    canSave?: boolean;
+
     canFormSicd?: boolean;
 
     canCreateSidd?: boolean;

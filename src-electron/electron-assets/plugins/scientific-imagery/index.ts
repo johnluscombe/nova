@@ -344,6 +344,15 @@ export async function cropImage(
 }
 
 export default {
+    exportImage: async (filePath, outputPath, parameters, scaling) => {
+        await executeReader(
+            filePath,
+            parameters,
+            execute,
+            ["--export", outputPath, scaling ?? "amplitude"],
+            600_000
+        );
+    },
     crop: (filePath, directory, selection, parameters) =>
         cropImage(filePath, directory, selection, parameters),
     createSidd: (filePath, outputPath, settings, parameters) =>

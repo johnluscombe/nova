@@ -46,6 +46,10 @@ test.use({
             path.join(folder, "formation.py"),
             "utf8"
         ),
+        "scientific-imagery/export_image.py": readFileSync(
+            path.join(folder, "export_image.py"),
+            "utf8"
+        ),
         "scientific-imagery/reader.py": readFileSync(
             path.join(folder, "reader.py"),
             "utf8"
@@ -94,6 +98,25 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     await expect(
         source.getByRole("img", { name: "derived.sidd", exact: true })
     ).toBeVisible();
+    const exported = path.join(profile, "derived-export.png");
+    const nitf = path.join(profile, "derived-export.nitf");
+
+    for (const output of [exported, nitf]) {
+        await application.evaluate(({ dialog }, filePath) => {
+            dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+        }, output);
+        await clickRibbon(page, "Save");
+        await expect.poll(() => existsSync(output)).toBe(true);
+    }
+    const pngSize = await application.evaluate(
+        ({ nativeImage }, filePath) =>
+            nativeImage.createFromPath(filePath).getSize(),
+        exported
+    );
+
+    expect(pngSize).toEqual({ width: 8, height: 4 });
+    expect(readFileSync(nitf)).toEqual(readFileSync(file));
+
     await selectRibbonFor(page, "Scaling");
     await expect(
         page.getByRole("button", { name: "Scaling", exact: true })

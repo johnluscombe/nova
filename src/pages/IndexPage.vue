@@ -18,6 +18,7 @@
             @open-scenario="openScenario()"
             @close-scenario="closeScenario"
             @open-image="openImage()"
+            @save-image="workspace?.saveImage()"
             @settings="settingsOpen = true"
             @plugin-action="runPluginAction"
             @metadata="workspace?.toggleMetadata()"
