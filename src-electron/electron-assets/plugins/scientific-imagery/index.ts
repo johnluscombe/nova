@@ -1,3 +1,4 @@
+import type { SiddSettings } from "../../../../src/types/sidd.ts";
 import { readFile, stat } from "node:fs/promises";
 import type { FormationSettings } from "../../../../src/types/formation.ts";
 import type {
@@ -100,16 +101,17 @@ async function executeReader(
         if (error.killed) {
             throw new Error(
                 timeout > 120_000
-                    ? "Image formation exceeded the ten-minute time limit. Try a smaller output or aperture."
+                    ? "Scientific image processing exceeded the ten-minute time limit."
                     : "Scientific Imagery preview exceeded the two-minute time limit."
             );
         }
+        const details = String(error.stderr || error.message).trim();
+        const diagnostic =
+            details.match(
+                /Scientific Imagery could not read the image: ([\s\S]*)$/
+            )?.[1] ?? details;
         throw new Error(
-            `Scientific Imagery reader failed: ${String(
-                error.stderr || error.message
-            )
-                .trim()
-                .slice(-2000)}`
+            `Scientific Imagery reader failed: ${diagnostic.slice(-2000)}`
         );
     }
     let result;
@@ -233,7 +235,24 @@ export async function formSicd(
         600_000
     );
 }
+export async function createSidd(
+    filePath: string,
+    outputPath: string,
+    settings: SiddSettings,
+    parameters: PluginParameters = {},
+    run: Runner = execute
+): Promise<void> {
+    await executeReader(
+        filePath,
+        parameters,
+        run,
+        ["--create-sidd", outputPath, JSON.stringify(settings)],
+        600_000
+    );
+}
 export default {
+    createSidd: (filePath, outputPath, settings, parameters) =>
+        createSidd(filePath, outputPath, settings, parameters),
     formSicd: (filePath, outputPath, settings, parameters) =>
         formSicd(filePath, outputPath, settings, parameters),
     readRegion: (filePath, polygon, parameters, scaling, peakPower) =>

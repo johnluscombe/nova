@@ -105,3 +105,34 @@ test("validates and persists image formation settings", async () => {
             .value
     ).toEqual(defaultFormationSettings);
 });
+
+test("SIDD settings validate, persist, and recover from invalid storage", async () => {
+    const { validateSiddSettings, defaultSiddSettings } =
+        await import("../../src/types/sidd");
+    for (const patch of [
+        { version: 1 },
+        { bitDepth: 32 },
+        { contrast: "bad" },
+        { interpolation: "bad" },
+        { pixelSpacing: NaN },
+        { pixelSpacing: -1 }
+    ]) {
+        expect(() =>
+            validateSiddSettings({ ...defaultSiddSettings, ...patch })
+        ).toThrow();
+    }
+    const { saveSiddSettings, siddSettings } =
+        await import("../../src/composables/useSettings");
+    saveSiddSettings({ ...defaultSiddSettings, bitDepth: 16, version: 2 });
+    expect(siddSettings.value.bitDepth).toBe(16);
+    vi.resetModules();
+    expect(
+        (await import("../../src/composables/useSettings")).siddSettings.value
+            .version
+    ).toBe(2);
+    localStorage.setItem("nova.settings.sidd", "{}");
+    vi.resetModules();
+    expect(
+        (await import("../../src/composables/useSettings")).siddSettings.value
+    ).toEqual(defaultSiddSettings);
+});

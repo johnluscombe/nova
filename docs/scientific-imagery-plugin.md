@@ -245,8 +245,8 @@ including SarPy's detailed consistency checker, flag all OTHER algorithms becaus
 they cannot validate their image-formation model.
 
 This is an experimental image former with synthetic point-target validation.
-Output is **uncalibrated** and does not perform autofocus, terrain correction, or
-SIDD generation. Source amplitude scaling is applied by SarPy, but no RCS or
+Output is **uncalibrated** and does not perform autofocus or terrain correction.
+SIDD creation is a separate action on the resulting SICD. Source amplitude scaling is applied by SarPy, but no RCS or
 sigma-zero calibration is inferred. Validate results against a trusted image
 former before quantitative use. TOA-domain and bistatic collections are rejected.
 
@@ -279,3 +279,35 @@ Keep that file with the image when moving it. Open product windows are saved in 
 scenario. Existing SICDs without a preview file continue to open normally;
 regenerate a product to obtain its intermediate slides. A missing or corrupt
 preview file does not prevent the final image from opening.
+
+## Creating a SIDD from a SICD
+
+Select a SICD image window and choose **Scientific Imagery → Data → Create SIDD**.
+A loading widget opens immediately, then displays the detected product. The source
+SICD stays open. Generated files are saved under Nova's application-data
+`derived-images` directory and persist with the scenario. The action is disabled
+for CPHD, SIDD, and intermediate diagnostic previews.
+
+Configure **Home → Settings → SICD to SIDD** before creating a product:
+
+- **SIDD version:** 2 or 3 (default 3).
+- **Bit depth:** 8 or 16, producing MONO8I or MONO16I grayscale data.
+- **Contrast:** SAR density, linear amplitude, or logarithmic amplitude. Global
+  display parameters are estimated from a bounded sampling of source magnitudes
+  and held constant across all processing blocks.
+- **Interpolation:** nearest neighbor or bilinear, applied to detected amplitude.
+- **Pixel spacing:** ground-plane spacing in meters; zero starts from source resolution and
+  automatically increases spacing as needed to fit the full scene. Explicit
+  spacing is preserved; oversized output reports a suggested coarser spacing. Output is limited to
+  16 megapixels and 16,384 pixels per side.
+
+Creation uses SarPy's planar detected-image pipeline, embeds the source SICD
+metadata, and checks the resulting metadata against the requested SIDD XML schema.
+Complete products are published without overwriting existing files. Source image
+projection, trajectory, and scene geometry must be available. Processing has a
+ten-minute timeout.
+
+These are display-mapped detected intensities, not complex samples or calibrated
+backscatter values. Creating a SIDD does not calibrate an uncalibrated SICD and
+does not apply a terrain model. The SICD's current preview scaling selection does
+not affect conversion: the operation always reads the original complex samples.

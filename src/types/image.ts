@@ -1,3 +1,4 @@
+import type { SiddSettings } from "./sidd";
 import type { FormationProduct, FormationSettings } from "./formation";
 import type { PolygonPoint, RegionStatistics } from "./region";
 import type { ImageImportUpdate, ImageImportResult } from "./image-import";
@@ -55,6 +56,11 @@ export interface ImagePluginStatus {
 }
 
 export interface ImageAPI {
+    createSidd(
+        filePath: string,
+        pluginId: string,
+        settings: SiddSettings
+    ): Promise<ImageInfo>;
     formSicd(
         filePath: string,
         pluginId: string,

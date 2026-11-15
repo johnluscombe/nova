@@ -98,12 +98,14 @@ export interface ImageWorkspaceAPI {
     toggleAxes(): void;
     togglePolygon(): void;
     clearRegion(): Promise<void>;
+    createSidd(): Promise<void>;
     formSicd(): Promise<void>;
     setScaling(scaling: Scaling): Promise<void>;
 }
 
 export interface ImageContext {
     canFormSicd?: boolean;
+    canCreateSidd?: boolean;
     available: boolean;
     scientific: boolean;
 }

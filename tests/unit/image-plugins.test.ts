@@ -825,3 +825,38 @@ test("invalid optional formation previews do not prevent opening the final image
             /Unavailable/
         );
     }));
+
+test("SIDD creation validates source readiness and settings before invoking the plugin", () =>
+    fixture(async (directory, host) => {
+        const { defaultSiddSettings } = await import("../../src/types/sidd");
+        await plugin(
+            directory,
+            "sidd",
+            `import {writeFile} from 'node:fs/promises'; export default { open() {return {width: 8, height: 8};}, async createSidd(source, output, settings) { await writeFile(output, JSON.stringify(settings)); } };`
+        );
+        await host.reload();
+        const output = path.join(directory, "output.test");
+        await assert.rejects(
+            host.createSidd("source.test", "sidd", output, defaultSiddSettings),
+            /Open a SICD/
+        );
+        await host.open("source.test");
+        await assert.rejects(
+            host.createSidd("source.test", "sidd", output, {
+                ...defaultSiddSettings,
+                pixelSpacing: -1
+            }),
+            /valid SIDD/
+        );
+        assert.equal(
+            (
+                await host.createSidd(
+                    "source.test",
+                    "sidd",
+                    output,
+                    defaultSiddSettings
+                )
+            ).path,
+            output
+        );
+    }));

@@ -365,3 +365,42 @@ test("formed SICDs load durable diagnostic previews and tolerate damaged sidecar
         await rm(directory, { recursive: true, force: true });
     }
 });
+
+test("SIDD creation forwards the source, destination, and settings to the worker", async () => {
+    const { createSidd } =
+        await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts");
+    const { defaultSiddSettings } = await import("../../src/types/sidd");
+    await createSidd(
+        "input.sicd",
+        "output.sidd",
+        defaultSiddSettings,
+        { python: "python-test" },
+        async (python, args, options) => {
+            assert.equal(python, "python-test");
+            assert.deepEqual(args.slice(1), [
+                "input.sicd",
+                "--create-sidd",
+                "output.sidd",
+                JSON.stringify(defaultSiddSettings)
+            ]);
+            assert.equal(options.timeout, 600_000);
+            return { stdout: '{"path":"output.sidd"}' };
+        }
+    );
+});
+
+test("reader failures show the actual diagnostic without font-cache chatter", async () => {
+    await assert.rejects(
+        openScientificImage("image.sicd", {}, async () => {
+            throw Object.assign(new Error("failed"), {
+                stderr: "Matplotlib is building the font cache\nThe SICDReader file writer generated an exception\nScientific Imagery could not read the image: Set SIDD pixel spacing to 0 for automatic sizing\n"
+            });
+        }),
+        error => {
+            assert.ok(error instanceof Error);
+            assert.match(error.message, /Set SIDD pixel spacing to 0/);
+            assert.ok(!error.message.includes("Matplotlib"));
+            return true;
+        }
+    );
+});

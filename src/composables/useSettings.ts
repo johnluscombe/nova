@@ -1,3 +1,9 @@
+import {
+    defaultSiddSettings,
+    validateSiddSettings,
+    type SiddSettings
+} from "@/types/sidd";
+export { defaultSiddSettings };
 import { ref } from "vue";
 import {
     defaultFormationSettings,
@@ -75,4 +81,22 @@ export function saveFormationSettings(value: FormationSettings): void {
     const settings = validateFormationSettings(value);
     localStorage.setItem(formationStorageKey, JSON.stringify(settings));
     formationSettings.value = settings;
+}
+
+const siddStorageKey = "nova.settings.sidd";
+function loadSiddSettings(): SiddSettings {
+    try {
+        const saved = localStorage.getItem(siddStorageKey);
+        return saved
+            ? validateSiddSettings(JSON.parse(saved))
+            : { ...defaultSiddSettings };
+    } catch {
+        return { ...defaultSiddSettings };
+    }
+}
+export const siddSettings = ref(loadSiddSettings());
+export function saveSiddSettings(value: SiddSettings): void {
+    const settings = validateSiddSettings(value);
+    localStorage.setItem(siddStorageKey, JSON.stringify(settings));
+    siddSettings.value = settings;
 }

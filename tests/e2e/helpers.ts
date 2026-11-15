@@ -34,6 +34,7 @@ export async function selectRibbonFor(page: Page, label: string) {
     const imageTools = [
         "Attach Metadata",
         "Form SICD",
+        "Create SIDD",
         "Statistics",
         "Scaling",
         "Slice",

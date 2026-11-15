@@ -1,3 +1,4 @@
+import { validateSiddSettings, type SiddSettings } from "../src/types/sidd";
 import {
     validateFormationProducts,
     validateFormationSettings,
@@ -29,6 +30,12 @@ import type {
 } from "../src/types/image";
 
 export interface ImagePlugin {
+    createSidd?(
+        filePath: string,
+        outputPath: string,
+        settings: SiddSettings,
+        parameters: PluginParameters
+    ): Promise<void>;
     formSicd?(
         filePath: string,
         outputPath: string,
@@ -233,6 +240,8 @@ export class ImagePlugins {
                     ) &&
                         typeof module.default.executeRibbonAction !==
                             "function") ||
+                    (module.default.createSidd !== undefined &&
+                        typeof module.default.createSidd !== "function") ||
                     (module.default.formSicd !== undefined &&
                         typeof module.default.formSicd !== "function") ||
                     (module.default.readRegion !== undefined &&
@@ -517,6 +526,31 @@ export class ImagePlugins {
         }
         const options = validateFormationSettings(settings);
         await plugin.implementation.formSicd(
+            filePath,
+            outputPath,
+            options,
+            plugin.manifest.parameters ?? {}
+        );
+        return this.open(outputPath, pluginId);
+    }
+
+    async createSidd(
+        filePath: string,
+        pluginId: string,
+        outputPath: string,
+        settings: SiddSettings
+    ): Promise<ImageInfo> {
+        const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+        if (
+            !this.openedImages.has(JSON.stringify([filePath, pluginId])) ||
+            !plugin?.implementation.createSidd
+        ) {
+            throw new Error(
+                "Open a SICD image with SIDD creation support first."
+            );
+        }
+        const options = validateSiddSettings(settings);
+        await plugin.implementation.createSidd(
             filePath,
             outputPath,
             options,

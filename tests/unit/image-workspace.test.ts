@@ -443,3 +443,37 @@ test("formation navigator stays available on other windows and opens distinct pr
     await wrapper.get('[aria-label="3. final"]').trigger("click");
     expect(api.snapshot()).toHaveLength(4);
 });
+
+test("SIDD creation keeps the source SICD and opens the derived image in another widget", async () => {
+    const api = workspace();
+    const createSidd = vi.fn().mockResolvedValue({
+        ...image,
+        name: "detected.sidd",
+        path: "/detected.sidd",
+        metadata: { Format: "SIDD / NITF" }
+    });
+    window.images = { createSidd } as unknown as NonNullable<Window["images"]>;
+    api.add({
+        ...image,
+        pluginId: "nova.sicd",
+        metadata: { Format: "SICD / NITF" }
+    });
+    await nextTick();
+    expect(wrapper.emitted("imageContextChange")?.at(-1)?.[0]).toMatchObject({
+        canCreateSidd: true
+    });
+    await api.createSidd();
+    await nextTick();
+    expect(createSidd).toHaveBeenCalledWith(
+        image.path,
+        "nova.sicd",
+        expect.objectContaining({ version: 3 })
+    );
+    expect(api.snapshot().map(item => item.path)).toEqual([
+        image.path,
+        "/detected.sidd"
+    ]);
+    expect(wrapper.emitted("imageContextChange")?.at(-1)?.[0]).toMatchObject({
+        canCreateSidd: false
+    });
+});

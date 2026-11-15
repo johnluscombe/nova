@@ -382,3 +382,12 @@ with an error; the host opens the resulting file through the same plugin's `open
 handler. Formation requires an already opened source. The built-in Form SICD
 control is available for an active Scientific Imagery CPHD widget, and settings
 are configured globally in the Settings dialog.
+
+### SIDD creation
+
+Plugins may implement
+`createSidd(filePath, outputPath, settings, parameters): Promise<void>`, with
+`SiddSettings` defined in `src/types/sidd.ts`. The host validates the settings,
+requires an opened source, assigns a new output path, and opens the completed
+product using the same plugin. Scientific Imagery exposes this through Create SIDD
+for active SICD image windows. Configuration is global through Settings.

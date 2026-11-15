@@ -33,6 +33,10 @@ test.use({
             path.join(folder, "index.ts"),
             "utf8"
         ),
+        "scientific-imagery/sidd_creation.py": readFileSync(
+            path.join(folder, "sidd_creation.py"),
+            "utf8"
+        ),
         "scientific-imagery/formation.py": readFileSync(
             path.join(folder, "formation.py"),
             "utf8"
@@ -365,10 +369,11 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
         exact: true
     });
     await expect(
-        inputProduct.getByRole("figure", {
-            name: "Intermediate product preview"
+        inputProduct.getByRole("img", {
+            name: "Input phase history",
+            exact: true
         })
-    ).toContainText("Selected first-channel aperture");
+    ).toBeVisible();
     await source
         .getByRole("button", { name: "Maximize target.cphd", exact: true })
         .click();
@@ -451,4 +456,78 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
         })
     ).toHaveValue("0.5");
     await settings.getByRole("button", { name: "Cancel", exact: true }).click();
+});
+
+test("SICD creates a SIDD with configured display settings and restores both products", async ({
+    application,
+    profile
+}) => {
+    test.setTimeout(60_000);
+    try {
+        await execute(python, ["-c", "import sarpy, numpy, scipy, lxml"]);
+    } catch {
+        test.skip(
+            true,
+            "SIDD creation requires Scientific Imagery Python dependencies."
+        );
+    }
+    await execute(python, [
+        "-c",
+        `import runpy,pathlib,sys
+sys.dont_write_bytecode=True
+fixtures=runpy.run_path(sys.argv[1])
+fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
+        path.resolve("src-electron/sidd-creation.test.py"),
+        profile
+    ]);
+    const page = await application.firstWindow();
+    const scenario = await createScenario(application, page, profile);
+    await clickRibbon(page, "Settings");
+    const settings = page.getByRole("dialog", {
+        name: "Settings",
+        exact: true
+    });
+    await settings
+        .getByRole("combobox", { name: "SIDD bit depth", exact: true })
+        .click();
+    await page.getByRole("option", { name: "16", exact: true }).click();
+    await settings
+        .getByRole("combobox", { name: "SIDD contrast", exact: true })
+        .click();
+    await page
+        .getByRole("option", { name: "Linear amplitude", exact: true })
+        .click();
+    await settings
+        .getByRole("spinbutton", {
+            name: "SIDD pixel spacing (m)",
+            exact: true
+        })
+        .fill("1");
+    await settings.getByRole("button", { name: "Save", exact: true }).click();
+    await chooseFile(application, path.join(profile, "source.sicd"));
+    await clickRibbon(page, "Add Image");
+    const source = page.getByRole("article", {
+        name: "source.sicd",
+        exact: true
+    });
+    await expect(source.getByRole("img")).toBeVisible();
+    await clickRibbon(page, "Create SIDD");
+    const detected = page.getByRole("article", {
+        name: "source-detected.sidd",
+        exact: true
+    });
+    await expect(detected.getByRole("img")).toBeVisible({ timeout: 15000 });
+    await clickRibbon(page, "Metadata");
+    await expect(detected).toContainText("SIDD / NITF");
+    await expect(detected).toContainText("MONO16I");
+    await expect(source).toBeVisible();
+    await selectRibbonFor(page, "Create SIDD");
+    await expect(
+        page.getByRole("button", { name: "Create SIDD", exact: true })
+    ).toBeDisabled();
+    await clickRibbon(page, "Close");
+    await chooseFile(application, scenario);
+    await clickRibbon(page, "Open");
+    await expect(detected.getByRole("img")).toBeVisible();
+    await expect(source.getByRole("img")).toBeVisible();
 });

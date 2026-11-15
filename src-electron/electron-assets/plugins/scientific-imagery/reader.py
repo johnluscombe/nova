@@ -115,6 +115,8 @@ def open_image_reader(file_path):
 def sidd_metadata(metadata):
     fields = {"Product": "ProductCreation.ProductName", "Product class": "ProductCreation.ProductClass",
               "Classification": "ProductCreation.Classification.classification", "Pixel type": "Display.PixelType",
+              "Row spacing (m)": "Measurement.PlaneProjection.SampleSpacing.Row",
+              "Column spacing (m)": "Measurement.PlaneProjection.SampleSpacing.Col",
               "Projection": "Measurement.ProjectionType"}
     result = {"Format": "SIDD / NITF", "Image selection": "First derived image"}
     for label, field in fields.items():
@@ -612,7 +614,10 @@ def main():
             argv = argv[:-2]
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(argv) == 5 and argv[2] == "--form-sicd":
+            if len(argv) == 5 and argv[2] == "--create-sidd":
+                from sidd_creation import create_sidd
+                result = create_sidd(argv[1], argv[3], json.loads(argv[4]))
+            elif len(argv) == 5 and argv[2] == "--form-sicd":
                 from formation import form_sicd
                 result = form_sicd(argv[1], argv[3], json.loads(argv[4]))
             elif len(argv) == 6 and argv[2] == "--region":

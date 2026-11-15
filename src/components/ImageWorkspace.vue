@@ -386,6 +386,7 @@ import ImageSliceView from "./ImageSliceView.vue";
 import LineGraph from "./LineGraph.vue";
 import { sliceAxes, slicePosition } from "@/utils/slice-axes";
 import { previewSlice } from "@/utils/image-slice";
+import { siddSettings } from "@/composables/useSettings";
 import { formationSettings } from "@/composables/useSettings";
 import type { Scaling, ScalingState } from "@/types/scaling";
 import type { SliceData, SliceSelection } from "@/types/slice";
@@ -831,6 +832,41 @@ async function formSicd() {
     }
 }
 
+async function createSidd() {
+    const widget = activeWidget.value;
+    if (
+        !widget ||
+        widget.loading ||
+        widget.graph ||
+        diagnosticProduct(widget) ||
+        widget.image.metadata?.Format !== "SICD / NITF"
+    ) {
+        return;
+    }
+    const source = widget.image;
+    const id = add(
+        {
+            name: `${source.name} — creating SIDD`,
+            path: "",
+            pluginId: "",
+            pluginName: "Scientific Imagery"
+        },
+        true
+    );
+    try {
+        const result = await window.images!.createSidd(
+            source.path,
+            source.pluginId,
+            { ...siddSettings.value }
+        );
+        complete(id, result);
+    } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        fail(id, message);
+        emit("scalingError", message);
+    }
+}
+
 async function setScaling(scaling: Scaling) {
     const widget = activeWidget.value;
     if (
@@ -1084,6 +1120,13 @@ watch(
         return {
             available: !!widget,
             scientific: source?.pluginId === "nova.sicd",
+            canCreateSidd:
+                !!widget &&
+                !widget.graph &&
+                !widget.loading &&
+                !diagnosticProduct(widget) &&
+                source?.pluginId === "nova.sicd" &&
+                source.metadata?.Format === "SICD / NITF",
             canFormSicd:
                 !!widget &&
                 !widget.graph &&
@@ -1177,7 +1220,8 @@ defineExpose({
     togglePolygon,
     clearRegion,
     setScaling,
-    formSicd
+    formSicd,
+    createSidd
 } satisfies ImageWorkspaceAPI);
 function windowStyle(widget: ImageWindow) {
     const rect = widget.maximized ? { x: 0, y: 0, ...bounds } : widget.rect;

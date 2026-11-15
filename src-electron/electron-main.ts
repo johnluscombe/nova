@@ -1,3 +1,4 @@
+import type { SiddSettings } from "../src/types/sidd";
 import type { FormationSettings } from "../src/types/formation";
 import { randomUUID } from "node:crypto";
 import type { PolygonPoint } from "../src/types/region";
@@ -343,6 +344,31 @@ async function createWindow() {
                     `${path.parse(filePath).name}-formed.sicd`
                 );
                 return imagePlugins.formSicd(
+                    filePath,
+                    pluginId,
+                    outputPath,
+                    settings
+                );
+            })
+    );
+    mainWindow.webContents.ipc.handle(
+        "image:create-sidd",
+        (_event, filePath: string, pluginId: string, settings: SiddSettings) =>
+            documentAction(async () => {
+                if (!scenario.current) {
+                    throw new Error("Open a scenario before creating a SIDD.");
+                }
+                const directory = path.join(
+                    app.getPath("userData"),
+                    "derived-images",
+                    randomUUID()
+                );
+                await mkdir(directory, { recursive: true });
+                const outputPath = path.join(
+                    directory,
+                    `${path.parse(filePath).name}-detected.sidd`
+                );
+                return imagePlugins.createSidd(
                     filePath,
                     pluginId,
                     outputPath,

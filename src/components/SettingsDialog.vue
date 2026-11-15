@@ -76,9 +76,62 @@
                     FX-domain CPHD 1.x. Output uses a local ground plane at the
                     scene reference point; values are uncalibrated.
                 </p>
-                <p v-if="error" class="text-negative" role="alert">
-                    {{ error }}
+            </q-card-section>
+            <q-card-section>
+                <div class="text-subtitle1 q-mb-sm">SICD to SIDD</div>
+                <q-select
+                    v-model="sidd.version"
+                    outlined
+                    :options="[2, 3]"
+                    label="SIDD version" />
+                <q-select
+                    v-model="sidd.bitDepth"
+                    outlined
+                    class="q-mt-md"
+                    :options="[8, 16]"
+                    label="SIDD bit depth" />
+                <q-select
+                    v-model="sidd.contrast"
+                    outlined
+                    emit-value
+                    map-options
+                    class="q-mt-md"
+                    :options="[
+                        { label: 'Density (SAR)', value: 'density' },
+                        { label: 'Linear amplitude', value: 'linear' },
+                        { label: 'Logarithmic amplitude', value: 'logarithmic' }
+                    ]"
+                    label="SIDD contrast" />
+                <q-select
+                    v-model="sidd.interpolation"
+                    outlined
+                    emit-value
+                    map-options
+                    class="q-mt-md"
+                    :options="[
+                        { label: 'Nearest neighbor', value: 'nearest' },
+                        { label: 'Bilinear', value: 'bilinear' }
+                    ]"
+                    label="SIDD interpolation" />
+                <q-input
+                    v-model.number="sidd.pixelSpacing"
+                    outlined
+                    class="q-mt-md"
+                    type="number"
+                    min="0"
+                    max="1000"
+                    step="any"
+                    label="SIDD pixel spacing (m)"
+                    hint="0 automatically fits the full scene within output size limits" />
+                <p class="text-caption q-mt-md">
+                    Applies to the next Create SIDD operation. Creates a
+                    monochrome detected image on a ground plane, up to 16
+                    megapixels. Does not add radiometric calibration or terrain
+                    correction.
                 </p>
+            </q-card-section>
+            <q-card-section v-if="error" class="text-negative" role="alert">
+                {{ error }}
             </q-card-section>
             <q-card-actions align="right">
                 <q-btn
@@ -88,6 +141,7 @@
                     @click="
                         percentiles = [...defaultPercentiles];
                         formation = { ...defaultFormationSettings };
+                        sidd = { ...defaultSiddSettings };
                         error = '';
                     " />
                 <q-btn flat no-caps label="Cancel" @click="open = false" />
@@ -99,8 +153,12 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { validateSiddSettings } from "@/types/sidd";
 import { validateFormationSettings } from "@/types/formation";
 import {
+    siddSettings,
+    defaultSiddSettings,
+    saveSiddSettings,
     validatePercentiles,
     defaultPercentiles,
     selectedPercentiles,
@@ -112,6 +170,7 @@ import {
 const open = defineModel<boolean>({ default: false });
 const percentiles = ref<number[]>([]);
 const formation = ref({ ...formationSettings.value });
+const sidd = ref({ ...siddSettings.value });
 const allPercentiles = Array.from({ length: 101 }, (_, index) => index);
 const percentileOptions = ref(allPercentiles);
 function filterPercentiles(
@@ -131,6 +190,7 @@ watch(
         if (value) {
             percentiles.value = [...selectedPercentiles.value];
             formation.value = { ...formationSettings.value };
+            sidd.value = { ...siddSettings.value };
             error.value = "";
         }
     },
@@ -140,6 +200,8 @@ function save() {
     try {
         validatePercentiles(percentiles.value);
         validateFormationSettings(formation.value);
+        validateSiddSettings(sidd.value);
+        saveSiddSettings(sidd.value);
         saveFormationSettings(formation.value);
         savePercentiles(percentiles.value);
         open.value = false;

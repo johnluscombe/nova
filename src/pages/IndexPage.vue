@@ -187,6 +187,15 @@
                                 label="Form SICD"
                                 :disable="busy || !imageContext.canFormSicd"
                                 @click="formSicd" />
+                            <q-btn
+                                v-if="imageContext.scientific"
+                                flat
+                                stack
+                                no-caps
+                                icon="image"
+                                label="Create SIDD"
+                                :disable="busy || !imageContext.canCreateSidd"
+                                @click="createSidd" />
                         </div>
                         <div id="data-group-label" class="ribbon-group-label">
                             Data
@@ -699,6 +708,18 @@ async function formSicd() {
     busy.value = true;
     try {
         await workspace.value?.formSicd();
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function createSidd() {
+    if (busy.value || !imageContext.value.canCreateSidd) {
+        return;
+    }
+    busy.value = true;
+    try {
+        await workspace.value?.createSidd();
     } finally {
         busy.value = false;
     }

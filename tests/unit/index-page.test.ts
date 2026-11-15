@@ -78,6 +78,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     activeScenario.value = null;
     imagesMock = {
+        createSidd: vi.fn(),
         formSicd: vi.fn(),
         region: vi.fn(),
         attachMetadata: vi.fn(),
