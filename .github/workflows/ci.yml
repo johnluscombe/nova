@@ -36,20 +36,21 @@ jobs:
               with:
                   python-version: "3.12"
                   cache: pip
-                  cache-dependency-path: src-electron/electron-assets/plugins/sicd/requirements.txt
+                  cache-dependency-path: src-electron/electron-assets/plugins/scientific-imagery/requirements.txt
             - name: Install dependencies
               run: |
                   npm ci
                   npm ci --prefix src-electron
-                  python -m pip install -r src-electron/electron-assets/plugins/sicd/requirements.txt
+                  python -m pip install -r src-electron/electron-assets/plugins/scientific-imagery/requirements.txt
             - name: Check types and formatting
               run: |
                   npm run typecheck
                   npm run lint:check
-            - name: Test the SICD and SIDD readers
+            - name: Test the SICD, SIDD, and TIFF readers
               run: |
                   python src-electron/sicd-reader.test.py
                   python src-electron/sidd-reader.test.py
+                  python src-electron/tiff-reader.test.py
             - name: Run unit and Electron tests with combined coverage
               run: npm run test:coverage:all
             - name: Summarize coverage and prepare badge

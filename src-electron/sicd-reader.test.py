@@ -17,7 +17,7 @@ from sarpy.io.complex.sicd import SICDWriter
 from sarpy.io.complex.sicd_elements.SICD import SICDType
 from sarpy.io.complex.sicd_elements.ImageData import ImageDataType
 
-spec = importlib.util.spec_from_file_location("sicd_reader", pathlib.Path(__file__).parent / "electron-assets/plugins/sicd/reader.py")
+spec = importlib.util.spec_from_file_location("sicd_reader", pathlib.Path(__file__).parent / "electron-assets/plugins/scientific-imagery/reader.py")
 reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)
 

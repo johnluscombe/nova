@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import numpy as np
 from sarpy.io.product.sidd import SIDDWriter
 
-spec = importlib.util.spec_from_file_location("radar_reader", pathlib.Path(__file__).parent / "electron-assets/plugins/sicd/reader.py")
+spec = importlib.util.spec_from_file_location("radar_reader", pathlib.Path(__file__).parent / "electron-assets/plugins/scientific-imagery/reader.py")
 reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)
 

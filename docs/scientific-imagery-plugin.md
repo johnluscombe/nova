@@ -1,34 +1,38 @@
-# SICD / SIDD plugin
+# Scientific Imagery plugin
 
-The bundled `nova.sicd` plugin opens SICD and SIDD NITF files with `.sicd`,
-`.sidd`, `.nitf`, or `.ntf` extensions. It identifies the product from its metadata,
-not its extension, using NGA's SarPy readers in a separate Python process. Both
+The bundled **Scientific Imagery** plugin opens SICD and SIDD NITF files with `.sicd`,
+`.sidd`, `.nitf`, or `.ntf` extensions. It also opens TIFF images with `.tif` or
+`.tiff` extensions using Pillow. It identifies the product from its metadata,
+not its extension, using NGA's SarPy readers in a separate Python process. All
 formats use the same `parameters.python` interpreter setting. Ordinary NITF files
 without SICD or SIDD metadata are not supported.
+
+The plugin retains its internal ID `nova.sicd` so existing scenarios and installed
+plugin overrides continue to work. Its bundled folder is `scientific-imagery`.
 
 ## Runtime setup
 
 Install Python 3 and create a dedicated environment at a persistent location:
 
 ```sh
-python3 -m venv "$HOME/.nova-sicd"
-"$HOME/.nova-sicd/bin/python" -m pip install -r src-electron/electron-assets/plugins/sicd/requirements.txt
+python3 -m venv "$HOME/.nova-scientific-imagery"
+"$HOME/.nova-scientific-imagery/bin/python" -m pip install -r src-electron/electron-assets/plugins/scientific-imagery/requirements.txt
 ```
 
 On Windows use `python -m venv` and the environment's `Scripts/python.exe`.
 The Python runtime and SarPy dependencies are not included in the Electron app.
 The small plugin and reader script are bundled and enabled by default.
 
-Set the interpreter in the SICD plugin's `plugin.json`:
+Set the interpreter in the Scientific Imagery plugin's `plugin.json`:
 
 ```json
 "parameters": {
-    "python": "/absolute/path/to/.nova-sicd/bin/python"
+    "python": "/absolute/path/to/.nova-scientific-imagery/bin/python"
 }
 ```
 
-In development, edit `src-electron/electron-assets/plugins/sicd/plugin.json`.
-For an installed app, copy the bundled `sicd` folder into the user plugins
+In development, edit `src-electron/electron-assets/plugins/scientific-imagery/plugin.json`.
+For an installed app, copy the bundled `scientific-imagery` folder into the user plugins
 folder shown by Nova and edit that copy's `plugin.json`. The user copy overrides
 the bundled plugin. Restart Nova after configuration.
 Use `Scripts/python.exe` on Windows. Paths containing spaces need no extra quoting.
@@ -146,3 +150,48 @@ Run the reader tests with the configured Python environment:
 python src-electron/sicd-reader.test.py
 python src-electron/sidd-reader.test.py
 ```
+
+## TIFF images
+
+The same plugin opens `.tif` and `.tiff` files using Pillow in the configured
+Python environment. Install or update its `requirements.txt` to include Pillow.
+Supported image modes include 8/16-bit grayscale, signed and floating-point
+intensity, RGB/RGBA, palette, and monochrome images. Standard uncompressed, LZW,
+PackBits, and Deflate TIFF files are covered by tests.
+
+8-bit and color previews preserve display values and transparency. Higher-depth
+intensity previews use a percentile contrast stretch, while statistics, slices,
+and pixel inspection retain original source values. Color inspection uses RGB
+luminance; fully transparent pixels have no value. Previews and slices use the
+same sample limits as the radar formats. Pillow may decode the full source image
+internally, so source decoding memory depends on the TIFF size and compression.
+
+Multi-page TIFF files open the first page, identified in Metadata. Axes use pixel
+coordinates; GeoTIFF georeferencing is not interpreted. Complex scaling remains
+disabled. Files work with Add Image, drag and drop, and scenario restoration.
+
+```sh
+python src-electron/tiff-reader.test.py
+```
+
+### Large TIFF pixel limit
+
+Scientific Imagery allows up to **1,000,000,000 pixels** per TIFF page by default,
+replacing Pillow's smaller decompression-bomb threshold. To change it, set the
+plugin parameter and restart Nova:
+
+```json
+{
+    "parameters": {
+        "python": "/path/to/your/python3",
+        "maxTiffPixels": 2000000000
+    }
+}
+```
+
+`maxTiffPixels` is a nonnegative integer measuring width × height, not file size.
+Set it to `0` to remove the limit for TIFF files you trust. The limit is checked
+before pixel decoding and applies to previews, source slices, pixel inspection,
+and scenario restoration. This does not change the 1600-pixel preview limit.
+Pillow can still decode the full TIFF internally, so larger files require more
+memory even when their preview is small.

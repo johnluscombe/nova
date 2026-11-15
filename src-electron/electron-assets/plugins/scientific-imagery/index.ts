@@ -33,7 +33,18 @@ async function executeReader(
         (process.platform === "win32" ? "python" : "python3");
     if (typeof configuredPython !== "string" || !configuredPython.trim()) {
         throw new Error(
-            "SICD/SIDD's python parameter must be a nonempty Python executable path or command."
+            "Scientific Imagery's python parameter must be a nonempty Python executable path or command."
+        );
+    }
+    const maxTiffPixels = parameters.maxTiffPixels;
+    if (
+        maxTiffPixels !== undefined &&
+        (typeof maxTiffPixels !== "number" ||
+            !Number.isSafeInteger(maxTiffPixels) ||
+            maxTiffPixels < 0)
+    ) {
+        throw new Error(
+            "Scientific Imagery's maxTiffPixels parameter must be a nonnegative safe integer (0 disables the limit)."
         );
     }
     const python =
@@ -47,7 +58,10 @@ async function executeReader(
             [
                 fileURLToPath(new URL("./reader.py", import.meta.url)),
                 filePath,
-                ...extraArgs
+                ...extraArgs,
+                ...(maxTiffPixels !== undefined
+                    ? ["--max-tiff-pixels", String(maxTiffPixels)]
+                    : [])
             ],
             {
                 encoding: "utf8",
@@ -68,21 +82,23 @@ async function executeReader(
         };
         if (error.code === "ENOENT") {
             throw new Error(
-                `SICD/SIDD could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/sicd-plugin.md.`
+                `Scientific Imagery could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/scientific-imagery-plugin.md.`
             );
         }
         if (error.code === "EACCES") {
             throw new Error(
-                `SICD/SIDD cannot execute Python interpreter ${JSON.stringify(python)}: permission denied.`
+                `Scientific Imagery cannot execute Python interpreter ${JSON.stringify(python)}: permission denied.`
             );
         }
         if (error.killed) {
             throw new Error(
-                "SICD/SIDD preview exceeded the two-minute time limit."
+                "Scientific Imagery preview exceeded the two-minute time limit."
             );
         }
         throw new Error(
-            `SICD/SIDD reader failed: ${String(error.stderr || error.message)
+            `Scientific Imagery reader failed: ${String(
+                error.stderr || error.message
+            )
                 .trim()
                 .slice(-2000)}`
         );
@@ -91,11 +107,11 @@ async function executeReader(
     try {
         result = JSON.parse(stdout);
     } catch {
-        throw new Error("SICD/SIDD reader returned invalid output.");
+        throw new Error("Scientific Imagery reader returned invalid output.");
     }
     return result;
 }
-export async function openSicd(
+export async function openScientificImage(
     filePath: string,
     parameters: PluginParameters = {},
     run: Runner = execute,
@@ -116,11 +132,13 @@ export async function openSicd(
         typeof result.previewDataUrl !== "string" ||
         !result.previewDataUrl.startsWith("data:image/png;base64,")
     ) {
-        throw new Error("SICD/SIDD reader returned an invalid preview.");
+        throw new Error(
+            "Scientific Imagery reader returned an invalid preview."
+        );
     }
     return result;
 }
-export async function readSicdSlice(
+export async function readImageSlice(
     filePath: string,
     orientation: SliceOrientation,
     index: number,
@@ -135,7 +153,7 @@ export async function readSicdSlice(
         ...(scaling ? [scaling] : [])
     ])) as SliceData;
 }
-export async function readSicdPixel(
+export async function readImagePixel(
     filePath: string,
     row: number,
     column: number,
@@ -154,7 +172,7 @@ export async function readSicdPixel(
 }
 export default {
     readPixel: (filePath, row, column, parameters, scaling, peakPower) =>
-        readSicdPixel(
+        readImagePixel(
             filePath,
             row,
             column,
@@ -164,7 +182,7 @@ export default {
             peakPower
         ),
     readSlice: (filePath, orientation, index, parameters, scaling) =>
-        readSicdSlice(
+        readImageSlice(
             filePath,
             orientation,
             index,
@@ -173,5 +191,5 @@ export default {
             scaling
         ),
     open: (filePath, parameters, scaling?: Scaling) =>
-        openSicd(filePath, parameters, execute, scaling)
+        openScientificImage(filePath, parameters, execute, scaling)
 } satisfies ImagePlugin;

@@ -1,6 +1,6 @@
 # Image plugins
 
-Nova ships with raster (JPG/PNG), vector (SVG), and SICD plugins, enabled by default.
+Nova ships with raster (JPG/PNG), vector (SVG), and Scientific Imagery plugins, enabled by default.
 Add Image is disabled if no valid plugins load. The main process also rejects image opening without plugins.
 No built-in fallback reads or decodes image files.
 
@@ -88,8 +88,8 @@ assets in development and packaged builds; no first-run copy is needed.
 - `nova.vector`: SVG. Reads the file and returns a vector data URL (up to 16 MB),
   preserving sharpness when the image window is resized.
 
-- `nova.sicd`: SICD-in-NITF radar images. Uses a separate Python/SarPy environment
-  for bounded grayscale previews. See [SICD setup](sicd-plugin.md).
+- `nova.sicd`: Scientific Imagery (SICD, SIDD, and TIFF). Uses a separate
+  Python environment with SarPy and Pillow for previews and source inspection. See [Scientific Imagery setup](scientific-imagery-plugin.md).
 
 `examples/plugins/raster/` remains a reference for user plugins.
 
@@ -280,7 +280,7 @@ plugin's default behavior. Existing plugins need no changes; Scaling stays disab
 unless capabilities are advertised. The host accepts scaling requests only for
 previously opened images and their advertised modes.
 
-See [SICD scaling](sicd-plugin.md#scaling) for the built-in implementation.
+See [SICD scaling](scientific-imagery-plugin.md#scaling) for the built-in implementation.
 
 ## Pixel inspection
 
@@ -320,7 +320,7 @@ passing them to the renderer.
 **View → Axes** draws columns horizontally and rows vertically, aligned with the
 contained image preview. Without axis metadata, Nova displays zero-based pixel
 coordinates. The toggle is independent per window and temporary, like Slice and
-Pixel Values. See [SICD axes](sicd-plugin.md#image-axes) for physical conventions.
+Pixel Values. See [SICD axes](scientific-imagery-plugin.md#image-axes) for physical conventions.
 
 Slice selectors and graph titles also use the image's axis names and coordinates,
 while retaining the source row/column index. A horizontal slice varies along the
@@ -331,8 +331,13 @@ source pixel indices from `readSlice`; Nova converts those positions for display
 using the `axes` returned by `open`. Do not preconvert them in the plugin. Graph
 scaling changes preserve the physical coordinate labels and positions.
 
-The bundled radar plugin supports SICD and SIDD in NITF containers, including
+The bundled Scientific Imagery plugin supports SICD and SIDD in NITF containers, including
 `.sidd` files. Both formats share its configured Python interpreter. SIDD provides
 source intensity/luminance slices, source pixel inspection, metadata, statistics,
 and plane-grid meter axes when available. Complex scaling is reserved for SICD.
-See [SIDD support](sicd-plugin.md#sidd-derived-imagery).
+See [SIDD support](scientific-imagery-plugin.md#sidd-derived-imagery).
+
+TIFF (`.tif` / `.tiff`) is decoded by the Scientific Imagery plugin using Pillow, sharing
+the interpreter configured for SICD/SIDD. It supports higher-depth source values,
+RGB/RGBA previews, source inspection/slicing, and first-page selection. See
+[TIFF support](scientific-imagery-plugin.md#tiff-images).
