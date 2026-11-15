@@ -67,6 +67,18 @@ Bundled plugins support JPG/PNG, SVG, TIFF (`.tif`/`.tiff`), and SICD/SIDD-in-NI
 See [image plugins](docs/image-plugins.md) and [Scientific Imagery setup](docs/scientific-imagery-plugin.md).
 The Settings dialog configures the percentiles displayed in Statistics.
 
+Use the image tab's **Edit → Color Scale** to set clipping limits and colors for
+the active image. Choose Grayscale, Viridis, Inferno, Rainbow, or Blue–white–red, or edit
+2–8 color stops. The dialog lists colors from maximum at the top to minimum at
+the bottom, with labeled endpoints and a matching vertical preview. Blank limits
+use the 1st–99th percentiles for scientific data and 0–255 luminance for ordinary
+images. Scientific limits use the selected
+scaling's units; amplitude retains its logarithmic display mapping. Values
+outside the range clip to the endpoint colors. Reset restores the original
+preview. Color settings are saved per image with the scenario, leave analysis
+values unchanged, and are included in raster exports. Choose a different output
+filename when exporting a color-mapped raster to preserve the source.
+
 Application and test sources use TypeScript. Plugins use Electron's native type
 stripping and must use erasable TypeScript syntax. Scenario schema definitions
 live in `src-electron/scenario-schema.ts`.

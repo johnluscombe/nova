@@ -52,7 +52,7 @@
                 regionOverlay?.leavePointer();
             ">
             <img
-                :src="image.previewDataUrl"
+                :src="previewUrl ?? image.previewDataUrl"
                 :alt="image.name"
                 draggable="false"
                 @load="loaded" />
@@ -176,6 +176,8 @@ import { previewPixel } from "@/utils/image-pixel";
 import type { PixelData, PixelPosition } from "@/types/pixel";
 
 const props = defineProps<{
+    previewUrl?: string | undefined;
+
     image: ImageInfo;
 
     enabled: boolean;

@@ -167,3 +167,27 @@ test("converts to the target format atomically and preserves existing outputs on
         await rm(directory, { recursive: true, force: true });
     }
 });
+
+test("color-mapped raster saves encode even when the extension matches and protect the source", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "nova-save-color-"));
+
+    try {
+        const source = path.join(directory, "source.png");
+        const output = path.join(directory, "colored.png");
+        const saver = new ImageSaver();
+        const convert = async (_source: string, temporary: string) => {
+            await writeFile(temporary, "colored");
+        };
+
+        await writeFile(source, "original");
+        await saver.save(source, async () => output, convert, true);
+        expect(await readFile(output, "utf8")).toBe("colored");
+        expect(await readFile(source, "utf8")).toBe("original");
+        await expect(
+            saver.save(source, async () => source, convert, true)
+        ).rejects.toThrow("different filename");
+        expect(await readFile(source, "utf8")).toBe("original");
+    } finally {
+        await rm(directory, { recursive: true, force: true });
+    }
+});

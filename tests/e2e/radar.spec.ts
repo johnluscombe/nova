@@ -46,6 +46,10 @@ test.use({
             path.join(folder, "formation.py"),
             "utf8"
         ),
+        "scientific-imagery/color_scale.py": readFileSync(
+            path.join(folder, "color_scale.py"),
+            "utf8"
+        ),
         "scientific-imagery/export_image.py": readFileSync(
             path.join(folder, "export_image.py"),
             "utf8"
@@ -98,6 +102,21 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     await expect(
         source.getByRole("img", { name: "derived.sidd", exact: true })
     ).toBeVisible();
+    await clickRibbon(page, "Color Scale");
+    const colorDialog = page.getByRole("dialog");
+
+    await colorDialog.getByLabel("Minimum", { exact: true }).fill("0");
+    await colorDialog.getByLabel("Maximum", { exact: true }).fill("31000");
+    await colorDialog
+        .getByLabel("Choose minimum color", { exact: true })
+        .fill("#0000ff");
+    await colorDialog
+        .getByLabel("Choose maximum color", { exact: true })
+        .fill("#ff0000");
+    await colorDialog
+        .getByRole("button", { name: "Apply", exact: true })
+        .click();
+    await expect(source.getByRole("img")).toBeVisible();
     const exported = path.join(profile, "derived-export.png");
     const nitf = path.join(profile, "derived-export.nitf");
 
@@ -115,6 +134,18 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     );
 
     expect(pngSize).toEqual({ width: 8, height: 4 });
+    expect(
+        await application.evaluate(
+            ({ nativeImage }, filePath) => [
+                ...nativeImage
+                    .createFromPath(filePath)
+                    .toBitmap()
+                    .subarray(0, 4)
+            ],
+            exported
+        )
+    ).toEqual([255, 0, 0, 255]);
+
     expect(readFileSync(nitf)).toEqual(readFileSync(file));
 
     await selectRibbonFor(page, "Scaling");

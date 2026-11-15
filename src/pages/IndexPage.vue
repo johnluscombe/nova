@@ -18,6 +18,7 @@
             @open-scenario="openScenario()"
             @close-scenario="closeScenario"
             @open-image="openImage()"
+            @color-scale="workspace?.openColorScale()"
             @save-image="workspace?.saveImage()"
             @settings="settingsOpen = true"
             @plugin-action="runPluginAction"

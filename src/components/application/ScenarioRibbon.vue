@@ -228,6 +228,14 @@
                             flat
                             stack
                             no-caps
+                            icon="palette"
+                            label="Color Scale"
+                            :disable="busy || !hasSliceImage"
+                            @click="$emit('colorScale')" />
+                        <q-btn
+                            flat
+                            stack
+                            no-caps
                             icon="crop"
                             label="Crop"
                             :disable="busy || !cropState.available"
@@ -421,6 +429,8 @@ defineEmits<{
     openImage: [];
 
     saveImage: [];
+
+    colorScale: [];
 
     settings: [];
 

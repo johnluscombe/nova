@@ -85,6 +85,7 @@
                             <ImageSliceView
                                 v-else-if="widget.image.previewDataUrl"
                                 :image="widget.image"
+                                :preview-url="widget.colorPreviewDataUrl"
                                 :enabled="
                                     !!widget.sliceEnabled && !widget.cropping
                                 "
@@ -143,6 +144,12 @@
                 @click="restore(widget)" />
         </div>
     </section>
+    <ColorScaleDialog
+        :open="!!colorScaleTarget"
+        :scale="colorScaleTarget?.colorScale"
+        :scientific="colorScaleTarget?.image.pluginId === 'nova.sicd'"
+        @apply="applyColorScale"
+        @cancel="cancelColorScale" />
 </template>
 
 <script setup lang="ts">
@@ -167,7 +174,11 @@ import { useFormationProducts } from "@/composables/useFormationProducts";
 import { previewRegionStatistics } from "@/utils/region-statistics";
 import { useImageProcessing } from "@/composables/useImageProcessing";
 import { useImageStatistics } from "@/composables/useImageStatistics";
+import { validateColorScale } from "@/types/color-scale";
+import { colorizePreview } from "@/utils/color-scale";
 import { rasterizeSvg } from "@/utils/image-export";
+import ColorScaleDialog from "@/components/image/ColorScaleDialog.vue";
+import { useColorScale } from "@/composables/useColorScale";
 import { useWidgetGestures } from "@/composables/useWidgetGestures";
 import FormationNavigator from "@/components/workspace/FormationNavigator.vue";
 import ImageSliceView from "@/components/image/ImageSliceView.vue";
@@ -190,6 +201,11 @@ const activeWidget = computed(() =>
         widget => widget.id === activeId.value && !widget.minimized
     )
 );
+
+const { colorScaleTarget, openColorScale, cancelColorScale, applyColorScale } =
+    useColorScale(windows, activeWidget, message =>
+        emit("scalingError", message)
+    );
 
 const {
     formationSidebarOpen,
@@ -255,11 +271,19 @@ async function saveImage() {
         const source = widget.image;
         const svgRaster =
             source.pluginId === "nova.vector" && source.previewDataUrl
-                ? await rasterizeSvg(source.previewDataUrl)
+                ? widget.colorScale
+                    ? await colorizePreview(
+                          source.previewDataUrl,
+                          widget.colorScale
+                      )
+                    : await rasterizeSvg(source.previewDataUrl)
                 : undefined;
 
         await window.images.save(source.path, {
             pluginId: source.pluginId,
+            ...(widget.colorScale
+                ? { colorScale: validateColorScale(widget.colorScale) }
+                : {}),
             ...(source.scaling ? { scaling: source.scaling } : {}),
             ...(svgRaster ? { svgRaster } : {})
         });
@@ -629,6 +653,14 @@ function snapshot(): SavedImageWindow[] {
                       )
                   }
                 : {}),
+            ...(widget.colorScale
+                ? {
+                      colorScale: {
+                          ...widget.colorScale,
+                          colors: [...widget.colorScale.colors]
+                      }
+                  }
+                : {}),
             path: widget.image.path,
             pluginId: widget.image.pluginId,
             rect: { ...widget.rect },
@@ -646,6 +678,7 @@ function hydrate(saved: RestoredImageWindow[]) {
     formationSource.value = undefined;
     windows.value = saved.map(widget => ({
         id: widget.id,
+        ...(widget.colorScale ? { colorScale: widget.colorScale } : {}),
         image: productWindowImage(
             resolveMetadataAxes(widget.image, widget.metadataAxesSource),
             widget.formationProductId
@@ -865,7 +898,8 @@ defineExpose({
     setScaling,
     formSicd,
     createSidd,
-    saveImage
+    saveImage,
+    openColorScale
 } satisfies ImageWorkspaceAPI);
 
 /**

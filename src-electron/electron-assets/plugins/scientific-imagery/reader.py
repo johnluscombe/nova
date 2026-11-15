@@ -313,7 +313,7 @@ def derived_values(samples, kind="SIDD"):
     raise ValueError("Unsupported derived image bands")
 
 
-def render_derived(reader):
+def render_derived(reader, color_scale=None):
     """Build a bounded preview and sampled percentiles for the first SIDD image or TIFF page."""
 
     import numpy as np
@@ -369,6 +369,12 @@ def render_derived(reader):
                 pixels[finite] = 127
 
         info["Preview"] = "Intensity, 1st–99th percentile stretch"
+
+    if color_scale is not None:
+        from color_scale import colorize
+
+        pixels = colorize(values, color_scale)
+        info["Preview"] = "Custom color scale, source intensity limits"
 
     axes = sidd_axes(metadata)
 
@@ -721,7 +727,7 @@ def scale_samples(samples, metadata, rows, columns, scaling):
     return power
 
 
-def render(file_path, scaling="amplitude"):
+def render(file_path, scaling="amplitude", color_scale=None):
     """Read the first source image or channel into a bounded preview and sampled statistics.
 
     Complex previews retain original dimensions and expose supported scaling modes;
@@ -743,7 +749,7 @@ def render(file_path, scaling="amplitude"):
             if scaling != "amplitude":
                 raise ValueError("Derived image pixels do not support complex scaling")
 
-            return render_derived(reader)
+            return render_derived(reader, color_scale)
 
         metadata = complex_metadata(reader)
         height, width = int(metadata.ImageData.NumRows), int(metadata.ImageData.NumCols)
@@ -788,11 +794,23 @@ def render(file_path, scaling="amplitude"):
             else:
                 pixels[finite] = 127
 
+        if color_scale is not None:
+            from color_scale import colorize
+
+            pixels = colorize(values, color_scale, scaling == "amplitude")
+
         info = image_metadata(metadata)
         info["Scaling"] = SCALING_LABELS[scaling]
         info["Preview"] = (
             "Log amplitude" if scaling == "amplitude" else SCALING_LABELS[scaling]
         ) + ", 1st–99th percentile stretch"
+        if color_scale is not None:
+            info["Preview"] = (
+                "Custom color scale, "
+                + SCALING_LABELS[scaling]
+                + (" (logarithmic display)" if scaling == "amplitude" else "")
+            )
+
         power = np.abs(complex_samples.astype(np.complex128)) ** 2
         finite_power = power[np.isfinite(power)]
         axes = image_axes(metadata)
@@ -1156,11 +1174,17 @@ def main():
 
         # Keep library logging away from the stdout JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            if len(argv) == 5 and argv[2] == "--export":
+            if len(argv) == 5 and argv[2] == "--display":
+                result = render(argv[1], argv[3], json.loads(argv[4]))
+            elif len(argv) in (5, 6) and argv[2] == "--export":
                 import export_image
 
                 result = export_image.export_image(
-                    argv[1], argv[3], argv[4], sys.modules[__name__]
+                    argv[1],
+                    argv[3],
+                    argv[4],
+                    sys.modules[__name__],
+                    json.loads(argv[5]) if len(argv) == 6 else None,
                 )
             elif len(argv) == 5 and argv[2] == "--crop":
                 from crop import crop_image

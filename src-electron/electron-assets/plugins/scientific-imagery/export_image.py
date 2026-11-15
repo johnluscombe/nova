@@ -38,7 +38,7 @@ def write_raster(image, output):
     image.save(output, format=kind, **options)
 
 
-def export_image(source, output, scaling, worker):
+def export_image(source, output, scaling, worker, color_scale=None):
     """Export the first image/channel at source resolution using preview display mapping.
 
     Scientific values are mapped to 8-bit display pixels; this is a visual export,
@@ -56,6 +56,24 @@ def export_image(source, output, scaling, worker):
     if not scientific:
         with Image.open(source) as image:
             image.load()
+            if color_scale is not None:
+                from color_scale import validate_scale, apply_colors
+
+                validate_scale(color_scale)
+                low = (
+                    color_scale["minimum"] if color_scale["minimum"] is not None else 0
+                )
+                high = (
+                    color_scale["maximum"]
+                    if color_scale["maximum"] is not None
+                    else 255
+                )
+                if low >= high:
+                    raise ValueError("Color scale minimum must be below maximum")
+                rgba = np.array(image.convert("RGBA"))
+                luminance = rgba[..., :3] @ np.array([0.2126, 0.7152, 0.0722])
+                rgba[..., :3] = apply_colors(luminance, color_scale, (low, high))
+                image = Image.fromarray(rgba)
             write_raster(image, output)
         return {}
 
@@ -96,7 +114,11 @@ def export_image(source, output, scaling, worker):
                         else np.full(power.shape, np.nan)
                     )
             result = worker.scale_samples(samples, metadata, rows, columns, scaling)
-            return np.log1p(result) if scaling == "amplitude" else result
+            return (
+                np.log1p(result)
+                if scaling == "amplitude" and color_scale is None
+                else result
+            )
 
         reference = values(preview, range(0, height, step), range(0, width, step))
         finite = np.isfinite(reference) & (
@@ -105,7 +127,16 @@ def export_image(source, output, scaling, worker):
         low, high = (
             np.percentile(reference[finite], [1, 99]) if finite.any() else (0, 0)
         )
-        channels = preview.shape[2:] if preserve else ()
+        color_limits = None
+        if color_scale is not None:
+            from color_scale import color_bounds, apply_colors
+
+            color_limits = color_bounds(
+                reference, color_scale, not derived and scaling == "amplitude"
+            )
+        channels = (
+            (3,) if color_scale is not None else preview.shape[2:] if preserve else ()
+        )
         if channels == (1,):
             channels = ()
         with tempfile.TemporaryFile() as buffer:
@@ -116,7 +147,15 @@ def export_image(source, output, scaling, worker):
                 samples = reader.read(
                     slice(row, row + 1), slice(0, width), index=0, squeeze=False
                 )
-                if preserve:
+                if color_scale is not None:
+                    data = values(samples, [row], range(width))[0]
+                    pixels[row] = apply_colors(
+                        data,
+                        color_scale,
+                        color_limits,
+                        not derived and scaling == "amplitude",
+                    )
+                elif preserve:
                     data = samples[0]
                     pixels[row] = (
                         data[..., 0] if data.ndim == 2 and data.shape[-1] == 1 else data

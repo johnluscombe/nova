@@ -1,3 +1,5 @@
+import { colorizePixels } from "../src/utils/color-scale";
+import { validateColorScale, type ColorScale } from "../src/types/color-scale";
 import type { ImageSaveOptions } from "../src/types/image-export";
 import { ImageSaver, rasterExportExtensions } from "./image-save";
 import type { ImageCrop } from "../src/types/crop";
@@ -205,7 +207,8 @@ async function createWindow() {
                     const image = await imagePlugins.open(
                         saved.path,
                         saved.pluginId,
-                        saved.scaling
+                        saved.scaling,
+                        saved.colorScale
                     );
 
                     if (saved.metadataFiles?.length) {
@@ -481,7 +484,7 @@ async function createWindow() {
                         const extension = path.extname(output).toLowerCase();
                         const vector = options.pluginId === "nova.vector";
                         const standard = options.pluginId !== "nova.sicd";
-                        const raster =
+                        let raster =
                             vector && options.svgRaster
                                 ? nativeImage.createFromDataURL(
                                       options.svgRaster
@@ -489,6 +492,36 @@ async function createWindow() {
                                 : standard
                                   ? nativeImage.createFromPath(source)
                                   : undefined;
+
+                        if (
+                            raster &&
+                            !raster.isEmpty() &&
+                            options.colorScale &&
+                            !vector &&
+                            [".png", ".jpg", ".jpeg"].includes(extension)
+                        ) {
+                            const size = raster.getSize();
+                            const bytes = raster.toBitmap();
+                            const rgba = new Uint8ClampedArray(bytes);
+
+                            for (let i = 0; i < rgba.length; i += 4) {
+                                [rgba[i], rgba[i + 2]] = [
+                                    rgba[i + 2]!,
+                                    rgba[i]!
+                                ];
+                            }
+                            colorizePixels(rgba, options.colorScale);
+                            for (let i = 0; i < rgba.length; i += 4) {
+                                [rgba[i], rgba[i + 2]] = [
+                                    rgba[i + 2]!,
+                                    rgba[i]!
+                                ];
+                            }
+                            raster = nativeImage.createFromBitmap(
+                                Buffer.from(rgba),
+                                size
+                            );
+                        }
 
                         if (
                             raster &&
@@ -529,10 +562,12 @@ async function createWindow() {
                             await imagePlugins.exportRaster(
                                 source,
                                 output,
-                                options.scaling
+                                options.scaling,
+                                options.colorScale
                             );
                         }
-                    }
+                    },
+                    !!options.colorScale
                 )
             )
     );
@@ -590,14 +625,49 @@ async function createWindow() {
             })
     );
     mainWindow.webContents.ipc.handle(
+        "image:color-scale",
+        (
+            _event,
+            filePath: string,
+            pluginId: string,
+            scale: ColorScale | undefined,
+            scaling?: Scaling
+        ) =>
+            documentAction(() => {
+                if (!scenario.current || pluginId !== "nova.sicd") {
+                    throw new Error(
+                        "Open a scientific image before changing its color scale."
+                    );
+                }
+
+                return imagePlugins.open(
+                    filePath,
+                    pluginId,
+                    scaling,
+                    scale ? validateColorScale(scale) : undefined
+                );
+            })
+    );
+    mainWindow.webContents.ipc.handle(
         "image:scaling",
-        (_event, filePath: string, pluginId: string, scaling: Scaling) =>
+        (
+            _event,
+            filePath: string,
+            pluginId: string,
+            scaling: Scaling,
+            colorScale?: ColorScale
+        ) =>
             documentAction(() => {
                 if (!scenario.current) {
                     throw new Error("Open a scenario before scaling images.");
                 }
 
-                return imagePlugins.rescale(filePath, pluginId, scaling);
+                return imagePlugins.rescale(
+                    filePath,
+                    pluginId,
+                    scaling,
+                    colorScale
+                );
             })
     );
     mainWindow.webContents.ipc.handle(

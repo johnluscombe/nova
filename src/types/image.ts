@@ -1,3 +1,4 @@
+import type { ColorScale } from "./color-scale";
 import type { ImageSaveOptions } from "./image-export";
 import type { ImageCrop } from "./crop";
 import type { SiddSettings } from "./sidd";
@@ -150,6 +151,14 @@ export interface ImagePluginStatus {
  * Source reads and file writes run through the main process.
  */
 export interface ImageAPI {
+    /** Render a scientific preview using source-unit clipping limits and an RGB palette. */
+    colorScale(
+        filePath: string,
+        pluginId: string,
+        scale: ColorScale | undefined,
+        scaling?: Scaling
+    ): Promise<ImageInfo>;
+
     /**
      * Save native bytes or convert to the destination raster encoding using the
      * selected display scaling. Return the destination or null on cancellation.
@@ -258,7 +267,8 @@ export interface ImageAPI {
     rescale(
         filePath: string,
         pluginId: string,
-        scaling: Scaling
+        scaling: Scaling,
+        colorScale?: ColorScale
     ): Promise<ImageInfo>;
 
     /**

@@ -1,3 +1,4 @@
+import { validateColorScale } from "@/types/color-scale";
 import type { Ref, ComputedRef } from "vue";
 import type { ImageInfo } from "@/types/image";
 import type { ImageWindow } from "@/types/image-window";
@@ -275,7 +276,10 @@ export function useImageProcessing(context: ProcessingContext) {
                 const image = await window.images!.rescale(
                     widget.image.path,
                     widget.image.pluginId,
-                    scaling
+                    scaling,
+                    ...(widget.colorScale
+                        ? [validateColorScale(widget.colorScale)]
+                        : [])
                 );
 
                 if (widget.image.attachedMetadata) {

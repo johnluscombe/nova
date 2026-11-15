@@ -56,6 +56,7 @@ jobs:
                   python tests/unit/python/sidd-creation.test.py
                   python tests/unit/python/crop.test.py
                   python tests/unit/python/export.test.py
+                  python tests/unit/python/color-scale.test.py
             - name: Run unit and Electron tests with combined coverage
               run: npm run test:coverage:all
             - name: Summarize coverage and prepare badge

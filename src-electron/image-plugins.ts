@@ -1,3 +1,4 @@
+import { validateColorScale, type ColorScale } from "../src/types/color-scale";
 import { validateCrop, type ImageCrop } from "../src/types/crop";
 import { validateSiddSettings, type SiddSettings } from "../src/types/sidd";
 import {
@@ -40,7 +41,8 @@ export interface ImagePlugin {
         filePath: string,
         outputPath: string,
         parameters: PluginParameters,
-        scaling?: Scaling
+        scaling?: Scaling,
+        colorScale?: ColorScale
     ): Promise<void>;
 
     /**
@@ -140,7 +142,8 @@ export interface ImagePlugin {
     open?(
         filePath: string,
         parameters: PluginParameters,
-        scaling?: Scaling
+        scaling?: Scaling,
+        colorScale?: ColorScale
     ): ImagePluginResult | Promise<ImagePluginResult>;
 
     /**
@@ -170,7 +173,8 @@ export class ImagePlugins {
     async exportRaster(
         filePath: string,
         outputPath: string,
-        scaling?: Scaling
+        scaling?: Scaling,
+        colorScale?: ColorScale
     ): Promise<void> {
         const plugin = this.plugins.find(
             item => item.manifest.id === "nova.sicd"
@@ -190,7 +194,8 @@ export class ImagePlugins {
             filePath,
             outputPath,
             plugin.manifest.parameters ?? {},
-            scaling
+            scaling,
+            colorScale ? validateColorScale(colorScale) : undefined
         );
     }
 
@@ -817,7 +822,8 @@ export class ImagePlugins {
     async rescale(
         filePath: string,
         pluginId: string,
-        scaling: Scaling
+        scaling: Scaling,
+        colorScale?: ColorScale
     ): Promise<ImageInfo> {
         const image = this.openedImages.get(
             JSON.stringify([filePath, pluginId])
@@ -827,7 +833,7 @@ export class ImagePlugins {
             throw new Error("Scaling is unavailable for this image.");
         }
 
-        return this.open(filePath, pluginId, scaling);
+        return this.open(filePath, pluginId, scaling, colorScale);
     }
 
     /**
@@ -837,7 +843,8 @@ export class ImagePlugins {
     async open(
         filePath: string,
         pluginId?: string,
-        scaling?: Scaling
+        scaling?: Scaling,
+        colorScale?: ColorScale
     ): Promise<ImageInfo> {
         if (!this.plugins.length) {
             throw new Error("Install an image plugin before opening images.");
@@ -866,7 +873,8 @@ export class ImagePlugins {
                 const result = await implementation.open!(
                     filePath,
                     manifest.parameters ?? Object.freeze({}),
-                    scaling
+                    scaling,
+                    colorScale ? validateColorScale(colorScale) : undefined
                 );
 
                 if (!result || typeof result !== "object") {

@@ -50,6 +50,7 @@ export async function selectRibbonFor(page: Page, label: string) {
         "Pixel Values",
         "Statistics",
         "Scaling",
+        "Color Scale",
         "Slice",
         "Polygon",
         "Crop",

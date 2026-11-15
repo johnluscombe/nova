@@ -15,6 +15,14 @@ import type {
 contextBridge.exposeInMainWorld("quasarRuntime", quasarRuntime);
 
 contextBridge.exposeInMainWorld("images", {
+    colorScale: (filePath, pluginId, scale, scaling) =>
+        ipcRenderer.invoke(
+            "image:color-scale",
+            filePath,
+            pluginId,
+            scale,
+            scaling
+        ),
     save: (filePath, options) =>
         ipcRenderer.invoke("image:save", filePath, options),
     region: (filePath, pluginId, polygon, scaling) =>
@@ -94,8 +102,14 @@ contextBridge.exposeInMainWorld("images", {
         ipcRenderer.invoke("image:create-sidd", filePath, pluginId, settings),
     formSicd: (filePath, pluginId, settings) =>
         ipcRenderer.invoke("image:form-sicd", filePath, pluginId, settings),
-    rescale: (filePath, pluginId, scaling) =>
-        ipcRenderer.invoke("image:scaling", filePath, pluginId, scaling),
+    rescale: (filePath, pluginId, scaling, colorScale) =>
+        ipcRenderer.invoke(
+            "image:scaling",
+            filePath,
+            pluginId,
+            scaling,
+            colorScale
+        ),
     slice: (filePath, pluginId, orientation, index, scaling) =>
         ipcRenderer.invoke(
             "image:slice",

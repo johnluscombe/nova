@@ -40,7 +40,8 @@ export class ImageSaver {
     async save(
         source: string,
         choose: (suggestedPath: string) => Promise<string | null>,
-        convert?: (source: string, output: string) => Promise<void>
+        convert?: (source: string, output: string) => Promise<void>,
+        forceRaster = false
     ): Promise<string | null> {
         if (typeof source !== "string" || !path.isAbsolute(source)) {
             throw new Error("Choose an image with a valid source file.");
@@ -70,7 +71,10 @@ export class ImageSaver {
                 extensions.includes(extension) &&
                 extensions.includes(targetExtension)
         );
-        let conversion = false;
+        let conversion =
+            !!convert &&
+            forceRaster &&
+            rasterExportExtensions.includes(targetExtension.slice(1));
 
         if (targetExtension !== extension && !sameEncoding) {
             if (
@@ -92,6 +96,12 @@ export class ImageSaver {
                     `Save this image with its original ${extension || "file"} extension. Format conversion is not supported.`
                 );
             }
+        }
+
+        if (target === sourcePath && conversion) {
+            throw new Error(
+                "Choose a different filename for a color-mapped export to preserve the source image."
+            );
         }
 
         if (target !== sourcePath) {

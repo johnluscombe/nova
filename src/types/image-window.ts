@@ -1,3 +1,4 @@
+import type { ColorScale } from "./color-scale";
 import type { ImageInfo } from "./image";
 import type { PolygonPoint, RegionStatistics } from "./region";
 import type { SliceData, SliceSelection } from "./slice";
@@ -8,6 +9,12 @@ import type { WindowRect } from "@/utils/window-geometry";
  * SavedImageWindow.
  */
 export interface ImageWindow {
+    /** Per-image scalar clipping and display palette, preserved with the scenario. */
+    colorScale?: ColorScale;
+
+    /** Colored standard-image preview; source preview remains available for analysis. */
+    colorPreviewDataUrl?: string;
+
     /** Session-local widget identifier used for asynchronous updates. */
     id: number;
 

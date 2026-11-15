@@ -1,3 +1,4 @@
+import type { ColorScale } from "../../../../src/types/color-scale.ts";
 import type { ImageCrop } from "../../../../src/types/crop.ts";
 import type { SiddSettings } from "../../../../src/types/sidd.ts";
 import { readFile, stat } from "node:fs/promises";
@@ -163,13 +164,18 @@ export async function openScientificImage(
     filePath: string,
     parameters: PluginParameters = {},
     run: Runner = execute,
-    scaling?: Scaling
+    scaling?: Scaling,
+    colorScale?: ColorScale
 ): Promise<ImagePluginResult> {
     const result = (await executeReader(
         filePath,
         parameters,
         run,
-        scaling ? ["--scaling", scaling] : []
+        colorScale
+            ? ["--display", scaling ?? "amplitude", JSON.stringify(colorScale)]
+            : scaling
+              ? ["--scaling", scaling]
+              : []
     )) as ImagePluginResult;
 
     if (
@@ -344,12 +350,23 @@ export async function cropImage(
 }
 
 export default {
-    exportImage: async (filePath, outputPath, parameters, scaling) => {
+    exportImage: async (
+        filePath,
+        outputPath,
+        parameters,
+        scaling,
+        colorScale
+    ) => {
         await executeReader(
             filePath,
             parameters,
             execute,
-            ["--export", outputPath, scaling ?? "amplitude"],
+            [
+                "--export",
+                outputPath,
+                scaling ?? "amplitude",
+                ...(colorScale ? [JSON.stringify(colorScale)] : [])
+            ],
             600_000
         );
     },
@@ -387,6 +404,6 @@ export default {
             execute,
             scaling
         ),
-    open: (filePath, parameters, scaling?: Scaling) =>
-        openScientificImage(filePath, parameters, execute, scaling)
+    open: (filePath, parameters, scaling?: Scaling, colorScale?: ColorScale) =>
+        openScientificImage(filePath, parameters, execute, scaling, colorScale)
 } satisfies ImagePlugin;

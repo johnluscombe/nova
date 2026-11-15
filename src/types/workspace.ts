@@ -1,3 +1,4 @@
+import { validateColorScale, type ColorScale } from "./color-scale";
 import { validatePolygon, type PolygonPoint } from "./region";
 import { isScaling, type Scaling } from "./scaling";
 import type { ImageInfo } from "./image";
@@ -7,6 +8,9 @@ import type { ImageInfo } from "./image";
  * statistics, and graph data are excluded.
  */
 export interface SavedImageWindow {
+    /** Per-image scalar clipping and display palette, preserved with the scenario. */
+    colorScale?: ColorScale;
+
     formationProductId?: string;
 
     /** Closed polygon vertices in source pixel-edge coordinates. */
@@ -127,6 +131,10 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
             );
         }
 
+        if (item.colorScale !== undefined) {
+            validateColorScale(item.colorScale);
+        }
+
         ids.add(item.id);
     }
 
@@ -138,6 +146,9 @@ export function validateWorkspace(value: unknown): SavedImageWindow[] {
  * active-image actions.
  */
 export interface ImageWorkspaceAPI {
+    /** Edit display clipping limits and palette for the active image. */
+    openColorScale(): void;
+
     /** Save or convert the active source image, always choosing a destination. */
     saveImage(): Promise<void>;
 
