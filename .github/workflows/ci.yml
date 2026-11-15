@@ -48,13 +48,13 @@ jobs:
                   npm run lint:check
             - name: Test scientific imagery readers
               run: |
-                  python src-electron/sicd-reader.test.py
-                  python src-electron/sidd-reader.test.py
-                  python src-electron/tiff-reader.test.py
-                  python src-electron/cphd-reader.test.py
-                  python src-electron/formation.test.py
-                  python src-electron/sidd-creation.test.py
-                  python src-electron/crop.test.py
+                  python tests/unit/python/sicd-reader.test.py
+                  python tests/unit/python/sidd-reader.test.py
+                  python tests/unit/python/tiff-reader.test.py
+                  python tests/unit/python/cphd-reader.test.py
+                  python tests/unit/python/formation.test.py
+                  python tests/unit/python/sidd-creation.test.py
+                  python tests/unit/python/crop.test.py
             - name: Run unit and Electron tests with combined coverage
               run: npm run test:coverage:all
             - name: Summarize coverage and prepare badge

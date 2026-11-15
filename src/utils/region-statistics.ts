@@ -5,10 +5,21 @@ import {
     type PolygonPoint,
     type RegionStatistics
 } from "../types/region";
+
+/**
+ * Compute percentiles 0 through 100 with linear interpolation over finite
+ * values.
+ *
+ * @param values - Numerical samples; nonfinite values are excluded without
+ * mutating the input.
+ * @returns Ordinal percentile labels mapped to values, or null for empty
+ * finite input.
+ */
 export function percentileStatistics(
     values: number[]
 ): Record<string, number | null> {
     const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+
     return Object.fromEntries(
         Array.from({ length: 101 }, (_, p) => {
             const suffix =
@@ -27,10 +38,22 @@ export function percentileStatistics(
                 ? sorted[low]! +
                   (sorted[high]! - sorted[low]!) * (position - low)
                 : null;
+
             return [`${p}${suffix} percentile`, value];
         })
     );
 }
+
+/**
+ * Compute preview luminance statistics on a canvas capped at 1600 pixels per
+ * side.
+ *
+ * @param polygon - Optional polygon in source-pixel edge coordinates, not
+ * preview coordinates.
+ * @returns Selected and whole-image percentiles, excluding fully transparent
+ * pixels. Values describe displayed luminance, not original scientific
+ * samples.
+ */
 export async function previewRegionStatistics(
     image: ImageInfo,
     polygon?: PolygonPoint[]
@@ -38,9 +61,12 @@ export async function previewRegionStatistics(
     if (!image.previewDataUrl) {
         throw new Error("This image has no preview to sample.");
     }
+
     const decoded = new Image();
+
     decoded.src = image.previewDataUrl;
     await decoded.decode();
+
     const width = image.width ?? decoded.naturalWidth,
         height = image.height ?? decoded.naturalHeight;
     const points = polygon
@@ -51,38 +77,51 @@ export async function previewRegionStatistics(
         1600 / Math.max(decoded.naturalWidth, decoded.naturalHeight)
     );
     const canvas = document.createElement("canvas");
+
     canvas.width = Math.max(1, Math.round(decoded.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(decoded.naturalHeight * scale));
+
     const context = canvas.getContext("2d");
+
     if (!context) {
         throw new Error("Region sampling is unavailable.");
     }
+
     context.drawImage(decoded, 0, 0, canvas.width, canvas.height);
+
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
     const whole: number[] = [],
         selected: number[] = [];
+
     for (let y = 0; y < canvas.height; y++) {
         const intervals = points
             ? polygonIntervals(((y + 0.5) * height) / canvas.height, points)
             : [[0, width]];
         let intervalIndex = 0;
+
         for (let x = 0; x < canvas.width; x++) {
             const i = (y * canvas.width + x) * 4;
+
             if (!pixels[i + 3]) {
                 continue;
             }
+
             const value =
                 0.2126 * pixels[i]! +
                 0.7152 * pixels[i + 1]! +
                 0.0722 * pixels[i + 2]!;
+
             whole.push(value);
+
             const column = ((x + 0.5) * width) / canvas.width;
+
             while (
                 intervalIndex < intervals.length &&
                 column > intervals[intervalIndex]![1]! + 1e-8
             ) {
                 intervalIndex++;
             }
+
             if (
                 intervalIndex < intervals.length &&
                 column >= intervals[intervalIndex]![0]! - 1e-8
@@ -93,7 +132,9 @@ export async function previewRegionStatistics(
             }
         }
     }
+
     const statistics = percentileStatistics(points ? selected : whole);
+
     return {
         statistics,
         wholeImageStatistics: points ? percentileStatistics(whole) : statistics,

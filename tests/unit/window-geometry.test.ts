@@ -22,17 +22,21 @@ test("windows stay reachable when moved off canvas or the canvas shrinks", () =>
 test("all resize edges enforce minimum size and canvas boundaries", () => {
     const bounds = { width: 800, height: 600 };
     const rect = { x: 100, y: 100, width: 400, height: 300 };
+
     for (const edge of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
         for (const dx of [-2000, 2000]) {
             for (const dy of [-2000, 2000]) {
                 const next = resizeWindow(rect, edge, dx, dy, bounds);
+
                 assert.ok(next.x >= 0 && next.y >= 0);
                 assert.ok(next.width >= 260 && next.height >= 180);
                 assert.ok(next.x + next.width <= bounds.width);
                 assert.ok(next.y + next.height <= bounds.height);
+
                 if (edge.includes("w")) {
                     assert.equal(next.x + next.width, 500);
                 }
+
                 if (edge.includes("n")) {
                     assert.equal(next.y + next.height, 400);
                 }

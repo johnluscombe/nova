@@ -56,31 +56,51 @@
         </text>
     </svg>
 </template>
+
 <script setup lang="ts">
 import { computed } from "vue";
 import { axisTicks, type ImageAxes } from "@/types/axes";
+
 const props = defineProps<{
     axes: ImageAxes;
+
     width: number;
+
     height: number;
-    rect: { left: number; top: number; width: number; height: number };
+
+    rect: {
+        left: number;
+
+        top: number;
+
+        width: number;
+
+        height: number;
+    };
 }>();
+
 const rowLabel = computed(
     () => `${props.axes.row.label} (${props.axes.row.unit})`
 );
 const columnLabel = computed(
     () => `${props.axes.column.label} (${props.axes.column.unit})`
 );
+
 const rowTicks = computed(() =>
     axisTicks(props.axes.row, props.height, props.rect.height)
 );
 const columnTicks = computed(() =>
     axisTicks(props.axes.column, props.width, props.rect.width)
 );
+
+/**
+ * Format an axis tick to a compact, readable numerical label.
+ */
 function format(value: number) {
     return Number(value.toPrecision(5)).toString();
 }
 </script>
+
 <style scoped>
 .image-axis {
     min-width: 0;
@@ -88,22 +108,26 @@ function format(value: number) {
     color: #d9e7f5;
     pointer-events: none;
 }
+
 .axis-y {
     grid-column: 1;
     grid-row: 1;
     width: 78px;
     height: 100%;
 }
+
 .axis-x {
     grid-column: 3;
     grid-row: 3;
     width: 100%;
     height: 50px;
 }
+
 line {
     stroke: #91a5ba;
     stroke-width: 1;
 }
+
 text {
     fill: currentColor;
     font: 10px sans-serif;

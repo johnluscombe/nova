@@ -9,6 +9,7 @@ import type { ScenarioAPI } from "../../src/types/scenario.ts";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { activeScenario } from "../../src/composables/useScenario.ts";
+
 const workspace = vi.hoisted(() => ({
     add: vi.fn(() => 1),
     complete: vi.fn(),
@@ -18,16 +19,23 @@ const workspace = vi.hoisted(() => ({
     toggleMetadata: vi.fn(),
     toggleStatistics: vi.fn()
 }));
-vi.mock("../../src/components/ImageWorkspace.vue", () => ({
+
+vi.mock("../../src/components/workspace/ImageWorkspace.vue", () => ({
     default: defineComponent({
         name: "ImageWorkspace",
+
+        /**
+         * Install isolated desktop API mocks for the page test.
+         */
         setup(_, { expose }) {
             expose(workspace);
+
             return () => h("div", "Workspace");
         }
     })
 }));
 import IndexPage from "../../src/pages/IndexPage.vue";
+
 let wrapper: VueWrapper<InstanceType<typeof IndexPage>> | undefined;
 let flush: () => void;
 let scenarioMock: Mocked<ScenarioAPI>;
@@ -53,6 +61,7 @@ const stubs: Record<string, Component> = Object.fromEntries(
         "QBanner"
     ].map(name => [name, container])
 );
+
 stubs.QTabs = {
     name: "QTabs",
     props: ["modelValue"],
@@ -85,14 +94,17 @@ beforeEach(() => {
         attachMetadata: vi.fn(),
         importFiles: vi.fn(async (onUpdate, paths) => {
             const selected = Array.isArray(paths) ? paths : [paths];
+
             for (const [index, file] of selected.entries()) {
                 const image = await imagesMock.open(image => {
                     onUpdate({ key: String(index), status: "loading", image });
                 }, file);
+
                 if (image) {
                     onUpdate({ key: String(index), status: "ready", image });
                 }
             }
+
             return { errors: [] };
         }),
         pixel: vi.fn(),
@@ -120,6 +132,7 @@ beforeEach(() => {
         saveWorkspace: vi.fn(async () => {}),
         onFlushRequested: vi.fn<ScenarioAPI["onFlushRequested"]>(callback => {
             flush = callback;
+
             return vi.fn();
         }),
         confirmClose: vi.fn(async () => {}),
@@ -143,11 +156,20 @@ afterEach(() => {
     delete window.images;
     Reflect.deleteProperty(window, "scenario");
 });
+
+/**
+ * Mount the scenario page with stubbed workspace and Quasar controls.
+ */
 async function page() {
     wrapper = mount(IndexPage, { global: { stubs } });
     await flushPromises();
+
     return wrapper;
 }
+
+/**
+ * Click the named ribbon control and flush asynchronous Vue work.
+ */
 async function click(label: string) {
     await wrapper!
         .findAll("button")
@@ -196,6 +218,7 @@ test("image opening handles plugins that return directly or announce loading fir
     expect(workspace.add).toHaveBeenCalledWith(image);
     imagesMock.open.mockImplementation(async callback => {
         callback?.(image);
+
         return image;
     });
     await wrapper!.get('[aria-label="Add Image"]').trigger("click");
@@ -203,6 +226,7 @@ test("image opening handles plugins that return directly or announce loading fir
     expect(workspace.complete).toHaveBeenCalledWith(1, image);
     imagesMock.open.mockImplementation(async callback => {
         callback?.(image);
+
         throw "decode failed";
     });
     await wrapper!.get('[aria-label="Add Image"]').trigger("click");
@@ -250,8 +274,12 @@ test("failed saves keep work open and prevent confirming application shutdown", 
     expect(activeScenario.value).toEqual(scenario);
 });
 
+/**
+ * Dispatch a native-style file drop into the page test.
+ */
 async function drop(...names: string[]) {
     const event = new Event("drop", { cancelable: true });
+
     Object.defineProperty(event, "dataTransfer", {
         value: { files: names.map(name => new File([""], name)) }
     });
@@ -295,6 +323,7 @@ test("image drops keep the existing loading and failure behavior", async () => {
     scenarioMock.restoreLast.mockResolvedValue(scenario);
     imagesMock.open.mockImplementation(async onLoading => {
         onLoading?.(image);
+
         throw new Error("Unable to decode dropped image");
     });
     await page();
@@ -312,14 +341,18 @@ test("image drops keep the existing loading and failure behavior", async () => {
 
 test("contextual image tabs organize View, Edit, and Analysis controls", async () => {
     await page();
+
     const labels = () =>
         wrapper!.findAll("button").map(button => button.text());
+
     expect(labels()).not.toContain("Metadata");
     expect(labels()).not.toContain("Slice");
     expect(labels()).not.toContain("Statistics");
+
     const workspaceComponent = wrapper!.getComponent({
         name: "ImageWorkspace"
     });
+
     workspaceComponent.vm.$emit("imageContextChange", {
         available: true,
         scientific: true
@@ -340,19 +373,23 @@ test("contextual image tabs organize View, Edit, and Analysis controls", async (
     expect(
         wrapper!.get('[aria-labelledby="view-group-label"]').text()
     ).toContain("Statistics");
+
     for (const label of ["Metadata", "Axes", "Pixel Values", "Statistics"]) {
         expect(
             wrapper!.get('[aria-labelledby="view-group-label"]').text()
         ).toContain(label);
     }
+
     expect(
         wrapper!.get('[aria-labelledby="edit-group-label"]').text()
     ).toContain("Crop");
+
     for (const label of ["Slice", "Polygon", "Clear Region"]) {
         expect(
             wrapper!.get('[aria-labelledby="analysis-group-label"]').text()
         ).toContain(label);
     }
+
     expect(labels()).toContain("Metadata");
     workspaceComponent.vm.$emit("imageContextChange", {
         available: true,

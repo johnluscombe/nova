@@ -31,7 +31,9 @@ npm run test:coverage:all
 ```
 
 Combined coverage is available at `coverage/combined/index.html`.
-See [testing and coverage](docs/testing.md) for setup and reporting details.
+See [testing and coverage](docs/testing.md) for setup and reporting details, and
+[code documentation and readability](docs/code-style.md) for method documentation
+and formatting conventions.
 
 ## Scenarios and images
 
@@ -57,7 +59,7 @@ bottom of the image. Hover over the left strip to preview a horizontal slice, or
 the bottom strip for a vertical slice; click to open its graph. SICD plots the selected source quantity; SIDD plots derived intensity or RGB luminance. Other formats plot preview luminance.
 Graphs open as independent temporary widgets and are not saved to scenarios.
 
-Use **Scientific Imagery → Analysis → Scaling** on SICD images or their slice graphs to select amplitude,
+Use **Scientific Imagery → Edit → Scaling** on SICD images or their slice graphs to select amplitude,
 complex components, phase, power, or calibrated radar quantities when available.
 Image scaling is saved with the scenario. See [SICD scaling](docs/scientific-imagery-plugin.md#scaling).
 
@@ -74,11 +76,12 @@ associated during import or added later using the image tab’s **Data → Attac
 Recognized JSON axes can supply physical coordinates or explicitly override
 embedded axes. See [metadata and axis sources](docs/metadata.md).
 
-The contextual tab is named **Scientific Imagery** for SICD, SIDD, and TIFF, or
-**Image** for ordinary images. It contains **Data** (Attach Metadata) and
-**Analysis** (Statistics, Scaling, Polygon, Clear Region, and Slice). Home’s **View** group retains Metadata,
-Axes, and Pixel Values. Image tools remain available for slice graphs
-where applicable, and the ribbon returns to Home when no widget is active.
+The contextual tab is named **Scientific Imagery** for SICD, SIDD, CPHD, and TIFF,
+or **Image** for ordinary images. It contains **View** (Metadata, Axes, Pixel Values,
+Statistics), **Edit** (Scaling, Crop), **Data** (Attach Metadata, with scientific
+product creation where supported), and **Analysis** (Polygon, Clear Region, Slice).
+Image tools remain available for slice graphs where applicable, and the ribbon
+returns to Home when no widget is active.
 
 Use **Analysis → Polygon** to select an image region. Closing it updates Statistics
 with regional percentiles; **Clear Region** restores whole-image statistics.

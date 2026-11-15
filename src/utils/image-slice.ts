@@ -1,6 +1,10 @@
 import type { ImageInfo } from "../types/image";
 import type { SliceData, SliceOrientation } from "../types/slice";
 
+/**
+ * Read a row or column from the decoded preview and label its
+ * luminance-based values.
+ */
 export async function previewSlice(
     image: ImageInfo,
     orientation: SliceOrientation,
@@ -9,27 +13,37 @@ export async function previewSlice(
     if (!image.previewDataUrl) {
         throw new Error("This image has no preview to slice.");
     }
+
     const decoded = new Image();
+
     decoded.src = image.previewDataUrl;
     await decoded.decode();
+
     const width = image.width ?? decoded.naturalWidth;
     const height = image.height ?? decoded.naturalHeight;
     const limit = orientation === "horizontal" ? height : width;
+
     if (!Number.isSafeInteger(index) || index < 0 || index >= limit) {
         throw new Error("Slice index is outside the image.");
     }
+
     const canvas = document.createElement("canvas");
     const scale = Math.min(
         1,
         1600 / Math.max(decoded.naturalWidth, decoded.naturalHeight)
     );
+
     canvas.width = Math.max(1, Math.round(decoded.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(decoded.naturalHeight * scale));
+
     const context = canvas.getContext("2d");
+
     if (!context) {
         throw new Error("Image sampling is unavailable.");
     }
+
     context.drawImage(decoded, 0, 0, canvas.width, canvas.height);
+
     const horizontal = orientation === "horizontal";
     const fixed = Math.min(
         (horizontal ? canvas.height : canvas.width) - 1,
@@ -54,6 +68,7 @@ export async function previewSlice(
                     count - 1,
                     Math.floor((position * count) / Math.min(length, count))
                 ) * 4;
+
             return {
                 position: Math.floor(
                     (position * length) / Math.min(length, count)
@@ -67,6 +82,7 @@ export async function previewSlice(
             };
         }
     );
+
     return {
         points,
         positionLabel: horizontal ? "Column (pixel)" : "Row (pixel)",
@@ -74,7 +90,9 @@ export async function previewSlice(
     };
 }
 
-/** Map a selector position to the source pixel, excluding letterboxed margins. */
+/**
+ * Map a selector position to the source pixel, excluding letterboxed margins.
+ */
 export function sliceAtOffset(
     offset: number,
     start: number,
@@ -93,6 +111,7 @@ export function sliceAtOffset(
     ) {
         return null;
     }
+
     return Math.min(
         length - 1,
         Math.floor(((offset - start) / extent) * length)

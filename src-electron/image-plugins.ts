@@ -30,25 +30,56 @@ import type {
     ImagePluginResult
 } from "../src/types/image";
 
+/**
+ * Decoder implementation contract loaded by the main-process host. Optional
+ * operations advertise source-data capabilities.
+ */
 export interface ImagePlugin {
+    /**
+     * Write a crop of original source pixels inside the assigned directory.
+     *
+     * @param selection - Validated source-pixel rectangle, including
+     * original image dimensions.
+     * @returns The generated file path directly inside directory; never
+     * overwrite the source.
+     */
     crop?(
         filePath: string,
         directory: string,
         selection: ImageCrop,
         parameters: PluginParameters
     ): Promise<string>;
+
+    /**
+     * Write a detected SIDD to a new output path using validated display
+     * and projection settings.
+     */
     createSidd?(
         filePath: string,
         outputPath: string,
         settings: SiddSettings,
         parameters: PluginParameters
     ): Promise<void>;
+
+    /**
+     * Form a SICD from supported phase history and write it to the
+     * assigned new output path.
+     */
     formSicd?(
         filePath: string,
         outputPath: string,
         settings: FormationSettings,
         parameters: PluginParameters
     ): Promise<void>;
+
+    /**
+     * Compute statistics inside a validated source-pixel polygon.
+     *
+     * @param peakPower - Sampled whole-image peak used by relative-power
+     * scaling.
+     * @returns Numeric percentiles, a finite sample count, and whether
+     * sampling was required.
+     */
     readRegion?(
         filePath: string,
         polygon: PolygonPoint[],
@@ -56,6 +87,11 @@ export interface ImagePlugin {
         scaling?: Scaling,
         peakPower?: number
     ): RegionStatistics | Promise<RegionStatistics>;
+
+    /**
+     * Return one zero-based source pixel in the selected scaling and
+     * relative-power reference.
+     */
     readPixel?(
         filePath: string,
         row: number,
@@ -64,6 +100,14 @@ export interface ImagePlugin {
         scaling?: Scaling,
         peakPower?: number
     ): PixelData | Promise<PixelData>;
+
+    /**
+     * Read a source row or column using manifest parameters and optional
+     * scaling.
+     *
+     * @returns Ordered samples whose positions are zero-based source pixel
+     * indices. Do not convert positions to meters here.
+     */
     readSlice?(
         filePath: string,
         orientation: SliceOrientation,
@@ -71,15 +115,30 @@ export interface ImagePlugin {
         parameters: PluginParameters,
         scaling?: Scaling
     ): SliceData | Promise<SliceData>;
+
+    /**
+     * Optionally probe whether this decoder accepts the selected file
+     * before attempting a read.
+     */
     canOpen?(
         filePath: string,
         parameters: PluginParameters
     ): boolean | Promise<boolean>;
+
+    /**
+     * Return source dimensions, preview, and available scientific metadata
+     * for this file and scaling.
+     */
     open?(
         filePath: string,
         parameters: PluginParameters,
         scaling?: Scaling
     ): ImagePluginResult | Promise<ImagePluginResult>;
+
+    /**
+     * Execute a declared plugin action with scenario context and manifest
+     * parameters.
+     */
     executeRibbonAction?(
         actionId: string,
         context: RibbonActionContext,
@@ -87,18 +146,27 @@ export interface ImagePlugin {
     ): RibbonActionResult | void | Promise<RibbonActionResult | void>;
 }
 
+/** A validated manifest paired with its loaded decoder implementation. */
 type LoadedPlugin = {
     manifest: ImagePluginManifest;
+
     implementation: ImagePlugin;
 };
 
+/**
+ * Discover decoders and validate their outputs at the renderer/plugin
+ * boundary.
+ */
 export class ImagePlugins {
     private readonly openedImages = new Map<
         string,
         {
             width: number | undefined;
+
             height: number | undefined;
+
             scalingOptions?: Scaling[];
+
             peakPower?: number;
         }
     >();
@@ -109,11 +177,18 @@ export class ImagePlugins {
 
     private readonly bundledDirectory: string | undefined;
 
+    /**
+     * Configure user and optional bundled plugin directories; discovery
+     * begins with reload.
+     */
     constructor(directory: string, bundledDirectory?: string) {
         this.directory = directory;
         this.bundledDirectory = bundledDirectory;
     }
 
+    /**
+     * Return installed plugin manifests together with discovery errors.
+     */
     get status(): ImagePluginStatus {
         return {
             directory: this.directory,
@@ -125,8 +200,13 @@ export class ImagePlugins {
         };
     }
 
+    /**
+     * Discover and validate plugins, allowing user installations to
+     * override matching bundled identifiers.
+     */
     async reload(): Promise<ImagePluginStatus> {
         await mkdir(this.directory, { recursive: true });
+
         const plugins: LoadedPlugin[] = [];
         const errors: string[] = [];
         const entries = (await readdir(this.directory, { withFileTypes: true }))
@@ -136,6 +216,7 @@ export class ImagePlugins {
                 directory: this.directory,
                 bundled: false
             }));
+
         if (this.bundledDirectory) {
             entries.push(
                 ...(
@@ -151,15 +232,18 @@ export class ImagePlugins {
                     }))
             );
         }
+
         for (const { entry, directory, bundled } of entries) {
             if (!entry.isDirectory()) {
                 continue;
             }
+
             try {
                 const folder = await realpath(path.join(directory, entry.name));
                 const manifest = JSON.parse(
                     await readFile(path.join(folder, "plugin.json"), "utf8")
                 ) as ImagePluginManifest;
+
                 if (
                     manifest.apiVersion !== 1 ||
                     typeof manifest.id !== "string" ||
@@ -178,6 +262,7 @@ export class ImagePlugins {
                         "Invalid image plugin manifest or unsupported API version."
                     );
                 }
+
                 if (
                     manifest.parameters !== undefined &&
                     (!manifest.parameters ||
@@ -196,14 +281,17 @@ export class ImagePlugins {
                         "Plugin parameters must be an object of strings, finite numbers, booleans, or null."
                     );
                 }
+
                 if (manifest.parameters !== undefined) {
                     manifest.parameters = Object.freeze({
                         ...manifest.parameters
                     });
                 }
+
                 if (manifest.ribbon !== undefined) {
                     validateRibbon(manifest.ribbon);
                 }
+
                 if (
                     !manifest.extensions.length &&
                     !manifest.ribbon?.tabs.length
@@ -212,18 +300,22 @@ export class ImagePlugins {
                         "Plugin must provide image types or ribbon tabs."
                     );
                 }
+
                 if (
                     plugins.some(plugin => plugin.manifest.id === manifest.id)
                 ) {
                     if (bundled) {
                         continue;
                     }
+
                     throw new Error("Duplicate plugin ID.");
                 }
+
                 const modulePath = await realpath(
                     path.resolve(folder, manifest.main)
                 );
                 const relative = path.relative(folder, modulePath);
+
                 if (
                     relative.startsWith("..") ||
                     path.isAbsolute(relative) ||
@@ -233,11 +325,13 @@ export class ImagePlugins {
                         "Plugin main must be a .ts or .mjs file inside its folder."
                     );
                 }
+
                 // External user-installed modules must stay outside the application bundle.
                 // Node caches modules; restart Nova after changing an already loaded module.
                 const module = (await import(
                     /* @vite-ignore */ pathToFileURL(modulePath).href
                 )) as { default?: ImagePlugin };
+
                 if (
                     !module.default ||
                     (manifest.extensions.length > 0 &&
@@ -266,6 +360,7 @@ export class ImagePlugins {
                         "Plugin must export handlers for its image types and ribbon buttons."
                     );
                 }
+
                 plugins.push({ manifest, implementation: module.default });
             } catch (cause) {
                 errors.push(
@@ -273,15 +368,26 @@ export class ImagePlugins {
                 );
             }
         }
+
         this.plugins = plugins;
         this.errors = errors;
+
         return this.status;
     }
 
-    get filters(): { name: string; extensions: string[] }[] {
+    /**
+     * Build native file-picker filters from the extensions accepted by
+     * installed decoders.
+     */
+    get filters(): {
+        name: string;
+
+        extensions: string[];
+    }[] {
         if (!this.plugins.some(plugin => plugin.manifest.extensions.length)) {
             return [];
         }
+
         return [
             {
                 name: "Supported images",
@@ -302,6 +408,10 @@ export class ImagePlugins {
         ];
     }
 
+    /**
+     * Validate a declared action and its scenario requirement before
+     * invoking the owning plugin.
+     */
     async executeRibbonAction(
         pluginId: string,
         actionId: string,
@@ -313,20 +423,25 @@ export class ImagePlugins {
         const button = plugin?.manifest.ribbon?.tabs
             .flatMap(tab => tab.groups.flatMap(group => group.buttons))
             .find(button => button.id === actionId);
+
         if (!plugin || !button || !plugin.implementation.executeRibbonAction) {
             throw new Error("Unknown plugin ribbon action.");
         }
+
         if (button.requiresScenario && !context.scenarioPath) {
             throw new Error("Open a scenario before using this action.");
         }
+
         const result = await plugin.implementation.executeRibbonAction(
             actionId,
             { scenarioPath: context.scenarioPath },
             plugin.manifest.parameters ?? Object.freeze({})
         );
+
         if (result === undefined) {
             return {};
         }
+
         if (
             !result ||
             typeof result !== "object" ||
@@ -334,9 +449,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Invalid plugin action result.");
         }
+
         return result.message === undefined ? {} : { message: result.message };
     }
 
+    /**
+     * Validate an opened image and polygon, then validate finite source
+     * statistics returned by its plugin.
+     */
     async readRegion(
         filePath: string,
         pluginId: string,
@@ -347,6 +467,7 @@ export class ImagePlugins {
             JSON.stringify([filePath, pluginId])
         );
         const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+
         if (
             !image?.width ||
             !image.height ||
@@ -354,13 +475,16 @@ export class ImagePlugins {
         ) {
             throw new Error("Open an image with source region support first.");
         }
+
         const points = validatePolygon(polygon, image.width, image.height);
+
         if (
             scaling !== undefined &&
             (!isScaling(scaling) || !image.scalingOptions?.includes(scaling))
         ) {
             throw new Error("Scaling is unavailable for this image.");
         }
+
         const result = await plugin.implementation.readRegion(
             filePath,
             points,
@@ -368,6 +492,11 @@ export class ImagePlugins {
             scaling,
             image.peakPower
         );
+
+        /**
+         * Require a bounded, nonempty collection of finite or null numeric
+         * statistics.
+         */
         const validStatistics = (statistics: unknown) =>
             statistics &&
             typeof statistics === "object" &&
@@ -380,6 +509,7 @@ export class ImagePlugins {
                     (value === null ||
                         (typeof value === "number" && Number.isFinite(value)))
             );
+
         if (
             !result ||
             !validStatistics(result.statistics) ||
@@ -395,9 +525,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Plugin returned invalid region statistics.");
         }
+
         return result;
     }
 
+    /**
+     * Validate source pixel bounds and scaling before reading a value from
+     * the owning plugin.
+     */
     async readPixel(
         filePath: string,
         pluginId: string,
@@ -409,9 +544,11 @@ export class ImagePlugins {
             JSON.stringify([filePath, pluginId])
         );
         const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+
         if (!image || !plugin?.implementation.readPixel) {
             throw new Error("Open an image with source pixel support first.");
         }
+
         if (
             !Number.isSafeInteger(row) ||
             !Number.isSafeInteger(column) ||
@@ -422,12 +559,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Pixel is outside the image.");
         }
+
         if (
             scaling !== undefined &&
             (!isScaling(scaling) || !image.scalingOptions?.includes(scaling))
         ) {
             throw new Error("Scaling is unavailable for this image.");
         }
+
         const result = await plugin.implementation.readPixel(
             filePath,
             row,
@@ -436,6 +575,7 @@ export class ImagePlugins {
             scaling,
             image.peakPower
         );
+
         if (
             !result ||
             typeof result.valueLabel !== "string" ||
@@ -449,9 +589,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Plugin returned invalid pixel data.");
         }
+
         return { value: result.value, valueLabel: result.valueLabel };
     }
 
+    /**
+     * Validate a source slice request and the ordered sample positions
+     * returned by the plugin.
+     */
     async readSlice(
         filePath: string,
         pluginId: string,
@@ -463,10 +608,13 @@ export class ImagePlugins {
             JSON.stringify([filePath, pluginId])
         );
         const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+
         if (!image || !plugin?.implementation.readSlice) {
             throw new Error("Open an image with source slice support first.");
         }
+
         const limit = orientation === "horizontal" ? image.height : image.width;
+
         if (
             !["horizontal", "vertical"].includes(orientation) ||
             !Number.isSafeInteger(index) ||
@@ -476,12 +624,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Slice index is outside the image.");
         }
+
         if (
             scaling !== undefined &&
             (!isScaling(scaling) || !image.scalingOptions?.includes(scaling))
         ) {
             throw new Error("Scaling is unavailable for this image.");
         }
+
         const result = await plugin.implementation.readSlice(
             filePath,
             orientation,
@@ -491,6 +641,7 @@ export class ImagePlugins {
         );
         const length =
             orientation === "horizontal" ? image.width : image.height;
+
         if (
             !result ||
             !Array.isArray(result.points) ||
@@ -515,9 +666,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Plugin returned invalid slice data.");
         }
+
         return result;
     }
 
+    /**
+     * Require an opened phase-history source, validate formation settings,
+     * and open the generated SICD.
+     */
     async formSicd(
         filePath: string,
         pluginId: string,
@@ -525,6 +681,7 @@ export class ImagePlugins {
         settings: FormationSettings
     ): Promise<ImageInfo> {
         const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+
         if (
             !this.openedImages.has(JSON.stringify([filePath, pluginId])) ||
             !plugin?.implementation.formSicd
@@ -533,16 +690,23 @@ export class ImagePlugins {
                 "Open a CPHD image with image formation support first."
             );
         }
+
         const options = validateFormationSettings(settings);
+
         await plugin.implementation.formSicd(
             filePath,
             outputPath,
             options,
             plugin.manifest.parameters ?? {}
         );
+
         return this.open(outputPath, pluginId);
     }
 
+    /**
+     * Validate source bounds and output location before opening a crop
+     * produced by the owning plugin.
+     */
     async crop(
         filePath: string,
         pluginId: string,
@@ -553,9 +717,11 @@ export class ImagePlugins {
             JSON.stringify([filePath, pluginId])
         );
         const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+
         if (!image || !plugin?.implementation.crop) {
             throw new Error("Open an image with crop support first.");
         }
+
         const crop = validateCrop(selection, image.width, image.height);
         const output = await plugin.implementation.crop(
             filePath,
@@ -563,6 +729,7 @@ export class ImagePlugins {
             crop,
             plugin.manifest.parameters ?? {}
         );
+
         if (
             typeof output !== "string" ||
             path.dirname(path.resolve(output)) !== path.resolve(directory) ||
@@ -570,9 +737,14 @@ export class ImagePlugins {
         ) {
             throw new Error("Plugin returned an invalid cropped image path.");
         }
+
         return this.open(output, pluginId);
     }
 
+    /**
+     * Require an opened source, validate SIDD preferences, and open the
+     * completed detected product.
+     */
     async createSidd(
         filePath: string,
         pluginId: string,
@@ -580,6 +752,7 @@ export class ImagePlugins {
         settings: SiddSettings
     ): Promise<ImageInfo> {
         const plugin = this.plugins.find(item => item.manifest.id === pluginId);
+
         if (
             !this.openedImages.has(JSON.stringify([filePath, pluginId])) ||
             !plugin?.implementation.createSidd
@@ -588,16 +761,23 @@ export class ImagePlugins {
                 "Open a SICD image with SIDD creation support first."
             );
         }
+
         const options = validateSiddSettings(settings);
+
         await plugin.implementation.createSidd(
             filePath,
             outputPath,
             options,
             plugin.manifest.parameters ?? {}
         );
+
         return this.open(outputPath, pluginId);
     }
 
+    /**
+     * Require a supported scaling mode before reopening the image through
+     * its original decoder.
+     */
     async rescale(
         filePath: string,
         pluginId: string,
@@ -606,12 +786,18 @@ export class ImagePlugins {
         const image = this.openedImages.get(
             JSON.stringify([filePath, pluginId])
         );
+
         if (!isScaling(scaling) || !image?.scalingOptions?.includes(scaling)) {
             throw new Error("Scaling is unavailable for this image.");
         }
+
         return this.open(filePath, pluginId, scaling);
     }
 
+    /**
+     * Try matching decoders, validate their output, and register source
+     * dimensions for later analysis reads.
+     */
     async open(
         filePath: string,
         pluginId?: string,
@@ -620,6 +806,7 @@ export class ImagePlugins {
         if (!this.plugins.length) {
             throw new Error("Install an image plugin before opening images.");
         }
+
         const extension = path.extname(filePath).slice(1).toLowerCase();
         const candidates = this.plugins.filter(
             plugin =>
@@ -627,6 +814,7 @@ export class ImagePlugins {
                 (!pluginId || plugin.manifest.id === pluginId)
         );
         const failures: string[] = [];
+
         for (const { manifest, implementation } of candidates) {
             try {
                 if (
@@ -638,14 +826,17 @@ export class ImagePlugins {
                 ) {
                     continue;
                 }
+
                 const result = await implementation.open!(
                     filePath,
                     manifest.parameters ?? Object.freeze({}),
                     scaling
                 );
+
                 if (!result || typeof result !== "object") {
                     throw new Error("Invalid image result.");
                 }
+
                 for (const field of ["metadata", "statistics"] as const) {
                     if (
                         result[field] !== undefined &&
@@ -667,6 +858,7 @@ export class ImagePlugins {
                         throw new Error(`Invalid image ${field}.`);
                     }
                 }
+
                 for (const dimension of [result.width, result.height]) {
                     if (
                         dimension !== undefined &&
@@ -675,6 +867,7 @@ export class ImagePlugins {
                         throw new Error("Invalid image dimensions.");
                     }
                 }
+
                 if (
                     result.previewDataUrl !== undefined &&
                     (typeof result.previewDataUrl !== "string" ||
@@ -687,11 +880,13 @@ export class ImagePlugins {
                         "Preview must be a PNG, JPEG, WebP, or SVG data URL under 32 MB."
                     );
                 }
+
                 if (scaling !== undefined && result.scaling !== scaling) {
                     throw new Error(
                         "Plugin did not return the requested scaling."
                     );
                 }
+
                 if (
                     result.scalingOptions !== undefined &&
                     (!Array.isArray(result.scalingOptions) ||
@@ -703,6 +898,7 @@ export class ImagePlugins {
                 ) {
                     throw new Error("Invalid image scaling options.");
                 }
+
                 if (
                     result.peakPower !== undefined &&
                     (typeof result.peakPower !== "number" ||
@@ -711,8 +907,10 @@ export class ImagePlugins {
                 ) {
                     throw new Error("Invalid image peak power.");
                 }
+
                 if (result.axes !== undefined) {
                     validateImageAxes(result.axes);
+
                     if (
                         !result.width ||
                         !result.height ||
@@ -726,7 +924,9 @@ export class ImagePlugins {
                         throw new Error("Invalid image axis dimensions.");
                     }
                 }
+
                 let formationProducts;
+
                 if (result.formationProducts !== undefined) {
                     try {
                         formationProducts = validateFormationProducts(
@@ -740,6 +940,7 @@ export class ImagePlugins {
                         };
                     }
                 }
+
                 const info: ImageInfo = {
                     ...(implementation.crop &&
                     result.metadata?.Format !== "CPHD"
@@ -782,6 +983,7 @@ export class ImagePlugins {
                         ? { previewDataUrl: result.previewDataUrl }
                         : {})
                 };
+
                 this.openedImages.set(JSON.stringify([filePath, manifest.id]), {
                     ...(result.peakPower !== undefined
                         ? { peakPower: result.peakPower }
@@ -792,6 +994,7 @@ export class ImagePlugins {
                         ? { scalingOptions: info.scalingOptions }
                         : {})
                 });
+
                 return info;
             } catch (cause) {
                 failures.push(
@@ -799,6 +1002,7 @@ export class ImagePlugins {
                 );
             }
         }
+
         throw new Error(
             failures.length
                 ? failures.join("\n")

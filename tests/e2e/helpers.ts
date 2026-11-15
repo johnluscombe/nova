@@ -2,12 +2,17 @@ import type { ElectronApplication, Page } from "@playwright/test";
 import { expect } from "./fixtures";
 import path from "node:path";
 
+/**
+ * Stub the save dialog and create an isolated scenario for the desktop
+ * test.
+ */
 export async function createScenario(
     application: ElectronApplication,
     page: Page,
     profile: string
 ) {
     const file = path.join(profile, "test.scenario");
+
     await application.evaluate(({ dialog }, filePath) => {
         dialog.showSaveDialog = async () => ({ canceled: false, filePath });
     }, file);
@@ -15,8 +20,13 @@ export async function createScenario(
     await expect(
         page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
+
     return file;
 }
+
+/**
+ * Stub the next native open-dialog result with the supplied test file.
+ */
 export async function chooseFile(
     application: ElectronApplication,
     file: string
@@ -45,6 +55,7 @@ export async function selectRibbonFor(page: Page, label: string) {
         "Crop",
         "Clear Region"
     ].includes(label);
+
     await page
         .getByRole("tab", {
             name: imageTools ? /^(Scientific Imagery|Image)$/ : "Home",
@@ -52,6 +63,10 @@ export async function selectRibbonFor(page: Page, label: string) {
         })
         .click();
 }
+
+/**
+ * Select the owning ribbon tab before clicking the named control.
+ */
 export async function clickRibbon(page: Page, label: string) {
     await selectRibbonFor(page, label);
     await page.getByRole("button", { name: label, exact: true }).click();

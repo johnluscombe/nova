@@ -2,16 +2,21 @@ import { axisCoordinate } from "../types/axes";
 import type { ImageInfo } from "../types/image";
 import type { SliceData, SliceOrientation } from "../types/slice";
 
-/** Slice handlers return source pixel positions; display them in the image's axes. */
+/**
+ * Slice handlers return source pixel positions; display them in the image's
+ * axes.
+ */
 export function sliceAxes(
     data: SliceData,
     image: ImageInfo,
     orientation: SliceOrientation
 ): SliceData {
     const axis = image.axes?.[orientation === "horizontal" ? "column" : "row"];
+
     if (!axis) {
         return data;
     }
+
     return {
         ...data,
         positionLabel: `${axis.label} (${axis.unit})`,
@@ -21,6 +26,11 @@ export function sliceAxes(
         }))
     };
 }
+
+/**
+ * Format the selected source row or column using its physical axis when
+ * available.
+ */
 export function slicePosition(
     image: ImageInfo,
     orientation: SliceOrientation,
@@ -29,9 +39,12 @@ export function slicePosition(
     const horizontal = orientation === "horizontal";
     const pixel = `${horizontal ? "row" : "column"} ${index}`;
     const axis = image.axes?.[horizontal ? "row" : "column"];
+
     if (!axis) {
         return pixel;
     }
+
     const value = Number(axisCoordinate(axis, index).toPrecision(7));
+
     return `${axis.label} ${value} ${axis.unit} (${pixel})`;
 }

@@ -147,8 +147,8 @@ loading widgets, and scenario restoration work the same way as other images.
 Run the reader tests with the configured Python environment:
 
 ```sh
-python src-electron/sicd-reader.test.py
-python src-electron/sidd-reader.test.py
+python tests/unit/python/sicd-reader.test.py
+python tests/unit/python/sidd-reader.test.py
 ```
 
 ## TIFF images
@@ -171,7 +171,7 @@ coordinates; GeoTIFF georeferencing is not interpreted. Complex scaling remains
 disabled. Files work with Add Image, drag and drop, and scenario restoration.
 
 ```sh
-python src-electron/tiff-reader.test.py
+python tests/unit/python/tiff-reader.test.py
 ```
 
 ### Large TIFF pixel limit

@@ -5,7 +5,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import type { VueWrapper } from "@vue/test-utils";
 import type { ImageAPI, ImageInfo } from "../../src/types/image";
 import type { PixelData } from "../../src/types/pixel";
-import ImageSliceView from "../../src/components/ImageSliceView.vue";
+import ImageSliceView from "../../src/components/image/ImageSliceView.vue";
+
 let wrapper: VueWrapper;
 const image: ImageInfo = {
     name: "radar.nitf",
@@ -18,6 +19,10 @@ const image: ImageInfo = {
     supportsSourcePixels: true,
     scaling: "real"
 };
+
+/**
+ * Mount the fitted image view with deterministic viewport geometry.
+ */
 async function view(pixel: ImageAPI["pixel"]) {
     vi.useFakeTimers();
     window.images = { pixel } as ImageAPI;
@@ -25,12 +30,22 @@ async function view(pixel: ImageAPI["pixel"]) {
         "ResizeObserver",
         class {
             callback: (
-                entries: { contentRect: { width: number; height: number } }[]
+                entries: {
+                    contentRect: {
+                        width: number;
+
+                        height: number;
+                    };
+                }[]
             ) => void;
             constructor(
                 callback: (
                     entries: {
-                        contentRect: { width: number; height: number };
+                        contentRect: {
+                            width: number;
+
+                            height: number;
+                        };
                     }[]
                 ) => void
             ) {
@@ -45,13 +60,20 @@ async function view(pixel: ImageAPI["pixel"]) {
     wrapper = mount(ImageSliceView, {
         props: { image, enabled: false, inspect: true }
     });
+
     const img = wrapper.get("img");
+
     Object.defineProperties(img.element, {
         naturalWidth: { value: 10 },
         naturalHeight: { value: 5 }
     });
     await img.trigger("load");
 }
+
+/**
+ * Move the simulated pointer to a source position and flush the debounced
+ * inspection work.
+ */
 async function hover(x: number, y: number) {
     wrapper.get(".slice-viewport").element.dispatchEvent(
         new MouseEvent("pointermove", {
@@ -62,6 +84,7 @@ async function hover(x: number, y: number) {
     );
     await nextTick();
 }
+
 afterEach(() => {
     wrapper?.unmount();
     delete window.images;
@@ -73,6 +96,7 @@ test("pixel hover maps fitted image coordinates, coalesces movement and ignores 
     const pixel = vi
         .fn<ImageAPI["pixel"]>()
         .mockResolvedValue({ value: -3, valueLabel: "Real component" });
+
     await view(pixel);
     await hover(15, 30);
     await hover(35, 40);
@@ -97,6 +121,7 @@ test("pixel hover allows one source request at a time and discards late results"
     const pixel = vi.fn<ImageAPI["pixel"]>(
         () => new Promise(resolve => pending.push(resolve))
     );
+
     await view(pixel);
     await hover(15, 30);
     await vi.advanceTimersByTimeAsync(150);

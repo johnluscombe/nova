@@ -71,12 +71,21 @@ const maximized = ref(false);
 const windowError = ref("");
 let unsubscribe: (() => void) | undefined;
 let mounted = false;
+
+/**
+ * Apply native maximization updates to the custom window controls.
+ */
 const updateState = (state: WindowState) => {
     maximized.value = state.maximized;
 };
 
+/**
+ * Invoke a native title-bar action and surface failures in the application
+ * layout.
+ */
 async function runWindowAction(action: () => Promise<unknown>) {
     windowError.value = "";
+
     try {
         await action();
     } catch {
@@ -86,12 +95,15 @@ async function runWindowAction(action: () => Promise<unknown>) {
 
 onMounted(async () => {
     mounted = true;
+
     if (!controls) {
         return;
     }
+
     unsubscribe = controls.onStateChanged(updateState);
     await runWindowAction(async () => {
         const state = await controls.getState();
+
         if (mounted) {
             updateState(state);
         }
@@ -107,6 +119,7 @@ onBeforeUnmount(() => {
 .nova-titlebar {
     background: #234c78;
 }
+
 .nova-toolbar {
     height: 36px;
     min-height: 36px;
@@ -115,6 +128,7 @@ onBeforeUnmount(() => {
     app-region: drag;
     user-select: none;
 }
+
 .window-controls {
     display: flex;
     align-self: stretch;
@@ -122,20 +136,24 @@ onBeforeUnmount(() => {
     -webkit-app-region: no-drag;
     app-region: no-drag;
 }
+
 .nova-toolbar-mac {
     /* Leave room for macOS's native close, minimize, and fullscreen buttons. */
     padding-left: 88px;
     padding-right: 16px;
 }
+
 .window-controls :deep(.q-btn) {
     width: 46px;
     border-radius: 0;
 }
+
 .window-close:hover,
 .window-close:focus-visible {
     background: #c42b1c;
     color: white;
 }
+
 .scenario-name {
     min-width: 0;
     overflow: hidden;

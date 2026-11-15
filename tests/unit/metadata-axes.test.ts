@@ -4,6 +4,7 @@ import {
     resolveMetadataAxes
 } from "../../src/utils/metadata-axes";
 import type { ImageInfo } from "../../src/types/image";
+
 const axes = {
     row: { label: "Down-range", unit: "m" as const, origin: -20, spacing: 2 },
     column: {
@@ -21,13 +22,20 @@ const image: ImageInfo = {
     width: 40,
     height: 20
 };
+
+/**
+ * Build an image with attached JSON metadata for axis-resolution tests.
+ */
 function attached(data: unknown, path = "/metadata.json") {
     return { path, name: path.split("/").at(-1)!, data };
 }
+
 const json = { width: 40, height: 20, axes };
+
 test("sidecar axes automatically fill missing axes and remain idempotent", () => {
     const source = { ...image, attachedMetadata: [attached(json)] };
     const result = resolveMetadataAxes(source);
+
     expect(result.axes).toEqual(axes);
     expect(result.axesSource).toBe("/metadata.json");
     expect(result.embeddedAxes).toBeUndefined();
@@ -42,15 +50,20 @@ test("embedded axes require an explicit override and can be restored", () => {
         axes: embedded,
         attachedMetadata: [attached(json)]
     };
+
     expect(resolveMetadataAxes(source).axes).toEqual(embedded);
+
     const result = resolveMetadataAxes(source, "/metadata.json");
+
     expect(result.axes).toEqual(axes);
     expect(result.embeddedAxes).toEqual(embedded);
     expect(resolveMetadataAxes(result, "embedded").axes).toEqual(embedded);
+
     const missing = resolveMetadataAxes(
         { ...result, attachedMetadata: [] },
         "/metadata.json"
     );
+
     expect(missing.axes).toEqual(embedded);
     expect(missing.axesNotice).toContain("unavailable");
 });
@@ -63,6 +76,7 @@ test("conflicting JSON sources need a selection while identical sources agree", 
         ...image,
         attachedMetadata: [attached(json), attached(alternate, "/other.json")]
     };
+
     expect(resolveMetadataAxes(source).axes).toBeUndefined();
     expect(resolveMetadataAxes(source).axesNotice).toContain("different axes");
     expect(resolveMetadataAxes(source, "/other.json").axes?.column.origin).toBe(
@@ -86,9 +100,11 @@ test("dimensions, numeric ranges, units and spacing are validated before use", (
         { ...json, axes: { ...axes, row: { ...axes.row, spacing: 1e308 } } }
     ]) {
         const source = { ...image, attachedMetadata: [attached(data)] };
+
         expect(metadataAxesCandidates(source)[0]?.error).toBeTruthy();
         expect(resolveMetadataAxes(source).axes).toBeUndefined();
     }
+
     expect(
         metadataAxesCandidates({
             ...image,
@@ -114,6 +130,7 @@ test("SICD exports account for scene center and chip offsets and avoid cross-pro
         metadata: { Format: "SICD / NITF" },
         attachedMetadata: [attached(data)]
     };
+
     expect(resolveMetadataAxes(source).axes).toEqual({
         row: { ...axes.row, origin: -4 },
         column: { ...axes.column, origin: -2.5 }
@@ -147,6 +164,7 @@ test("SIDD plane metadata uses the product reference point and spacing", () => {
         metadata: { Format: "SIDD / NITF" },
         attachedMetadata: [attached(data)]
     };
+
     expect(resolveMetadataAxes(source).axes).toEqual({
         row: { ...axes.row, label: "Row distance" },
         column: { ...axes.column, label: "Column distance" }

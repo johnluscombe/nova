@@ -1,10 +1,23 @@
+/**
+ * Settings for experimental CPHD-to-SICD CPU backprojection; these control the
+ * output grid and sampled aperture.
+ */
 export interface FormationSettings {
     algorithm: "backprojection";
+
+    /** Square output side length in pixels: 64, 128, 256, or 512. */
     imageSize: number;
+
+    /** Output sample spacing in meters; zero requests automatic spacing. */
     pixelSpacing: number;
+
+    /** Maximum number of aperture vectors used for backprojection (8–4096). */
     maxVectors: number;
+
+    /** Aperture weighting applied during formation. */
     window: "hann" | "uniform";
 }
+
 export const defaultFormationSettings: FormationSettings = {
     algorithm: "backprojection",
     imageSize: 256,
@@ -12,8 +25,14 @@ export const defaultFormationSettings: FormationSettings = {
     maxVectors: 512,
     window: "hann"
 };
+
+/**
+ * Validate supported backprojection settings and return a detached
+ * settings object.
+ */
 export function validateFormationSettings(value: unknown): FormationSettings {
     const settings = value as FormationSettings | null;
+
     if (
         !settings ||
         settings.algorithm !== "backprojection" ||
@@ -30,6 +49,7 @@ export function validateFormationSettings(value: unknown): FormationSettings {
             "Choose a valid image size, spacing (0–1000 m), aperture length (8–4096 vectors), and window."
         );
     }
+
     return {
         algorithm: settings.algorithm,
         imageSize: settings.imageSize,
@@ -39,16 +59,29 @@ export function validateFormationSettings(value: unknown): FormationSettings {
     };
 }
 
+/**
+ * A diagnostic slide produced during image formation; the final slide has the
+ * identifier "final".
+ */
 export interface FormationProduct {
     id: string;
+
     title: string;
+
     description: string;
+
     previewDataUrl: string;
 }
+
+/**
+ * Validate bounded PNG diagnostic previews with unique identifiers and a
+ * final-image slide.
+ */
 export function validateFormationProducts(value: unknown): FormationProduct[] {
     if (!Array.isArray(value) || value.length < 1 || value.length > 12) {
         throw new Error("Invalid formation products.");
     }
+
     const ids = new Set<string>();
     const products = value.map((item: FormationProduct) => {
         if (
@@ -69,7 +102,9 @@ export function validateFormationProducts(value: unknown): FormationProduct[] {
         ) {
             throw new Error("Invalid formation product preview.");
         }
+
         ids.add(item.id);
+
         return {
             id: item.id,
             title: item.title,
@@ -77,8 +112,10 @@ export function validateFormationProducts(value: unknown): FormationProduct[] {
             previewDataUrl: item.previewDataUrl
         };
     });
+
     if (products.at(-1)?.id !== "final") {
         throw new Error("Formation products must end with the final image.");
     }
+
     return products;
 }

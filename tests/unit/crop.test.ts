@@ -1,5 +1,6 @@
 import { test, expect } from "vitest";
 import { validateCrop } from "../../src/types/crop";
+
 const rectangle = {
     left: 2,
     top: 3,
@@ -8,9 +9,11 @@ const rectangle = {
     sourceWidth: 16,
     sourceHeight: 12
 };
+
 test("crop bounds use integer source pixels and authoritative source dimensions", () => {
     expect(validateCrop(rectangle, 16, 12)).toEqual(rectangle);
     expect(validateCrop(rectangle)).toEqual(rectangle);
+
     for (const patch of [
         { left: -1 },
         { top: NaN },

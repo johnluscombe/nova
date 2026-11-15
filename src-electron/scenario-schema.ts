@@ -7,6 +7,9 @@ export const workspaceState = sqliteTable("nova_workspace", {
 });
 export const schema = { workspaceState } satisfies Record<string, SQLiteTable>;
 
+/**
+ * Return the application-declared tables available for scenario browsing.
+ */
 export function getScenarioTables(): SQLiteTable[] {
     return Object.values(schema).filter(table => table !== workspaceState);
 }

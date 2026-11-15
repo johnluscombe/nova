@@ -5,11 +5,13 @@ test("startup reports plugin discovery and session restoration errors", async ({
     application
 }) => {
     const page = await application.firstWindow();
+
     await expect(
         page.getByRole("button", { name: "New", exact: true })
     ).toBeEnabled();
     await application.evaluate(({ BrowserWindow }) => {
         const ipc = BrowserWindow.getAllWindows()[0]!.webContents.ipc;
+
         for (const channel of ["image:plugins", "scenario:restore-last"]) {
             ipc.removeHandler(channel);
             ipc.handle(channel, () => {
@@ -27,6 +29,7 @@ test("startup reports plugin discovery and session restoration errors", async ({
 
 test("unknown routes redirect to the workspace", async ({ application }) => {
     const page = await application.firstWindow();
+
     await expect(
         page.getByRole("button", { name: "New", exact: true })
     ).toBeEnabled();

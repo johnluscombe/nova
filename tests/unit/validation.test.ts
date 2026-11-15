@@ -13,6 +13,7 @@ const tab = { id: "home", label: "Home", groups: [group] };
 
 test("ribbon validation accepts valid contributions and rejects malformed tabs and groups", () => {
     expect(validateRibbon({ tabs: [tab] }).tabs).toEqual([tab]);
+
     for (const value of [
         null,
         {},
@@ -41,6 +42,7 @@ test("ribbon action IDs are unique across tabs and controls have bounded plain l
             })
         ).toThrow(/button/);
     }
+
     expect(() =>
         validateRibbon({ tabs: [tab, { ...tab, id: "other" }] })
     ).toThrow(/button/);
@@ -55,6 +57,7 @@ const window = {
     maximized: false,
     z: 1
 };
+
 test("workspace validation rejects oversized layouts, duplicate IDs and invalid geometry", () => {
     expect(validateWorkspace([window])).toEqual([window]);
     expect(
@@ -69,6 +72,7 @@ test("workspace validation rejects oversized layouts, duplicate IDs and invalid 
     expect(
         validateWorkspace([{ ...window, scaling: "real" }])[0]?.scaling
     ).toBe("real");
+
     for (const value of [
         null,
         {},

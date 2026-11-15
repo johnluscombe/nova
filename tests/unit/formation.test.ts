@@ -7,8 +7,10 @@ const final = {
     description: "Completed image",
     previewDataUrl: "data:image/png;base64,eA=="
 };
+
 test("formation previews validate their protocol and finish with the final product", () => {
     expect(validateFormationProducts([final])).toEqual([final]);
+
     for (const value of [
         null,
         [],

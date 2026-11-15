@@ -5,10 +5,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { ImagePlugins } from "../../src-electron/image-plugins.ts";
 
+/**
+ * Create an isolated plugin directory and host, then remove the fixture
+ * after the test.
+ */
 async function fixture(
     run: (directory: string, host: ImagePlugins) => Promise<void>
 ) {
     const directory = await mkdtemp(path.join(tmpdir(), "nova-plugin-test-"));
+
     try {
         await run(directory, new ImagePlugins(directory));
     } finally {
@@ -16,6 +21,10 @@ async function fixture(
     }
 }
 
+/**
+ * Write a minimal plugin manifest and implementation for a host
+ * integration test.
+ */
 async function plugin(
     directory: string,
     name: string,
@@ -23,6 +32,7 @@ async function plugin(
     overrides: Record<string, unknown> = {}
 ) {
     const folder = path.join(directory, name);
+
     await mkdir(folder);
     await writeFile(
         path.join(folder, "plugin.json"),
@@ -41,6 +51,7 @@ async function plugin(
 test("no plugins means no supported filters or image opening", () =>
     fixture(async (directory, host) => {
         const state = await host.reload();
+
         assert.equal(state.directory, directory);
         assert.deepEqual(state.plugins, []);
         assert.deepEqual(host.filters, []);
@@ -65,11 +76,15 @@ test("discovers plugins, isolates failures, invokes plugin-owned file I/O, and r
             "c-working",
             `import {readFile} from 'node:fs/promises'; export default { async open(file) { return {width: Number(await readFile(file, 'utf8')), height: 2}; } };`
         );
+
         const state = await host.reload();
+
         assert.equal(state.plugins.length, 1);
         assert.equal(state.errors.length, 2);
         assert.deepEqual(host.filters[0]!.extensions, ["test"]);
+
         const file = path.join(directory, "image.TEST");
+
         await writeFile(file, "8");
         assert.deepEqual(await host.open(file), {
             name: "image.TEST",
@@ -135,7 +150,9 @@ test("rejects escaping entry paths and duplicate IDs", () =>
             "export default {open() {return {};}};",
             { id: "shared" }
         );
+
         const state = await host.reload();
+
         assert.equal(state.plugins.length, 1);
         assert.equal(state.errors.length, 2);
     }));
@@ -144,6 +161,7 @@ test("bundled plugins load without user installation and user overrides take pri
     fixture(async directory => {
         const bundled = path.join(directory, "bundled");
         const user = path.join(directory, "user");
+
         await mkdir(bundled);
         await mkdir(user);
         await plugin(
@@ -152,7 +170,9 @@ test("bundled plugins load without user installation and user overrides take pri
             "export default {open() {return {width: 10};}};",
             { id: "shared" }
         );
+
         const host = new ImagePlugins(user, bundled);
+
         assert.equal((await host.reload()).plugins.length, 1);
         assert.equal((await host.open("file.test")).width, 10);
         await plugin(
@@ -165,7 +185,9 @@ test("bundled plugins load without user installation and user overrides take pri
         assert.equal((await host.open("file.test")).width, 20);
         await rm(path.join(user, "override"), { recursive: true });
         await plugin(user, "broken", "export default {};", { id: "shared" });
+
         const state = await host.reload();
+
         assert.equal(state.plugins.length, 1);
         assert.equal(state.errors.length, 1);
         assert.equal((await host.open("file.test")).width, 10);
@@ -178,8 +200,11 @@ test("vector plugin reads SVG and host accepts a vector preview", () =>
         const file = path.join(directory, "sample.svg");
         const svg =
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/></svg>';
+
         await writeFile(file, svg);
+
         const result = await vector.open(file);
+
         assert.equal(
             Buffer.from(
                 result.previewDataUrl!.split(",")[1]!,
@@ -193,7 +218,9 @@ test("vector plugin reads SVG and host accepts a vector preview", () =>
             `export default {open() {return ${JSON.stringify(result)};}};`,
             { extensions: ["svg"] }
         );
+
         const host = new ImagePlugins(directory);
+
         await host.reload();
         assert.equal(
             (await host.open(file)).previewDataUrl,
@@ -227,13 +254,16 @@ test("ribbon-only plugins contribute controls and dispatch only declared actions
                 }
             ]
         };
+
         await plugin(
             directory,
             "ribbon",
             `export default {executeRibbonAction(id, context, parameters) {if (parameters.python !== '/custom/python') throw new Error('Missing parameters'); return {message: id + ':' + context.scenarioPath};}};`,
             { extensions: [], ribbon, parameters: { python: "/custom/python" } }
         );
+
         const state = await host.reload();
+
         assert.equal(state.errors.length, 0);
         assert.deepEqual(state.plugins[0]!.ribbon, ribbon);
         assert.deepEqual(host.filters, []);
@@ -271,6 +301,7 @@ test("invalid ribbon declarations and missing action handlers are isolated", () 
                 }
             ]
         };
+
         await plugin(directory, "missing-handler", "export default {};", {
             extensions: [],
             ribbon
@@ -322,7 +353,9 @@ test("invalid ribbon declarations and missing action handlers are isolated", () 
                 }
             }
         );
+
         const state = await host.reload();
+
         assert.equal(state.plugins.length, 0);
         assert.equal(state.errors.length, 3);
     }));
@@ -347,6 +380,7 @@ test("plugin action exceptions and invalid results are reported", () =>
                 }
             ]
         };
+
         await plugin(
             directory,
             "actions",
@@ -387,9 +421,12 @@ test("passes plugin parameters to image handlers and rejects malformed parameter
                 }
             }
         );
+
         const host = new ImagePlugins(directory);
+
         assert.equal((await host.reload()).plugins.length, 1);
         assert.equal((await host.open("file.test")).width, 42);
+
         for (const [index, parameters] of [
             [],
             null,
@@ -402,7 +439,9 @@ test("passes plugin parameters to image handlers and rejects malformed parameter
                 "export default { open() { return {}; } };",
                 { parameters }
             );
+
             const state = await host.reload();
+
             assert.equal(state.plugins.length, 1);
             assert.match(state.errors.join(), /Plugin parameters/);
         }
@@ -468,6 +507,7 @@ test("rejects malformed dimensions and previews rather than passing them to the 
             "{ metadata: { bad: Infinity } }",
             "{ statistics: { bad: [] } }"
         ];
+
         for (const [index, result] of results.entries()) {
             await plugin(
                 directory,
@@ -475,7 +515,9 @@ test("rejects malformed dimensions and previews rather than passing them to the 
                 `export default { open() { return ${result}; } };`
             );
         }
+
         await host.reload();
+
         for (let index = 0; index < 6; index++) {
             await assert.rejects(
                 host.open("file.test", `bad-${index}`),
@@ -490,6 +532,7 @@ test("ignores loose files, rejects plugins with no contribution, and permits sil
         await plugin(directory, "empty", "export default {};", {
             extensions: []
         });
+
         const ribbon = {
             tabs: [
                 {
@@ -505,13 +548,16 @@ test("ignores loose files, rejects plugins with no contribution, and permits sil
                 }
             ]
         };
+
         await plugin(
             directory,
             "silent",
             "export default { executeRibbonAction() {} };",
             { extensions: [], ribbon }
         );
+
         const status = await host.reload();
+
         assert.match(
             status.errors.join(),
             /must provide image types or ribbon tabs/
@@ -551,12 +597,14 @@ test("source slices validate the opened image, orientation, index and returned s
                 { position: 3, value: null }
             ]
         );
+
         for (const index of [-1, 0.5, 3]) {
             await assert.rejects(
                 host.readSlice("file.test", "slices", "horizontal", index),
                 /outside/
             );
         }
+
         await assert.rejects(
             host.readSlice("file.test", "slices", "diagonal" as never, 0),
             /outside/
@@ -587,9 +635,12 @@ test("scaling is restricted to opened images and their advertised modes", () =>
             /unavailable/
         );
         await host.open("file.test");
+
         const image = await host.rescale("file.test", "scaling", "real");
+
         assert.equal(image.scaling, "real");
         assert.equal(image.metadata?.Scaling, "real");
+
         const slice = await host.readSlice(
             "file.test",
             "scaling",
@@ -597,6 +648,7 @@ test("scaling is restricted to opened images and their advertised modes", () =>
             1,
             "real"
         );
+
         assert.equal(slice.points[0]?.value, -3);
         await assert.rejects(
             host.rescale("file.test", "scaling", "rcs"),
@@ -664,6 +716,7 @@ test("source pixel reads validate coordinates, capabilities, scaling and numeric
             (await host.readPixel("file.test", "pixels", 0, 7)).value,
             null
         );
+
         for (const [row, column] of [
             [-1, 0],
             [0, -1],
@@ -677,6 +730,7 @@ test("source pixel reads validate coordinates, capabilities, scaling and numeric
                 /outside/
             );
         }
+
         await assert.rejects(
             host.readPixel("file.test", "pixels", 0, 0, "rcs"),
             /unavailable/
@@ -702,7 +756,9 @@ test("plugin axes preserve physical coordinates and reject invalid metadata", ()
         };`
         );
         await host.reload();
+
         const image = await host.open("file.test");
+
         assert.deepEqual(image.axes?.column, {
             label: "Cross-range",
             unit: "m",
@@ -725,12 +781,14 @@ test("source regions validate polygon geometry, scaling and percentile results",
     };`
         );
         await host.reload();
+
         const points = [
             { row: 0, column: 0 },
             { row: 0, column: 2 },
             { row: 2, column: 2 },
             { row: 2, column: 0 }
         ];
+
         await assert.rejects(
             host.readRegion("file.test", "regions", points),
             /Open an image/
@@ -767,6 +825,7 @@ test("image formation requires an opened source, validates settings, and opens t
     fixture(async (directory, host) => {
         const { defaultFormationSettings } =
             await import("../../src/types/formation.ts");
+
         await plugin(
             directory,
             "formation",
@@ -777,8 +836,10 @@ test("image formation requires an opened source, validates settings, and opens t
             { parameters: { python: "custom" } }
         );
         await host.reload();
+
         const source = path.join(directory, "source.test"),
             output = path.join(directory, "output.test");
+
         await assert.rejects(
             host.formSicd(
                 source,
@@ -796,15 +857,19 @@ test("image formation requires an opened source, validates settings, and opens t
             }),
             /valid image size/
         );
+
         const result = await host.formSicd(
             source,
             "formation",
             output,
             defaultFormationSettings
         );
+
         assert.equal(result.path, output);
+
         const { readFile } = await import("node:fs/promises");
         const written = JSON.parse(await readFile(output, "utf8"));
+
         assert.equal(written.parameters.python, "custom");
         assert.equal(written.options.algorithm, "backprojection");
     }));
@@ -817,7 +882,9 @@ test("invalid optional formation previews do not prevent opening the final image
             `export default {open() {return {width: 64, height: 64, formationProducts: [{id: 'bad'}]};}};`
         );
         await host.reload();
+
         const image = await host.open("formed.test");
+
         assert.equal(image.width, 64);
         assert.equal(image.formationProducts, undefined);
         assert.match(
@@ -829,13 +896,16 @@ test("invalid optional formation previews do not prevent opening the final image
 test("SIDD creation validates source readiness and settings before invoking the plugin", () =>
     fixture(async (directory, host) => {
         const { defaultSiddSettings } = await import("../../src/types/sidd");
+
         await plugin(
             directory,
             "sidd",
             `import {writeFile} from 'node:fs/promises'; export default { open() {return {width: 8, height: 8};}, async createSidd(source, output, settings) { await writeFile(output, JSON.stringify(settings)); } };`
         );
         await host.reload();
+
         const output = path.join(directory, "output.test");
+
         await assert.rejects(
             host.createSidd("source.test", "sidd", output, defaultSiddSettings),
             /Open a SICD/
@@ -869,6 +939,7 @@ test("crop requests validate the selected source bounds and generated output loc
             `import path from 'node:path'; export default { open() { return {width:16,height:12}; }, async crop(source,directory) { return path.join(directory,'crop.test'); } };`
         );
         await host.reload();
+
         const selection = {
             left: 2,
             top: 3,
@@ -877,6 +948,7 @@ test("crop requests validate the selected source bounds and generated output loc
             sourceWidth: 16,
             sourceHeight: 12
         };
+
         await assert.rejects(
             host.crop("source.test", "crop", directory, selection),
             /Open an image/
@@ -889,12 +961,14 @@ test("crop requests validate the selected source bounds and generated output loc
             }),
             /inside the image/
         );
+
         const result = await host.crop(
             "source.test",
             "crop",
             directory,
             selection
         );
+
         assert.equal(result.path, path.join(directory, "crop.test"));
         assert.equal(result.supportsCrop, true);
     }));

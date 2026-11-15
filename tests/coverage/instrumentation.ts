@@ -11,20 +11,29 @@ export function coverageInstrumentation(): Plugin {
         produceSourceMap: true
     });
     const sourceRoot = path.resolve("src") + path.sep;
+
     return {
         name: "nova-istanbul",
         enforce: "post",
+
+        /**
+         * Instrument eligible source modules while retaining their
+         * original source maps.
+         */
         transform(code, id) {
             const [filename, query] = id.split("?");
+
             if (
                 !filename?.startsWith(sourceRoot) ||
                 !/\.(vue|ts|js)$/.test(filename)
             ) {
                 return;
             }
+
             if (query && !query.includes("type=script")) {
                 return;
             }
+
             if (
                 filename.endsWith(".vue") &&
                 !query &&
@@ -32,6 +41,7 @@ export function coverageInstrumentation(): Plugin {
             ) {
                 return;
             }
+
             const sourceMap = this.getCombinedSourcemap();
             const instrumented = instrumenter.instrumentSync(
                 code,
@@ -40,6 +50,7 @@ export function coverageInstrumentation(): Plugin {
                     typeof instrumenter.instrumentSync
                 >[2]
             );
+
             return {
                 code: instrumented,
                 map: JSON.stringify(instrumenter.lastSourceMap())

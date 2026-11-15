@@ -19,21 +19,30 @@ const stubs: Record<string, Component> = Object.fromEntries(
         "RouterView"
     ].map(name => [name, container])
 );
+
 stubs.QBtn = {
     emits: ["click"],
     template: "<button @click=\"$emit('click')\"><slot /></button>"
 };
+
 let wrapper: VueWrapper<InstanceType<typeof MainLayout>> | undefined;
+
 afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
     delete window.windowControls;
     activeScenario.value = null;
 });
+
+/**
+ * Mount the title-bar layout with isolated native window-control mocks.
+ */
 function mountLayout() {
     wrapper = mount(MainLayout, { global: { stubs } });
+
     return wrapper;
 }
+
 function controls() {
     let publish: (state: WindowState) => void = () => {};
     const unsubscribe = vi.fn();
@@ -45,10 +54,13 @@ function controls() {
         toggleMaximize: vi.fn(async () => ({ maximized: true })),
         onStateChanged: vi.fn((callback: (state: WindowState) => void) => {
             publish = callback;
+
             return unsubscribe;
         })
     };
+
     window.windowControls = api;
+
     return {
         api,
         unsubscribe,
@@ -59,6 +71,7 @@ function controls() {
 test("Windows controls dispatch actions, reflect native state and unsubscribe on unmount", async () => {
     const { api, publish, unsubscribe } = controls();
     const layout = mountLayout();
+
     await flushPromises();
     await layout.get('[aria-label="Minimize window"]').trigger("click");
     await layout.get('[aria-label="Maximize window"]').trigger("click");
@@ -77,8 +90,11 @@ test("Windows controls dispatch actions, reflect native state and unsubscribe on
 
 test("native API failures show feedback and subsequent actions clear it", async () => {
     const { api } = controls();
+
     api.getState.mockRejectedValueOnce(new Error("Native state unavailable"));
+
     const layout = mountLayout();
+
     await flushPromises();
     expect(layout.get('[role="alert"]').text()).toContain(
         "Unable to update the window"
@@ -90,13 +106,18 @@ test("native API failures show feedback and subsequent actions clear it", async 
 
 test("macOS and browser mode omit custom window controls", async () => {
     const { api } = controls();
+
     api.platform = "darwin";
+
     const mac = mountLayout();
+
     await flushPromises();
     expect(mac.find('[aria-label="Window controls"]').exists()).toBe(false);
     mac.unmount();
     delete window.windowControls;
+
     const browser = mountLayout();
+
     await flushPromises();
     expect(browser.find('[aria-label="Window controls"]').exists()).toBe(false);
 });
@@ -104,13 +125,16 @@ test("macOS and browser mode omit custom window controls", async () => {
 test("a late state response after unmount does not update a destroyed layout", async () => {
     const { api, unsubscribe } = controls();
     let resolve: (state: WindowState) => void = () => {};
+
     api.getState.mockImplementationOnce(
         () =>
             new Promise<WindowState>(done => {
                 resolve = done;
             })
     );
+
     const layout = mountLayout();
+
     layout.unmount();
     wrapper = undefined;
     resolve({ maximized: true });

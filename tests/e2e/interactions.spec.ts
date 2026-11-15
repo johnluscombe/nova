@@ -47,6 +47,7 @@ const ribbon = {
         }
     ]
 };
+
 test.use({
     pluginFiles: {
         "test/plugin.json": JSON.stringify({
@@ -86,15 +87,20 @@ test("widget loading, statistics, keyboard movement, dragging, resizing and wind
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "slow.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const widget = page.getByRole("article", {
         name: "slow.test",
         exact: true
     });
+
     await expect(
         widget.getByText("Loading image…", { exact: true })
     ).toBeVisible();
@@ -113,30 +119,38 @@ test("widget loading, statistics, keyboard movement, dragging, resizing and wind
     ).toContainText("2.5");
     await widget.getByRole("button", { name: "Close statistics" }).click();
     await widget.getByRole("button", { name: "Close metadata" }).click();
+
     const title = widget.getByLabel(
         "slow.test window title. Use arrow keys to move."
     );
     const before = await widget.boundingBox();
+
     await title.press("ArrowRight");
     await title.press("Shift+ArrowDown");
     await expect
         .poll(async () => (await widget.boundingBox())!.x)
         .toBeGreaterThan(before!.x);
     await title.press("a");
+
     const resize = widget.getByLabel("Resize slow.test with arrow keys");
     const width = (await widget.boundingBox())!.width;
+
     await resize.press("ArrowRight");
     await expect
         .poll(async () => (await widget.boundingBox())!.width)
         .toBeGreaterThan(width);
     await resize.press("a");
+
     const position = await title.boundingBox();
+
     await page.mouse.move(position!.x + 80, position!.y + 12);
     await page.mouse.down();
     await page.mouse.move(position!.x + 110, position!.y + 32, { steps: 4 });
     await page.mouse.up();
+
     const handle = widget.locator(".resize-se").first();
     const corner = await handle.boundingBox();
+
     await page.mouse.move(corner!.x + 2, corner!.y + 2);
     await page.mouse.down();
     await page.mouse.move(corner!.x + 20, corner!.y + 12, { steps: 3 });
@@ -162,18 +176,23 @@ test("reopens saved widgets, preserves geometry and reports missing image refere
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
     const file = path.join(profile, "saved.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const widget = page.getByRole("article", {
         name: "saved.test",
         exact: true
     });
+
     await expect(widget.getByRole("img")).toBeVisible();
     await widget
         .getByLabel("saved.test window title. Use arrow keys to move.")
         .press("Shift+ArrowRight");
+
     const bounds = await widget.boundingBox();
+
     await clickRibbon(page, "Close");
     await expect(widget).toHaveCount(0);
     await chooseFile(application, scenario);
@@ -192,6 +211,7 @@ test("plugin ribbon contributions run declared actions and surface failures", as
     profile
 }) => {
     const page = await application.firstWindow();
+
     await expect(
         page.getByRole("button", { name: "Inspect", exact: true })
     ).toBeDisabled();
@@ -224,6 +244,7 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
     await application.evaluate(({ dialog }) => {
         dialog.showSaveDialog = async () => ({
@@ -236,12 +257,14 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     await clickRibbon(page, "Open");
     await clickRibbon(page, "Add Image");
     await expect(page.getByRole("article")).toHaveCount(0);
+
     const canvas = page.getByRole("region", {
         name: "Image workspace",
         exact: true
     });
     const canvasBeforeError = await canvas.boundingBox();
     const invalid = path.join(profile, "invalid.scenario");
+
     await writeFile(invalid, "not sqlite");
     await chooseFile(application, invalid);
     await clickRibbon(page, "Open");
@@ -255,7 +278,9 @@ test("cancellation and invalid scenarios preserve the current document; decoder 
     await expect(
         page.getByRole("button", { name: "Add Image", exact: true })
     ).toBeEnabled();
+
     const broken = path.join(profile, "slow-broken.test");
+
     await writeFile(broken, "bad");
     await chooseFile(application, broken);
     await clickRibbon(page, "Add Image");
@@ -273,15 +298,20 @@ test("closing a loading widget does not recreate it when decoding completes", as
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "slow-close.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const widget = page.getByRole("article", {
         name: "slow-close.test",
         exact: true
     });
+
     await expect(
         widget.getByText("Loading image…", { exact: true })
     ).toBeVisible();
@@ -298,8 +328,11 @@ test("restores the last session on renderer startup", async ({
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "startup.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
@@ -328,6 +361,7 @@ test("reports scenario creation and close failures without discarding the docume
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
     await application.evaluate(
         ({ dialog }, filePath) => {
@@ -342,6 +376,7 @@ test("reports scenario creation and close failures without discarding the docume
     ).toBeEnabled();
     await application.evaluate(({ BrowserWindow }) => {
         const ipc = BrowserWindow.getAllWindows()[0]!.webContents.ipc;
+
         ipc.removeHandler("scenario:close");
         ipc.handle("scenario:close", () => {
             throw new Error("Close failed");
@@ -359,15 +394,19 @@ test("surfaces autosave errors and prevents switching away from unsaved work", a
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
     await application.evaluate(({ BrowserWindow }) => {
         const ipc = BrowserWindow.getAllWindows()[0]!.webContents.ipc;
+
         ipc.removeHandler("scenario:workspace");
         ipc.handle("scenario:workspace", () => {
             throw new Error("Disk full");
         });
     });
+
     const file = path.join(profile, "unsaved.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
@@ -381,6 +420,7 @@ test("surfaces autosave errors and prevents switching away from unsaved work", a
     // Restore the IPC contract so fixture shutdown can flush successfully.
     await application.evaluate(({ BrowserWindow }) => {
         const ipc = BrowserWindow.getAllWindows()[0]!.webContents.ipc;
+
         ipc.removeHandler("scenario:workspace");
         ipc.handle("scenario:workspace", () => undefined);
     });
@@ -391,12 +431,15 @@ test("percentile settings validate, update open images, and persist after reload
     profile
 }) => {
     const page = await application.firstWindow();
+
     await clickRibbon(page, "Settings");
+
     const dialog = page.getByRole("dialog", { name: "Settings", exact: true });
     const field = dialog.getByRole("combobox", {
         name: "Percentiles",
         exact: true
     });
+
     // Removing every chip should keep the dialog open with validation feedback.
     for (let index = 0; index < 7; index++) {
         await dialog
@@ -404,20 +447,25 @@ test("percentile settings validate, update open images, and persist after reload
             .first()
             .click();
     }
+
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(
         dialog.getByText("Select at least one percentile from 0 to 100.")
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "percentiles.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const widget = page.getByRole("article", {
         name: "percentiles.test",
         exact: true
     });
+
     await expect(widget.getByRole("img")).toBeVisible();
     await clickRibbon(page, "Statistics");
     await expect(
@@ -427,6 +475,7 @@ test("percentile settings validate, update open images, and persist after reload
         widget.getByText("90th percentile", { exact: true })
     ).toHaveCount(0);
     await clickRibbon(page, "Settings");
+
     for (const value of [1, 5, 50, 75, 95, 99]) {
         await dialog
             .locator(".q-chip")
@@ -434,6 +483,7 @@ test("percentile settings validate, update open images, and persist after reload
             .getByRole("button", { name: "Remove", exact: true })
             .click();
     }
+
     await field.click();
     await field.fill("90");
     await page.getByRole("option", { name: "90", exact: true }).click();
@@ -474,18 +524,23 @@ test("visual slice strips preview the selected source line and open independent 
 }) => {
     const page = await application.firstWindow();
     const toggle = page.getByRole("button", { name: "Slice", exact: true });
+
     await expect(
         page.getByRole("tab", { name: /^(Scientific Imagery|Image)$/ })
     ).toHaveCount(0);
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "slice.test");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "slice.test",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "slice.test", exact: true })
     ).toBeVisible();
@@ -494,6 +549,7 @@ test("visual slice strips preview the selected source line and open independent 
     await selectRibbonFor(page, "Slice");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
     const left = source.getByRole("button", {
         name: "Horizontal slice selector for slice.test",
         exact: true
@@ -502,26 +558,35 @@ test("visual slice strips preview the selected source line and open independent 
         name: "Vertical slice selector for slice.test",
         exact: true
     });
+
     await expect(left).toBeVisible();
     await expect(bottom).toBeVisible();
+
     const viewport = (await source.locator(".slice-viewport").boundingBox())!;
     const strip = (await left.boundingBox())!;
     const scale = Math.min(viewport.width / 40, viewport.height / 20);
     const top = (viewport.height - 20 * scale) / 2;
+
     expect(top).toBeGreaterThan(5);
     await page.mouse.move(strip.x + strip.width / 2, strip.y + 1);
     await expect(source.locator(".slice-line")).toHaveCount(0);
+
     const rowY = viewport.y + top + 3.5 * scale;
+
     await page.mouse.move(strip.x + strip.width / 2, rowY);
     await expect(source.locator(".slice-line")).toBeVisible();
     await expect(source.getByText("Row 3", { exact: true })).toBeVisible();
+
     const line = (await source.locator(".slice-line").boundingBox())!;
+
     expect(Math.abs(line.y - rowY)).toBeLessThan(2);
     await page.mouse.click(strip.x + strip.width / 2, rowY);
+
     const horizontal = page.getByRole("article", {
         name: "Horizontal slice: slice.test · row 3",
         exact: true
     });
+
     await expect(
         horizontal.getByRole("img", {
             name: "Source amplitude by Column (pixel)",
@@ -538,17 +603,21 @@ test("visual slice strips preview the selected source line and open independent 
     await expect(left).toHaveCount(0);
     await selectRibbonFor(page, "Slice");
     await toggle.click();
+
     const area = (await source.locator(".slice-viewport").boundingBox())!;
     const below = (await bottom.boundingBox())!;
     const fitted = Math.min(area.width / 40, area.height / 20);
     const colX = area.x + (area.width - fitted * 40) / 2 + 2.5 * fitted;
+
     await page.mouse.move(colX, below.y + below.height / 2);
     await expect(source.getByText("Column 2", { exact: true })).toBeVisible();
     await page.mouse.click(colX, below.y + below.height / 2);
+
     const vertical = page.getByRole("article", {
         name: "Vertical slice: slice.test · column 2",
         exact: true
     });
+
     await expect(
         vertical.getByRole("img", {
             name: "Source amplitude by Row (pixel)",
@@ -569,33 +638,42 @@ test("SVG preview slices support keyboard selection and clearly label luminance"
     profile
 }) => {
     const page = await application.firstWindow();
+
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "preview.svg");
+
     await writeFile(
         file,
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="white"/></svg>'
     );
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "preview.svg",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "preview.svg", exact: true })
     ).toBeVisible();
     await clickRibbon(page, "Slice");
+
     const selector = source.getByRole("button", {
         name: "Vertical slice selector for preview.svg",
         exact: true
     });
+
     await selector.focus();
     await expect(source.getByText("Column 8", { exact: true })).toBeVisible();
     await selector.press("Enter");
+
     const graph = page.getByRole("article", {
         name: "Vertical slice: preview.svg · column 8",
         exact: true
     });
+
     await expect(
         graph.getByRole("img", {
             name: "Preview luminance (0–255) by Row (pixel)",
@@ -611,13 +689,17 @@ test("dropping native files opens a scenario and images without an open dialog",
 }) => {
     const page = await application.firstWindow();
     const scenarioPath = await createScenario(application, page, profile);
+
     await clickRibbon(page, "Close");
+
     const imagePath = path.join(profile, "dropped.test");
+
     await writeFile(imagePath, "test image");
     // File inputs supply native-backed File objects, so this exercises Electron's
     // webUtils path resolution as well as the renderer drop handler and IPC.
     await page.evaluate(() => {
         const input = document.createElement("input");
+
         input.type = "file";
         input.multiple = true;
         input.id = "drop-test-files";
@@ -630,9 +712,11 @@ test("dropping native files opens a scenario and images without an open dialog",
         const input =
             document.querySelector<HTMLInputElement>("#drop-test-files")!;
         const dataTransfer = new DataTransfer();
+
         for (const file of input.files!) {
             dataTransfer.items.add(file);
         }
+
         window.dispatchEvent(
             new DragEvent("drop", { dataTransfer, cancelable: true })
         );

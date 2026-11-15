@@ -10,9 +10,11 @@ test("reads a custom raw input file and preserves it at startup", async () => {
     const execute =
         vi.fn<(context: import("istanbul-lib-report").Context) => void>();
     const create = vi.spyOn(reports, "create").mockReturnValue({ execute });
+
     try {
         const input = path.join(directory, "input.json");
         const source = path.join(directory, "source.ts");
+
         writeFileSync(
             input,
             JSON.stringify({
@@ -32,9 +34,11 @@ test("reads a custom raw input file and preserves it at startup", async () => {
                 }
             })
         );
+
         const reporter = new CoverageReporter({
             rawInputFile: path.relative(process.cwd(), input)
         });
+
         reporter.onBegin();
         expect(JSON.parse(readFileSync(input, "utf8"))).toHaveProperty(source);
         await reporter.onEnd();

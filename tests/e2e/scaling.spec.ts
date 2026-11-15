@@ -37,14 +37,18 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
 }) => {
     const page = await application.firstWindow();
     const scaling = page.getByRole("button", { name: "Scaling", exact: true });
+
     await expect(
         page.getByRole("tab", { name: /^(Scientific Imagery|Image)$/ })
     ).toHaveCount(0);
+
     const scenarioPath = await createScenario(application, page, profile);
     const file = path.join(profile, "radar.complex");
+
     await writeFile(file, "complex fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "radar.complex",
         exact: true
@@ -53,8 +57,11 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
         name: "radar.complex",
         exact: true
     });
+
     await expect(preview).toBeVisible();
+
     const original = await preview.getAttribute("src");
+
     await selectRibbonFor(page, "Scaling");
     await scaling.click();
     await expect(
@@ -64,7 +71,9 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
         .getByRole("menuitemradio", { name: "Real", exact: true })
         .click();
     await expect(preview).not.toHaveAttribute("src", original!);
+
     const real = await preview.getAttribute("src");
+
     await clickRibbon(page, "Statistics");
     await expect(source.getByText("-3", { exact: true })).toBeVisible();
     await selectRibbonFor(page, "Scaling");
@@ -80,16 +89,20 @@ test("scaling updates previews, statistics and graphs, preserves failures and re
     );
     await expect(preview).toHaveAttribute("src", real!);
     await clickRibbon(page, "Slice");
+
     const strip = source.getByRole("button", {
         name: "Vertical slice selector for radar.complex",
         exact: true
     });
+
     await strip.focus();
     await strip.press("Enter");
+
     const graph = page.getByRole("article", {
         name: "Vertical slice: radar.complex · Cross-range 0 m (column 20)",
         exact: true
     });
+
     await expect(
         graph.getByRole("img", { name: "real by Down-range (m)", exact: true })
     ).toBeVisible();
@@ -122,16 +135,21 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
         name: "Pixel Values",
         exact: true
     });
+
     await expect(toggle).toHaveCount(0);
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "hover.complex");
+
     await writeFile(file, "complex fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "hover.complex",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "hover.complex", exact: true })
     ).toBeVisible();
@@ -139,10 +157,12 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     await selectRibbonFor(page, "Pixel Values");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
     const viewport = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(viewport.width / 40, viewport.height / 20);
     const top = (viewport.height - 20 * scale) / 2;
     const left = (viewport.width - 40 * scale) / 2;
+
     await page.mouse.move(
         viewport.x + left + 5.5 * scale,
         viewport.y + top + 3.5 * scale
@@ -182,21 +202,27 @@ test("pixel inspection follows fitted coordinates, selected scaling and preview 
     await selectRibbonFor(page, "Pixel Values");
     await toggle.click();
     await expect(source.locator(".pixel-readout")).toHaveCount(0);
+
     const svg = path.join(profile, "red.svg");
+
     await writeFile(
         svg,
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="red"/></svg>'
     );
     await chooseFile(application, svg);
     await clickRibbon(page, "Add Image");
+
     const raster = page.getByRole("article", { name: "red.svg", exact: true });
+
     await expect(
         raster.getByRole("img", { name: "red.svg", exact: true })
     ).toBeVisible();
     await selectRibbonFor(page, "Pixel Values");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await toggle.click();
+
     const bounds = (await raster.locator(".slice-viewport").boundingBox())!;
+
     await page.mouse.move(
         bounds.x + bounds.width / 2,
         bounds.y + bounds.height / 2
@@ -213,16 +239,21 @@ test("image axes display source distances and remain aligned with slicing and ho
 }) => {
     const page = await application.firstWindow();
     const toggle = page.getByRole("button", { name: "Axes", exact: true });
+
     await expect(toggle).toHaveCount(0);
     await createScenario(application, page, profile);
+
     const file = path.join(profile, "axes.complex");
+
     await writeFile(file, "fixture");
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "axes.complex",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "axes.complex", exact: true })
     ).toBeVisible();
@@ -230,6 +261,7 @@ test("image axes display source distances and remain aligned with slicing and ho
     await selectRibbonFor(page, "Axes");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
     const x = source.getByRole("img", {
         name: "X axis: Cross-range (m)",
         exact: true
@@ -238,6 +270,7 @@ test("image axes display source distances and remain aligned with slicing and ho
         name: "Y axis: Down-range (m)",
         exact: true
     });
+
     await expect(x).toBeVisible();
     await expect(y).toBeVisible();
     await expect(x.locator("text").first()).toHaveText("-10");
@@ -247,12 +280,14 @@ test("image axes display source distances and remain aligned with slicing and ho
     await clickRibbon(page, "Metadata");
     await clickRibbon(page, "Slice");
     await clickRibbon(page, "Pixel Values");
+
     const viewport = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(viewport.width / 40, viewport.height / 20);
     const top = (viewport.height - 20 * scale) / 2;
     const left = (viewport.width - 40 * scale) / 2;
     const axisBox = (await x.boundingBox())!;
     const baseline = x.locator("line").first();
+
     expect(
         Math.abs(
             axisBox.x +
@@ -272,18 +307,22 @@ test("image axes display source distances and remain aligned with slicing and ho
     await expect(source.getByRole("status")).toContainText(
         "Source amplitude: 125"
     );
+
     const rowStrip = source.getByRole("button", {
         name: "Horizontal slice selector for axes.complex",
         exact: true
     });
+
     await expect(rowStrip).toContainText("Down-range");
     await rowStrip.focus();
     await expect(source.locator(".slice-index")).toHaveText(
         "Down-range 0 m (row 10)"
     );
     await rowStrip.press("Enter");
+
     const title = "Horizontal slice: axes.complex · Down-range 0 m (row 10)";
     const graph = page.getByRole("article", { name: title, exact: true });
+
     await expect(
         graph.getByRole("img", {
             name: "amplitude by Cross-range (m)",
@@ -300,14 +339,18 @@ test("image axes display source distances and remain aligned with slicing and ho
     await selectRibbonFor(page, "Axes");
     await toggle.click();
     await expect(source.locator(".image-axis")).toHaveCount(0);
+
     const svg = path.join(profile, "axes.svg");
+
     await writeFile(
         svg,
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="red"/></svg>'
     );
     await chooseFile(application, svg);
     await clickRibbon(page, "Add Image");
+
     const raster = page.getByRole("article", { name: "axes.svg", exact: true });
+
     await expect(
         raster.getByRole("img", { name: "axes.svg", exact: true })
     ).toBeVisible();

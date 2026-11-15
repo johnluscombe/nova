@@ -167,12 +167,20 @@ import {
     saveFormationSettings,
     savePercentiles
 } from "@/composables/useSettings";
+
+const error = ref("");
 const open = defineModel<boolean>({ default: false });
 const percentiles = ref<number[]>([]);
 const formation = ref({ ...formationSettings.value });
 const sidd = ref({ ...siddSettings.value });
+
 const allPercentiles = Array.from({ length: 101 }, (_, index) => index);
 const percentileOptions = ref(allPercentiles);
+
+/**
+ * Filter percentile choices using the typed query without changing the
+ * current selection.
+ */
 function filterPercentiles(
     query: string,
     update: (callback: () => void) => void
@@ -183,7 +191,7 @@ function filterPercentiles(
         );
     });
 }
-const error = ref("");
+
 watch(
     open,
     value => {
@@ -196,6 +204,11 @@ watch(
     },
     { immediate: true }
 );
+
+/**
+ * Validate all setting groups, persist their preferences, and close the
+ * dialog on success.
+ */
 function save() {
     try {
         validatePercentiles(percentiles.value);

@@ -23,6 +23,7 @@ const python = existsSync(configured)
       ? "python"
       : "python3";
 const execute = promisify(execFile);
+
 test.use({
     pluginFiles: {
         "scientific-imagery/plugin.json": JSON.stringify({
@@ -64,7 +65,9 @@ test("SIDD products open through Scientific Imagery with source inspection and s
             "SIDD integration requires Python with the Scientific Imagery requirements installed."
         );
     }
+
     const file = path.join(profile, "derived.sidd");
+
     await execute(python, [
         "-c",
         `import importlib.util, pathlib, sys, numpy as np
@@ -73,17 +76,21 @@ spec = importlib.util.spec_from_file_location('fixtures', sys.argv[1])
 fixtures = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixtures)
 fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtype='uint16').reshape(4,8) * 1000, 'MONO16I')`,
-        path.resolve("src-electron/sidd-reader.test.py"),
+        path.resolve("tests/unit/python/sidd-reader.test.py"),
         file
     ]);
+
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
+
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "derived.sidd",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "derived.sidd", exact: true })
     ).toBeVisible();
@@ -97,8 +104,10 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
     ).toContainText("SIDD / NITF");
     await expect(source).toContainText("MONO16I");
     await clickRibbon(page, "Pixel Values");
+
     const bounds = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(bounds.width / 8, bounds.height / 4);
+
     await page.mouse.move(
         bounds.x + (bounds.width - 8 * scale) / 2 + 3.5 * scale,
         bounds.y + (bounds.height - 4 * scale) / 2 + 2.5 * scale
@@ -108,16 +117,20 @@ fixtures.SiddReaderTests().fixture(pathlib.Path(sys.argv[2]), np.arange(32, dtyp
         "Derived image intensity: 19000"
     );
     await clickRibbon(page, "Slice");
+
     const strip = source.getByRole("button", {
         name: "Horizontal slice selector for derived.sidd",
         exact: true
     });
+
     await strip.focus();
     await strip.press("Enter");
+
     const graph = page.getByRole("article", {
         name: "Horizontal slice: derived.sidd · row 2",
         exact: true
     });
+
     await expect(
         graph.getByRole("img", {
             name: "Derived image intensity by Column (pixel)",
@@ -145,8 +158,10 @@ test("TIFF images open with 16-bit source values and color previews", async ({
             "TIFF integration requires Python with Pillow and NumPy installed."
         );
     }
+
     const mono = path.join(profile, "intensity.tif");
     const color = path.join(profile, "color.tiff");
+
     await execute(python, [
         "-c",
         `import sys, numpy as np
@@ -156,14 +171,18 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
         mono,
         color
     ]);
+
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
+
     await chooseFile(application, mono);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "intensity.tif",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "intensity.tif", exact: true })
     ).toBeVisible();
@@ -172,8 +191,10 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
         source.getByRole("complementary", { name: "Image metadata" })
     ).toContainText("TIFF");
     await clickRibbon(page, "Pixel Values");
+
     const bounds = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(bounds.width / 8, bounds.height / 4);
+
     await page.mouse.move(
         bounds.x + (bounds.width - 8 * scale) / 2 + 3.5 * scale,
         bounds.y + (bounds.height - 4 * scale) / 2 + 2.5 * scale
@@ -183,18 +204,26 @@ Image.new('RGB',(8,4),(255,0,0)).save(sys.argv[2])`,
     );
     await chooseFile(application, color);
     await clickRibbon(page, "Add Image");
+
     const colorImage = page
         .getByRole("article", { name: "color.tiff", exact: true })
         .getByRole("img", { name: "color.tiff", exact: true });
+
     await expect(colorImage).toBeVisible();
     expect(
         await colorImage.evaluate(async node => {
             const image = node as HTMLImageElement;
+
             await image.decode();
+
             const canvas = document.createElement("canvas");
+
             canvas.width = canvas.height = 1;
+
             const context = canvas.getContext("2d")!;
+
             context.drawImage(image, 0, 0, 1, 1);
+
             return [...context.getImageData(0, 0, 1, 1).data];
         })
     ).toEqual([255, 0, 0, 255]);
@@ -219,7 +248,9 @@ test("scientific polygon statistics use source values, follow scaling and restor
             "Scientific region integration requires the Python image dependencies."
         );
     }
+
     const file = path.join(profile, "region.nitf");
+
     await execute(python, [
         "-c",
         `import importlib.util, pathlib, sys, numpy as np
@@ -230,25 +261,31 @@ spec.loader.exec_module(fixtures)
 data = np.full((8,8),100+0j,dtype='complex64')
 data[:3,:3] = 3+4j
 fixtures.SicdPreviewTests().fixture(pathlib.Path(sys.argv[2]),data)`,
-        path.resolve("src-electron/sicd-reader.test.py"),
+        path.resolve("tests/unit/python/sicd-reader.test.py"),
         file
     ]);
+
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
+
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "region.nitf",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "region.nitf", exact: true })
     ).toBeVisible();
     await clickRibbon(page, "Polygon");
+
     const viewport = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(viewport.width / 8, viewport.height / 8);
     const left = viewport.x + (viewport.width - 8 * scale) / 2,
         top = viewport.y + (viewport.height - 8 * scale) / 2;
+
     for (const [column, row] of [
         [0.1, 0.1],
         [2.9, 0.1],
@@ -258,16 +295,20 @@ fixtures.SicdPreviewTests().fixture(pathlib.Path(sys.argv[2]),data)`,
     ]) {
         await page.mouse.click(left + column! * scale, top + row! * scale);
     }
+
     const pane = source.getByRole("region", {
         name: "Image statistics",
         exact: true
     });
+
     await expect(pane).toContainText("Region statistics");
     await expect(pane).toContainText("9 finite samples");
+
     const median = pane
         .getByText("50th percentile", { exact: true })
         .locator("..")
         .locator("dd");
+
     await expect(median).toHaveText("5");
     await clickRibbon(page, "Scaling");
     await page
@@ -296,23 +337,29 @@ test("CPHD image formation uses saved settings and restores the resulting SICD",
             "Image formation requires the Scientific Imagery Python dependencies."
         );
     }
+
     const file = path.join(profile, "target.cphd");
+
     await execute(python, [
         "-c",
         `import runpy, pathlib, sys
 sys.dont_write_bytecode = True
 fixture = runpy.run_path(sys.argv[1])
 fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
-        path.resolve("src-electron/formation.test.py"),
+        path.resolve("tests/unit/python/formation.test.py"),
         file
     ]);
+
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
+
     await clickRibbon(page, "Settings");
+
     const settings = page.getByRole("dialog", {
         name: "Settings",
         exact: true
     });
+
     await settings
         .getByRole("combobox", {
             name: "Output size (square pixels)",
@@ -332,20 +379,24 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
     await settings.getByRole("button", { name: "Save", exact: true }).click();
     await chooseFile(application, file);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "target.cphd",
         exact: true
     });
+
     await expect(source.getByRole("img")).toBeVisible();
     await selectRibbonFor(page, "Form SICD");
     await expect(
         page.getByRole("button", { name: "Form SICD", exact: true })
     ).toBeEnabled();
     await clickRibbon(page, "Form SICD");
+
     const formed = page.getByRole("article", {
         name: "target-formed.sicd",
         exact: true
     });
+
     await expect(formed.getByRole("img")).toBeVisible();
     await expect(source).toBeVisible();
     await clickRibbon(page, "Metadata");
@@ -356,10 +407,12 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
     await expect(
         page.getByRole("button", { name: "Form SICD", exact: true })
     ).toBeDisabled();
+
     const slides = page.getByRole("complementary", {
         name: "Formation products",
         exact: true
     });
+
     await expect(
         slides
             .getByRole("list", { name: "Processing slides" })
@@ -368,10 +421,12 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
     await slides
         .getByRole("button", { name: "1. Input phase history", exact: true })
         .click();
+
     const inputProduct = page.getByRole("article", {
         name: "Input phase history · target-formed.sicd",
         exact: true
     });
+
     await expect(
         inputProduct.getByRole("img", {
             name: "Input phase history",
@@ -467,6 +522,7 @@ test("SICD creates a SIDD with configured display settings and restores both pro
     profile
 }) => {
     test.setTimeout(60_000);
+
     try {
         await execute(python, ["-c", "import sarpy, numpy, scipy, lxml"]);
     } catch {
@@ -475,22 +531,27 @@ test("SICD creates a SIDD with configured display settings and restores both pro
             "SIDD creation requires Scientific Imagery Python dependencies."
         );
     }
+
     await execute(python, [
         "-c",
         `import runpy,pathlib,sys
 sys.dont_write_bytecode=True
 fixtures=runpy.run_path(sys.argv[1])
 fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
-        path.resolve("src-electron/sidd-creation.test.py"),
+        path.resolve("tests/unit/python/sidd-creation.test.py"),
         profile
     ]);
+
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
+
     await clickRibbon(page, "Settings");
+
     const settings = page.getByRole("dialog", {
         name: "Settings",
         exact: true
     });
+
     await settings
         .getByRole("combobox", { name: "SIDD bit depth", exact: true })
         .click();
@@ -510,16 +571,20 @@ fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
     await settings.getByRole("button", { name: "Save", exact: true }).click();
     await chooseFile(application, path.join(profile, "source.sicd"));
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "source.sicd",
         exact: true
     });
+
     await expect(source.getByRole("img")).toBeVisible();
     await clickRibbon(page, "Create SIDD");
+
     const detected = page.getByRole("article", {
         name: "source-detected.sidd",
         exact: true
     });
+
     await expect(detected.getByRole("img")).toBeVisible({ timeout: 15000 });
     await clickRibbon(page, "Metadata");
     await expect(detected).toContainText("SIDD / NITF");
@@ -548,29 +613,36 @@ test("cropping a SICD preserves a scientific source product and restores it", as
             "SICD cropping requires Scientific Imagery Python dependencies."
         );
     }
+
     await execute(python, [
         "-c",
         `import runpy,pathlib,sys
 sys.dont_write_bytecode=True
 fixtures=runpy.run_path(sys.argv[1])
 fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
-        path.resolve("src-electron/sidd-creation.test.py"),
+        path.resolve("tests/unit/python/sidd-creation.test.py"),
         profile
     ]);
+
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
+
     await chooseFile(application, path.join(profile, "source.sicd"));
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "source.sicd",
         exact: true
     });
+
     await expect(source.getByRole("img")).toBeVisible();
     await clickRibbon(page, "Crop");
+
     const bounds = (await source.locator(".slice-viewport").boundingBox())!;
     const scale = Math.min(bounds.width / 64, bounds.height / 64);
     const left = bounds.x + (bounds.width - 64 * scale) / 2;
     const top = bounds.y + (bounds.height - 64 * scale) / 2;
+
     await page.mouse.move(left + 16.1 * scale, top + 16.1 * scale);
     await page.mouse.down();
     await page.mouse.move(left + 47.9 * scale, top + 47.9 * scale);
@@ -578,10 +650,12 @@ fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
     await source
         .getByRole("button", { name: "Create Crop", exact: true })
         .click();
+
     const cropped = page.getByRole("article", {
         name: "source-crop.sicd",
         exact: true
     });
+
     await expect(cropped.getByRole("img")).toBeVisible();
     await expect(cropped).toContainText("32 × 32");
     await clickRibbon(page, "Metadata");

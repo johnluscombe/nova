@@ -6,8 +6,10 @@ import vector from "../../src-electron/electron-assets/plugins/vector/index.ts";
 
 test("vector rejects non-SVG content and oversized source files", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "nova-vector-"));
+
     try {
         const file = path.join(directory, "test.svg");
+
         await writeFile(file, "not SVG");
         await expect(vector.open(file)).rejects.toThrow(
             /does not contain an SVG/

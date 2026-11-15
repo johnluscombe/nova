@@ -44,11 +44,15 @@
         </span>
     </div>
 </template>
+
 <script setup lang="ts">
 import { computed } from "vue";
 import type { SliceData } from "@/types/slice";
+
 const props = defineProps<{ data: SliceData }>();
+
 const ticks = [0, 0.25, 0.5, 0.75, 1];
+
 const values = computed(() =>
     props.data.points.flatMap(point =>
         point.value === null ? [] : [point.value]
@@ -60,19 +64,21 @@ const low = computed(() =>
 const high = computed(() =>
     values.value.length ? Math.max(...values.value) : 1
 );
+
 const start = computed(() => props.data.points[0]?.position ?? 0);
 const end = computed(() => props.data.points.at(-1)?.position ?? 1);
-function format(value: number) {
-    return Number(value.toPrecision(4)).toString();
-}
+
 const path = computed(() => {
     let move = true;
+
     return props.data.points
         .map(point => {
             if (point.value === null) {
                 move = true;
+
                 return "";
             }
+
             const x =
                 78 +
                 ((point.position - start.value) /
@@ -85,12 +91,23 @@ const path = computed(() => {
                       ((point.value - low.value) / (high.value - low.value)) *
                           235;
             const command = `${move ? "M" : "L"}${x},${y}`;
+
             move = false;
+
             return command;
         })
         .join(" ");
 });
+
+/**
+ * Format finite graph coordinates compactly while retaining useful
+ * precision.
+ */
+function format(value: number) {
+    return Number(value.toPrecision(4)).toString();
+}
 </script>
+
 <style scoped>
 .line-graph {
     width: 100%;
@@ -100,15 +117,18 @@ const path = computed(() => {
     background: #f8fafc;
     color: #334155;
 }
+
 svg {
     width: 100%;
     flex: 1;
     min-height: 0;
 }
+
 text {
     font: 11px sans-serif;
     fill: #334155;
 }
+
 .graph-note {
     font-size: 10px;
     text-align: center;

@@ -25,11 +25,28 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 const execute = promisify(execFile);
+
+/**
+ * Injectable shell-free Python process runner returning the worker JSON
+ * response on stdout.
+ */
 type Runner = (
     python: string,
     args: string[],
     options: ExecFileOptionsWithStringEncoding
 ) => Promise<{ stdout: string }>;
+
+/**
+ * Execute the configured Python worker using a shell-free argument array.
+ *
+ * @param extraArgs - Worker operation arguments placed after the source
+ * path.
+ * @param timeout - Operation timeout in milliseconds; long processing
+ * operations opt into a larger limit.
+ * @returns Parsed worker JSON. Library logging remains on stderr.
+ * @throws Error for interpreter, timeout, worker-exit, or JSON-protocol
+ * failures.
+ */
 async function executeReader(
     filePath: string,
     parameters: PluginParameters = {},
@@ -40,12 +57,15 @@ async function executeReader(
     const configuredPython =
         parameters.python ??
         (process.platform === "win32" ? "python" : "python3");
+
     if (typeof configuredPython !== "string" || !configuredPython.trim()) {
         throw new Error(
             "Scientific Imagery's python parameter must be a nonempty Python executable path or command."
         );
     }
+
     const maxTiffPixels = parameters.maxTiffPixels;
+
     if (
         maxTiffPixels !== undefined &&
         (typeof maxTiffPixels !== "number" ||
@@ -56,11 +76,13 @@ async function executeReader(
             "Scientific Imagery's maxTiffPixels parameter must be a nonnegative safe integer (0 disables the limit)."
         );
     }
+
     const python =
         configuredPython.startsWith("~/") || configuredPython.startsWith("~\\")
             ? path.join(homedir(), configuredPython.slice(2))
             : configuredPython;
     let stdout;
+
     try {
         ({ stdout } = await run(
             python,
@@ -87,18 +109,22 @@ async function executeReader(
     } catch (cause) {
         const error = cause as NodeJS.ErrnoException & {
             killed?: boolean;
+
             stderr?: string;
         };
+
         if (error.code === "ENOENT") {
             throw new Error(
                 `Scientific Imagery could not find Python interpreter ${JSON.stringify(python)}. Set parameters.python in plugin.json to an existing executable; see docs/scientific-imagery-plugin.md.`
             );
         }
+
         if (error.code === "EACCES") {
             throw new Error(
                 `Scientific Imagery cannot execute Python interpreter ${JSON.stringify(python)}: permission denied.`
             );
         }
+
         if (error.killed) {
             throw new Error(
                 timeout > 120_000
@@ -106,23 +132,33 @@ async function executeReader(
                     : "Scientific Imagery preview exceeded the two-minute time limit."
             );
         }
+
         const details = String(error.stderr || error.message).trim();
         const diagnostic =
             details.match(
                 /Scientific Imagery could not read the image: ([\s\S]*)$/
             )?.[1] ?? details;
+
         throw new Error(
             `Scientific Imagery reader failed: ${diagnostic.slice(-2000)}`
         );
     }
+
     let result;
+
     try {
         result = JSON.parse(stdout);
     } catch {
         throw new Error("Scientific Imagery reader returned invalid output.");
     }
+
     return result;
 }
+
+/**
+ * Read and validate a scientific preview, then load any retained formation
+ * diagnostic previews.
+ */
 export async function openScientificImage(
     filePath: string,
     parameters: PluginParameters = {},
@@ -135,6 +171,7 @@ export async function openScientificImage(
         run,
         scaling ? ["--scaling", scaling] : []
     )) as ImagePluginResult;
+
     if (
         !result ||
         !Number.isSafeInteger(result.width) ||
@@ -148,22 +185,28 @@ export async function openScientificImage(
             "Scientific Imagery reader returned an invalid preview."
         );
     }
+
     if (
         result.metadata?.["Image formation application"] ===
         "Nova CPU backprojection"
     ) {
         try {
             const sidecar = `${filePath}.formation.json`;
+
             if ((await stat(sidecar)).size > 4 * 1024 * 1024) {
                 throw new Error("Formation previews exceed the size limit.");
             }
+
             const data = JSON.parse(await readFile(sidecar, "utf8"));
+
             if (data.version !== 1) {
                 throw new Error("Unsupported formation preview version.");
             }
+
             if (!Array.isArray(data.products) || data.products.length > 12) {
                 throw new Error("Invalid formation products.");
             }
+
             result.formationProducts = data.products;
         } catch (cause) {
             if ((cause as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -172,8 +215,14 @@ export async function openScientificImage(
             }
         }
     }
+
     return result;
 }
+
+/**
+ * Read source row or column samples in the requested scaling; positions
+ * remain zero-based pixel indices.
+ */
 export async function readImageSlice(
     filePath: string,
     orientation: SliceOrientation,
@@ -189,6 +238,11 @@ export async function readImageSlice(
         ...(scaling ? [scaling] : [])
     ])) as SliceData;
 }
+
+/**
+ * Read one original source pixel, using the image preview peak as the
+ * relative-power reference.
+ */
 export async function readImagePixel(
     filePath: string,
     row: number,
@@ -206,6 +260,11 @@ export async function readImagePixel(
         String(peakPower)
     ])) as PixelData;
 }
+
+/**
+ * Compute bounded source-polygon percentiles in the requested scaling and
+ * peak reference.
+ */
 export async function readImageRegion(
     filePath: string,
     polygon: PolygonPoint[],
@@ -221,6 +280,11 @@ export async function readImageRegion(
         String(peakPower)
     ])) as RegionStatistics;
 }
+
+/**
+ * Ask the Python worker to form a new SICD with the supplied
+ * backprojection settings.
+ */
 export async function formSicd(
     filePath: string,
     outputPath: string,
@@ -236,6 +300,11 @@ export async function formSicd(
         600_000
     );
 }
+
+/**
+ * Ask the Python worker to create a detected SIDD using the supplied
+ * display and projection settings.
+ */
 export async function createSidd(
     filePath: string,
     outputPath: string,
@@ -251,6 +320,11 @@ export async function createSidd(
         600_000
     );
 }
+
+/**
+ * Crop original scientific source pixels into a new file and return its
+ * generated path.
+ */
 export async function cropImage(
     filePath: string,
     directory: string,
@@ -265,8 +339,10 @@ export async function cropImage(
         ["--crop", directory, JSON.stringify(selection)],
         600_000
     )) as { path: string };
+
     return result.path;
 }
+
 export default {
     crop: (filePath, directory, selection, parameters) =>
         cropImage(filePath, directory, selection, parameters),

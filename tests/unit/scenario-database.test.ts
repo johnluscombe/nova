@@ -12,6 +12,7 @@ test("opens scenarios, pages records, preserves large integers, and rejects inva
     const directory = mkdtempSync(path.join(tmpdir(), "nova-scenario-"));
     const file = path.join(directory, "test.scenario");
     const scenario = new ScenarioDatabase();
+
     // Register a predefined test schema without adding placeholder production tables.
     (
         schema as typeof schema & { records?: ReturnType<typeof sqliteTable> }
@@ -20,14 +21,18 @@ test("opens scenarios, pages records, preserves large integers, and rejects inva
         data: blob("data", { mode: "buffer" }),
         value: text("value")
     });
+
     try {
         const fixture = new DatabaseSync(file);
+
         fixture.exec(
             'CREATE TABLE "odd""table" (id BLOB, data BLOB, value TEXT)'
         );
+
         const insert = fixture.prepare(
             'INSERT INTO "odd""table" VALUES (?, ?, ?)'
         );
+
         for (let i = 0; i < 101; i++) {
             insert.run(
                 new TextEncoder().encode("9223372036854775807"),
@@ -35,10 +40,13 @@ test("opens scenarios, pages records, preserves large integers, and rejects inva
                 null
             );
         }
+
         fixture.exec("CREATE TABLE undeclared (id INTEGER)");
         fixture.close();
         assert.deepEqual((await scenario.open(file)).tables, ['odd"table']);
+
         const first = scenario.readTable('odd"table', 0);
+
         assert.equal(first.rows.length, 100);
         assert.equal(first.hasMore, true);
         assert.deepEqual(first.rows[0], {
@@ -52,7 +60,9 @@ test("opens scenarios, pages records, preserves large integers, and rejects inva
         await assert.rejects(
             scenario.open(path.join(directory, "missing.scenario"))
         );
+
         const invalid = path.join(directory, "invalid.scenario");
+
         writeFileSync(invalid, "This is not SQLite");
         await assert.rejects(scenario.open(invalid));
         assert.equal(scenario.readTable('odd"table', 0).rows.length, 100);
@@ -74,6 +84,7 @@ test("opens an empty scenario with an empty predefined schema", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-empty-scenario-"));
     const file = path.join(directory, "empty.scenario");
     const scenario = new ScenarioDatabase();
+
     try {
         new DatabaseSync(file).close();
         assert.deepEqual(await scenario.open(file), {
@@ -92,6 +103,7 @@ test("creates, saves, overwrites, and reopens an empty scenario", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-save-"));
     const file = path.join(directory, "new.scenario");
     const scenario = new ScenarioDatabase();
+
     try {
         assert.deepEqual(scenario.create(), {
             name: "Untitled scenario",
@@ -103,7 +115,9 @@ test("creates, saves, overwrites, and reopens an empty scenario", async () => {
         );
         assert.equal(scenario.current!.path, null);
         await assert.rejects(scenario.save(path.join(directory, "wrong.txt")));
+
         const saved = await scenario.save(file);
+
         assert.equal(saved.path, file);
         assert.equal(saved.name, "new.scenario");
         await scenario.save(file);
@@ -122,8 +136,10 @@ test("saving an opened scenario preserves undeclared tables", async () => {
     const source = path.join(directory, "source.scenario");
     const destination = path.join(directory, "copy.scenario");
     const scenario = new ScenarioDatabase();
+
     try {
         const fixture = new DatabaseSync(source);
+
         fixture.exec(
             "CREATE TABLE retained (value TEXT); INSERT INTO retained VALUES ('keep me')"
         );
@@ -131,7 +147,9 @@ test("saving an opened scenario preserves undeclared tables", async () => {
         await scenario.open(source);
         await scenario.save(destination);
         await scenario.save(destination);
+
         const copy = new DatabaseSync(destination, { readOnly: true });
+
         try {
             assert.equal(
                 copy.prepare("SELECT value FROM retained").get()!.value,
@@ -149,16 +167,21 @@ test("saving an opened scenario preserves undeclared tables", async () => {
 test("file-backed creation opens only after persistence and preserves the current scenario on failure", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-create-"));
     const scenario = new ScenarioDatabase();
+
     try {
         const file = path.join(directory, "new.scenario");
         const info = await scenario.createFile(file);
+
         assert.equal(info.path, file);
+
         const reopened = new ScenarioDatabase();
+
         try {
             assert.deepEqual(await reopened.open(file), info);
         } finally {
             reopened.close();
         }
+
         await assert.rejects(
             scenario.createFile(
                 path.join(directory, "missing", "fail.scenario")
@@ -199,6 +222,7 @@ test("autosaved workspace round-trips all window states and removes closed windo
             z: 3
         }
     ];
+
     try {
         await scenario.createFile(file);
         assert.deepEqual(scenario.readWorkspace(), []);
@@ -228,12 +252,14 @@ test("autosaved workspace round-trips all window states and removes closed windo
 test("corrupt saved layout does not replace an already open scenario", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "nova-corrupt-layout-"));
     const scenario = new ScenarioDatabase();
+
     try {
         const good = await scenario.createFile(
             path.join(directory, "good.scenario")
         );
         const broken = path.join(directory, "broken.scenario");
         const fixture = new DatabaseSync(broken);
+
         fixture.exec(
             "CREATE TABLE nova_workspace (id TEXT PRIMARY KEY, windows TEXT NOT NULL); INSERT INTO nova_workspace VALUES ('workspace', 'invalid JSON')"
         );
@@ -248,6 +274,7 @@ test("corrupt saved layout does not replace an already open scenario", async () 
 
 test("workspace operations require an open persisted scenario", async () => {
     const scenario = new ScenarioDatabase();
+
     assert.throws(() => scenario.readWorkspace(), /Open a scenario first/);
     await assert.rejects(scenario.saveWorkspace([]), /Open a scenario first/);
     scenario.close();

@@ -28,6 +28,10 @@ app.on("before-quit", () => {
     quitRequested = true;
 });
 
+/**
+ * Create the desktop window, initialize document services, and register
+ * renderer IPC handlers.
+ */
 async function createWindow() {
     /**
      * Initial window options
@@ -53,10 +57,19 @@ async function createWindow() {
         }
     });
 
+    /**
+     * Read the native window state exposed to the custom title bar.
+     */
     const windowState = () => ({ maximized: mainWindow.isMaximized() });
+
+    /**
+     * Notify the renderer after the native window changes maximization
+     * state.
+     */
     const publishWindowState = () => {
         mainWindow.webContents.send("window:state-changed", windowState());
     };
+
     mainWindow.on("maximize", publishWindowState);
     mainWindow.on("unmaximize", publishWindowState);
     mainWindow.webContents.ipc.handle("window:state", windowState);
@@ -69,6 +82,7 @@ async function createWindow() {
         } else {
             mainWindow.maximize();
         }
+
         return windowState();
     });
     mainWindow.webContents.ipc.handle("window:close", () => mainWindow.close());
@@ -78,6 +92,7 @@ async function createWindow() {
         path.join(app.getPath("userData"), "plugins"),
         resolveElectronAssetsPath("plugins")
     );
+
     await imagePlugins.reload();
 
     // Serialize document actions, including native dialogs and asynchronous backups.
@@ -85,6 +100,7 @@ async function createWindow() {
     let documentActions = 0;
     let closeConfirmed = false;
     let rendererReady = false;
+
     mainWindow.on("close", event => {
         if (
             !closeConfirmed &&
@@ -93,8 +109,10 @@ async function createWindow() {
         ) {
             event.preventDefault();
             mainWindow.webContents.send("scenario:flush");
+
             return;
         }
+
         if (documentActions) {
             event.preventDefault();
             void pending.then(() => mainWindow.close());
@@ -103,6 +121,7 @@ async function createWindow() {
     mainWindow.on("closed", () => scenario.close());
     mainWindow.webContents.ipc.handle("scenario:confirm-close", () => {
         closeConfirmed = true;
+
         if (quitRequested) {
             // The save-flush close guard canceled the original app.quit().
             // Resume quitting once all document work has finished.
@@ -111,15 +130,29 @@ async function createWindow() {
             mainWindow.close();
         }
     });
+
+    /**
+     * Serialize document operations and keep the window open until queued
+     * work has finished.
+     */
     function documentAction<T>(action: () => Promise<T> | T): Promise<T> {
         documentActions++;
+
         const result = pending.then(action).finally(() => {
             documentActions--;
         });
+
         pending = result.catch(() => undefined);
+
         return result;
     }
+
     const preferencesPath = path.join(app.getPath("userData"), "session.json");
+
+    /**
+     * Atomically persist the last scenario path used for session
+     * restoration.
+     */
     async function rememberScenario(filePath: string | null) {
         await writeFile(
             `${preferencesPath}.tmp`,
@@ -128,6 +161,11 @@ async function createWindow() {
         );
         await rename(`${preferencesPath}.tmp`, preferencesPath);
     }
+
+    /**
+     * Create loading placeholders for saved image windows before their
+     * readers finish.
+     */
     function restoreWorkspace(info: ScenarioInfo): ScenarioInfo {
         return {
             ...info,
@@ -153,22 +191,27 @@ async function createWindow() {
             }))
         };
     }
+
     mainWindow.webContents.ipc.handle("scenario:load-images", () =>
         documentAction(async () => {
             const updates: RestoredImageUpdate[] = [];
+
             for (const saved of scenario.readWorkspace()) {
                 let update;
+
                 try {
                     const image = await imagePlugins.open(
                         saved.path,
                         saved.pluginId,
                         saved.scaling
                     );
+
                     if (saved.metadataFiles?.length) {
                         image.attachedMetadata = await Promise.all(
                             saved.metadataFiles.map(readMetadata)
                         );
                     }
+
                     update = { id: saved.id, image };
                 } catch (cause) {
                     update = {
@@ -179,7 +222,9 @@ async function createWindow() {
                                 : "Unable to restore image."
                     };
                 }
+
                 updates.push(update);
+
                 if (!mainWindow.webContents.isDestroyed()) {
                     mainWindow.webContents.send(
                         "scenario:image-restored",
@@ -187,6 +232,7 @@ async function createWindow() {
                     );
                 }
             }
+
             return updates;
         })
     );
@@ -199,16 +245,20 @@ async function createWindow() {
                         "The scenario has changed; workspace was not saved."
                     );
                 }
+
                 await scenario.saveWorkspace(windows);
             })
     );
     mainWindow.webContents.ipc.handle("scenario:restore-last", () =>
         documentAction(async () => {
             rendererReady = true;
+
             if (scenario.current) {
                 return restoreWorkspace(scenario.current);
             }
+
             let lastScenario: unknown;
+
             try {
                 lastScenario = JSON.parse(
                     await readFile(preferencesPath, "utf8")
@@ -217,17 +267,21 @@ async function createWindow() {
                 if ((cause as NodeJS.ErrnoException).code === "ENOENT") {
                     return null;
                 }
+
                 throw new Error(
                     "Unable to read the previous application session."
                 );
             }
+
             if (typeof lastScenario !== "string" || !lastScenario) {
                 return null;
             }
+
             try {
                 return restoreWorkspace(await scenario.open(lastScenario));
             } catch (cause) {
                 scenario.close();
+
                 throw new Error(
                     `Unable to reopen ${lastScenario}: ${cause instanceof Error ? cause.message : String(cause)}`
                 );
@@ -243,15 +297,21 @@ async function createWindow() {
                     { name: "Scenario database", extensions: ["scenario"] }
                 ]
             });
+
             if (result.canceled || !result.filePath) {
                 return null;
             }
+
             let filePath = result.filePath;
+
             if (!path.extname(filePath)) {
                 filePath += ".scenario";
             }
+
             const created = await scenario.createFile(filePath);
+
             await rememberScenario(filePath);
+
             return restoreWorkspace(created);
         })
     );
@@ -269,6 +329,7 @@ async function createWindow() {
                 ) {
                     throw new Error("Invalid ribbon action.");
                 }
+
                 return imagePlugins.executeRibbonAction(pluginId, actionId, {
                     scenarioPath: scenario.current?.path ?? null
                 });
@@ -289,6 +350,7 @@ async function createWindow() {
                         "Open a scenario before selecting image regions."
                     );
                 }
+
                 return imagePlugins.readRegion(
                     filePath,
                     pluginId,
@@ -313,6 +375,7 @@ async function createWindow() {
                         "Open a scenario before inspecting pixels."
                     );
                 }
+
                 return imagePlugins.readPixel(
                     filePath,
                     pluginId,
@@ -334,16 +397,20 @@ async function createWindow() {
                 if (!scenario.current) {
                     throw new Error("Open a scenario before forming an image.");
                 }
+
                 const directory = path.join(
                     app.getPath("userData"),
                     "formed-images",
                     randomUUID()
                 );
+
                 await mkdir(directory, { recursive: true });
+
                 const outputPath = path.join(
                     directory,
                     `${path.parse(filePath).name}-formed.sicd`
                 );
+
                 return imagePlugins.formSicd(
                     filePath,
                     pluginId,
@@ -359,12 +426,15 @@ async function createWindow() {
                 if (!scenario.current) {
                     throw new Error("Open a scenario before cropping images.");
                 }
+
                 const directory = path.join(
                     app.getPath("userData"),
                     "cropped-images",
                     randomUUID()
                 );
+
                 await mkdir(directory, { recursive: true });
+
                 return imagePlugins.crop(
                     filePath,
                     pluginId,
@@ -380,16 +450,20 @@ async function createWindow() {
                 if (!scenario.current) {
                     throw new Error("Open a scenario before creating a SIDD.");
                 }
+
                 const directory = path.join(
                     app.getPath("userData"),
                     "derived-images",
                     randomUUID()
                 );
+
                 await mkdir(directory, { recursive: true });
+
                 const outputPath = path.join(
                     directory,
                     `${path.parse(filePath).name}-detected.sidd`
                 );
+
                 return imagePlugins.createSidd(
                     filePath,
                     pluginId,
@@ -405,6 +479,7 @@ async function createWindow() {
                 if (!scenario.current) {
                     throw new Error("Open a scenario before scaling images.");
                 }
+
                 return imagePlugins.rescale(filePath, pluginId, scaling);
             })
     );
@@ -422,6 +497,7 @@ async function createWindow() {
                 if (!scenario.current) {
                     throw new Error("Open a scenario before slicing images.");
                 }
+
                 return imagePlugins.readSlice(
                     filePath,
                     pluginId,
@@ -440,24 +516,29 @@ async function createWindow() {
                         "Open a scenario before attaching metadata."
                     );
                 }
+
                 const result = await dialog.showOpenDialog(mainWindow, {
                     title: "Attach JSON metadata",
                     defaultPath: path.dirname(imagePath),
                     filters: [{ name: "JSON metadata", extensions: ["json"] }],
                     properties: ["openFile", "multiSelections"]
                 });
+
                 if (result.canceled || !result.filePaths.length) {
                     return null;
                 }
+
                 if (result.filePaths.length > 32) {
                     throw new Error(
                         "Attach at most 32 metadata files per image."
                     );
                 }
+
                 const attachments = await Promise.all(
                     result.filePaths.map(readMetadata)
                 );
                 const failures = attachments.filter(item => item.error);
+
                 if (failures.length) {
                     throw new Error(
                         failures
@@ -465,6 +546,7 @@ async function createWindow() {
                             .join("\n")
                     );
                 }
+
                 return attachments;
             })
     );
@@ -477,14 +559,17 @@ async function createWindow() {
                         "Open or create a scenario before opening images."
                     );
                 }
+
                 const extensions = new Set(
                     imagePlugins.filters.flatMap(filter => filter.extensions)
                 );
+
                 if (!extensions.size) {
                     throw new Error(
                         "Install an image plugin before opening images."
                     );
                 }
+
                 const selected =
                     paths === undefined
                         ? await dialog.showOpenDialog(mainWindow, {
@@ -508,9 +593,11 @@ async function createWindow() {
                               filePaths:
                                   typeof paths === "string" ? [paths] : paths
                           };
+
                 if (selected.canceled || !selected.filePaths.length) {
                     return { errors: [] };
                 }
+
                 if (
                     !Array.isArray(selected.filePaths) ||
                     selected.filePaths.length > 1000 ||
@@ -520,17 +607,26 @@ async function createWindow() {
                 ) {
                     throw new Error("Invalid image selection.");
                 }
+
                 const batch = await prepareImport(
                     selected.filePaths,
                     path.join(app.getPath("userData"), "imports"),
                     extensions
                 );
+
                 if (batch.entries.length > 1000) {
                     throw new Error("Import at most 1,000 images at a time.");
                 }
+
                 const updates: ImageImportUpdate[] = [];
+
+                /**
+                 * Publish an image import update and retain it for
+                 * reconciliation with the final IPC response.
+                 */
                 const send = (update: ImageImportUpdate) => {
                     updates.push(update);
+
                     if (!mainWindow.webContents.isDestroyed()) {
                         mainWindow.webContents.send(
                             "image:import-update",
@@ -538,6 +634,7 @@ async function createWindow() {
                         );
                     }
                 };
+
                 for (const [index, entry] of batch.entries.entries()) {
                     const key = `${index}:${entry.filePath}`;
                     const loading: ImageInfo = {
@@ -546,22 +643,28 @@ async function createWindow() {
                         pluginId: "",
                         pluginName: "Loading…"
                     };
+
                     send({ key, status: "loading", image: loading });
+
                     try {
                         const image = await imagePlugins.open(entry.filePath);
+
                         if (entry.metadata.length) {
                             image.attachedMetadata = entry.metadata;
                         }
+
                         send({ key, status: "ready", image });
                     } catch (cause) {
                         const error =
                             cause instanceof Error
                                 ? cause.message
                                 : String(cause);
+
                         batch.errors.push(`${loading.name}: ${error}`);
                         send({ key, status: "error", error });
                     }
                 }
+
                 return { errors: batch.errors, updates };
             })
     );
@@ -574,11 +677,13 @@ async function createWindow() {
                         "Open or create a scenario before opening images."
                     );
                 }
+
                 if (!imagePlugins.filters.length) {
                     throw new Error(
                         "Install an image plugin before opening images."
                     );
                 }
+
                 const result =
                     droppedPath === undefined
                         ? await dialog.showOpenDialog(mainWindow, {
@@ -588,15 +693,18 @@ async function createWindow() {
                           })
                         : { canceled: false, filePaths: [droppedPath] };
                 const filePath = result.filePaths[0];
+
                 if (result.canceled || !filePath) {
                     return null;
                 }
+
                 mainWindow.webContents.send("image:loading", {
                     name: path.basename(filePath),
                     path: filePath,
                     pluginId: "",
                     pluginName: "Loading…"
                 });
+
                 return imagePlugins.open(filePath);
             })
     );
@@ -618,11 +726,15 @@ async function createWindow() {
                           })
                         : { canceled: false, filePaths: [droppedPath] };
                 const filePath = result.filePaths[0];
+
                 if (result.canceled || !filePath) {
                     return null;
                 }
+
                 const opened = await scenario.open(filePath);
+
                 await rememberScenario(filePath);
+
                 return restoreWorkspace(opened);
             })
     );
@@ -657,9 +769,11 @@ async function createWindow() {
 
 void app.whenReady().then(() => {
     registerQuasarRuntime();
+
     if (platform === "darwin") {
         app.dock?.setIcon(resolveElectronAssetsPath("icons/nova.png"));
     }
+
     void createWindow();
 
     app.on("activate", () => {

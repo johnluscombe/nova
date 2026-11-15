@@ -27,21 +27,36 @@ contextBridge.exposeInMainWorld("images", {
         ipcRenderer.invoke("image:attach-metadata", imagePath),
     importFiles: async (onUpdate, paths) => {
         const seen = new Set<string>();
+
+        /**
+         * Deliver each progress state once while reconciling IPC events
+         * with the final invocation result.
+         */
         const deliver = (update: ImageImportUpdate) => {
             const key = `${update.key}:${update.status}`;
+
             if (seen.has(key)) {
                 return;
             }
+
             seen.add(key);
             onUpdate(update);
         };
+
+        /**
+         * Forward an IPC event payload to the renderer callback registered
+         * for this operation.
+         */
         const listener = (
             _event: Electron.IpcRendererEvent,
             update: ImageImportUpdate
         ) => deliver(update);
+
         ipcRenderer.on("image:import-update", listener);
+
         try {
             const result = await ipcRenderer.invoke("image:import", paths);
+
             // The invoke reply and progress events can arrive on separate queues.
             // Reconcile final results before removing the progress listener.
             for (const update of result.updates ?? []) {
@@ -52,8 +67,10 @@ contextBridge.exposeInMainWorld("images", {
                 ) {
                     continue;
                 }
+
                 deliver(update);
             }
+
             return { errors: result.errors };
         } finally {
             ipcRenderer.removeListener("image:import-update", listener);
@@ -87,11 +104,17 @@ contextBridge.exposeInMainWorld("images", {
             scaling
         ),
     open: async (onLoading?: (image: ImageInfo) => void, filePath?: string) => {
+        /**
+         * Forward an IPC event payload to the renderer callback registered
+         * for this operation.
+         */
         const listener = (
             _event: Electron.IpcRendererEvent,
             image: ImageInfo
         ) => onLoading?.(image);
+
         ipcRenderer.on("image:loading", listener);
+
         try {
             return await ipcRenderer.invoke("image:open", filePath);
         } finally {
@@ -110,11 +133,17 @@ contextBridge.exposeInMainWorld("windowControls", {
     toggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
     close: () => ipcRenderer.invoke("window:close"),
     onStateChanged: (callback: (state: WindowState) => void) => {
+        /**
+         * Forward an IPC event payload to the renderer callback registered
+         * for this operation.
+         */
         const listener = (
             _event: Electron.IpcRendererEvent,
             state: WindowState
         ) => callback(state);
+
         ipcRenderer.on("window:state-changed", listener);
+
         return () =>
             ipcRenderer.removeListener("window:state-changed", listener);
     }
@@ -123,20 +152,34 @@ contextBridge.exposeInMainWorld("windowControls", {
 contextBridge.exposeInMainWorld("scenario", {
     loadImages: async (onRestored: (update: RestoredImageUpdate) => void) => {
         const seen = new Set<number>();
+
+        /**
+         * Deliver each progress state once while reconciling IPC events
+         * with the final invocation result.
+         */
         const deliver = (update: RestoredImageUpdate) => {
             if (seen.has(update.id)) {
                 return;
             }
+
             seen.add(update.id);
             onRestored(update);
         };
+
+        /**
+         * Forward an IPC event payload to the renderer callback registered
+         * for this operation.
+         */
         const listener = (
             _event: Electron.IpcRendererEvent,
             update: RestoredImageUpdate
         ) => deliver(update);
+
         ipcRenderer.on("scenario:image-restored", listener);
+
         try {
             const updates = await ipcRenderer.invoke("scenario:load-images");
+
             for (const update of updates ?? []) {
                 deliver(update);
             }
@@ -148,8 +191,14 @@ contextBridge.exposeInMainWorld("scenario", {
     saveWorkspace: (path: string, windows: SavedImageWindow[]) =>
         ipcRenderer.invoke("scenario:workspace", path, windows),
     onFlushRequested: (callback: () => void) => {
+        /**
+         * Forward an IPC event payload to the renderer callback registered
+         * for this operation.
+         */
         const listener = () => callback();
+
         ipcRenderer.on("scenario:flush", listener);
+
         return () => ipcRenderer.removeListener("scenario:flush", listener);
     },
     confirmClose: () => ipcRenderer.invoke("scenario:confirm-close"),

@@ -4,6 +4,7 @@ import { createScenario, chooseFile } from "./helpers";
 import { writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { zipSync, strToU8 } from "fflate";
+
 const axes = {
     row: { label: "Northing", unit: "m", origin: 100, spacing: 2 },
     column: { label: "Easting", unit: "m", origin: 200, spacing: 3 }
@@ -14,6 +15,7 @@ const json = JSON.stringify({
     axes,
     collection: "Test collection"
 });
+
 test.use({
     pluginFiles: {
         "test/plugin.json": JSON.stringify({
@@ -44,6 +46,7 @@ test("multi-select shares JSON axes and late attachments persist with the scenar
         b = path.join(profile, "beta.test"),
         shared = path.join(profile, "shared.json"),
         extra = path.join(profile, "extra.json");
+
     await Promise.all([
         writeFile(a, "a"),
         writeFile(b, "b"),
@@ -61,7 +64,9 @@ test("multi-select shares JSON axes and late attachments persist with the scenar
     );
     await clickRibbon(page, "Add Image");
     await expect(page.getByRole("article")).toHaveCount(2);
+
     const beta = page.getByRole("article", { name: "beta.test", exact: true });
+
     await expect(
         beta.getByRole("img", { name: "beta.test", exact: true })
     ).toBeVisible();
@@ -106,6 +111,7 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
     const scenario = await createScenario(application, page, profile);
     const file = path.join(profile, "embedded.test"),
         metadata = path.join(profile, "axes.json");
+
     await Promise.all([writeFile(file, "fixture"), writeFile(metadata, json)]);
     await application.evaluate(
         ({ dialog }, files) => {
@@ -117,10 +123,12 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
         [file, metadata]
     );
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "embedded.test",
         exact: true
     });
+
     await expect(
         source.getByRole("img", { name: "embedded.test", exact: true })
     ).toBeVisible();
@@ -132,10 +140,12 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
         })
     ).toBeVisible();
     await clickRibbon(page, "Slice");
+
     const strip = source.getByRole("button", {
         name: "Horizontal slice selector for embedded.test",
         exact: true
     });
+
     await strip.focus();
     await strip.press("Enter");
     await expect(
@@ -155,10 +165,12 @@ test("JSON axis override is explicit, updates existing slices and persists", asy
     await expect(
         source.getByRole("img", { name: "X axis: Easting (m)", exact: true })
     ).toBeVisible();
+
     const graph = page.getByRole("article", {
         name: "Horizontal slice: embedded.test · Northing 120 m (row 10)",
         exact: true
     });
+
     await expect(
         graph.getByRole("img", {
             name: "Intensity by Easting (m)",
@@ -194,6 +206,7 @@ test("ZIP images and JSON axes restore independently of the original archive", a
     const page = await application.firstWindow();
     const scenario = await createScenario(application, page, profile);
     const archive = path.join(profile, "collection.zip");
+
     await writeFile(
         archive,
         zipSync({
@@ -204,10 +217,12 @@ test("ZIP images and JSON axes restore independently of the original archive", a
     );
     await chooseFile(application, archive);
     await clickRibbon(page, "Add Image");
+
     const source = page.getByRole("article", {
         name: "second.test",
         exact: true
     });
+
     await expect(page.getByRole("article")).toHaveCount(2);
     await expect(
         source.getByRole("img", { name: "second.test", exact: true })

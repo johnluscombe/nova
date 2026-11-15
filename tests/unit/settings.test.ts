@@ -16,6 +16,7 @@ afterEach(() => {
 
 test("validates percentile ranges and sorts unique selections", () => {
     expect(validatePercentiles([100, 0, 50, 50])).toEqual([0, 50, 100]);
+
     for (const invalid of [
         [],
         null,
@@ -72,6 +73,7 @@ test("validates and persists image formation settings", async () => {
         await import("../../src/types/formation");
     const { saveFormationSettings, formationSettings } =
         await import("../../src/composables/useSettings");
+
     for (const patch of [
         { imageSize: 0 },
         { pixelSpacing: NaN },
@@ -84,6 +86,7 @@ test("validates and persists image formation settings", async () => {
             validateFormationSettings({ ...defaultFormationSettings, ...patch })
         ).toThrow();
     }
+
     saveFormationSettings({
         ...defaultFormationSettings,
         imageSize: 128,
@@ -109,6 +112,7 @@ test("validates and persists image formation settings", async () => {
 test("SIDD settings validate, persist, and recover from invalid storage", async () => {
     const { validateSiddSettings, defaultSiddSettings } =
         await import("../../src/types/sidd");
+
     for (const patch of [
         { version: 1 },
         { bitDepth: 32 },
@@ -121,8 +125,10 @@ test("SIDD settings validate, persist, and recover from invalid storage", async 
             validateSiddSettings({ ...defaultSiddSettings, ...patch })
         ).toThrow();
     }
+
     const { saveSiddSettings, siddSettings } =
         await import("../../src/composables/useSettings");
+
     saveSiddSettings({ ...defaultSiddSettings, bitDepth: 16, version: 2 });
     expect(siddSettings.value.bitDepth).toBe(16);
     vi.resetModules();

@@ -21,9 +21,11 @@ test("Scientific Imagery uses an argument array and returns the worker preview",
             assert.equal(options.timeout, 120000);
             assert.equal(options.windowsHide, true);
             assert.equal(options.shell, undefined);
+
             return { stdout: JSON.stringify(result) };
         }
     );
+
     assert.deepEqual(actual, result);
 });
 test("Scientific Imagery reports setup, timeout, decoding, and protocol failures", async () => {
@@ -68,6 +70,7 @@ test("Scientific Imagery expands a home-relative interpreter without a shell", a
         async (python, _args, options) => {
             assert.equal(python, path.join(homedir(), ".nova/bin/python3"));
             assert.equal(options.shell, undefined);
+
             return {
                 stdout: JSON.stringify({
                     width: 1,
@@ -114,6 +117,7 @@ test("default Scientific Imagery export forwards configured interpreter paramete
     const plugin = (
         await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts")
     ).default;
+
     await assert.rejects(
         plugin.open("missing.nitf", { python: "" }),
         /python parameter/
@@ -141,15 +145,18 @@ test("Scientific Imagery source slices pass orientation and index to the Python 
                 "horizontal",
                 "7"
             ]);
+
             return { stdout: JSON.stringify(expected) };
         }
     );
+
     assert.deepEqual(result, expected);
 });
 
 test("Scientific Imagery forwards scaling for previews and source slices", async () => {
     const { readImageSlice } =
         await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts");
+
     await openScientificImage(
         "image.nitf",
         {},
@@ -159,6 +166,7 @@ test("Scientific Imagery forwards scaling for previews and source slices", async
                 "--scaling",
                 "real"
             ]);
+
             return {
                 stdout: JSON.stringify({
                     width: 1,
@@ -171,11 +179,13 @@ test("Scientific Imagery forwards scaling for previews and source slices", async
         },
         "real"
     );
+
     const expected = {
         points: [{ position: 0, value: -3 }],
         positionLabel: "Column",
         valueLabel: "Real component"
     };
+
     assert.deepEqual(
         await readImageSlice(
             "image.nitf",
@@ -190,6 +200,7 @@ test("Scientific Imagery forwards scaling for previews and source slices", async
                     "0",
                     "real"
                 ]);
+
                 return { stdout: JSON.stringify(expected) };
             },
             "real"
@@ -205,6 +216,7 @@ test("Scientific Imagery pixel requests forward exact coordinates, scaling and t
         value: -6.0206,
         valueLabel: "Relative power (dB, sampled peak = 0)"
     };
+
     assert.deepEqual(
         await readImagePixel(
             "image.nitf",
@@ -220,6 +232,7 @@ test("Scientific Imagery pixel requests forward exact coordinates, scaling and t
                     "relative-power",
                     "100"
                 ]);
+
                 return { stdout: JSON.stringify(expected) };
             },
             "relative-power",
@@ -239,6 +252,7 @@ test("Scientific Imagery forwards and validates the TIFF pixel limit", async () 
                     "--max-tiff-pixels",
                     String(limit)
                 ]);
+
                 return {
                     stdout: JSON.stringify({
                         width: 1,
@@ -249,6 +263,7 @@ test("Scientific Imagery forwards and validates the TIFF pixel limit", async () 
             }
         );
     }
+
     for (const maxTiffPixels of [-1, 1.5, "1000", true, null, Infinity]) {
         await assert.rejects(
             openScientificImage("large.tif", { maxTiffPixels }, async () => {
@@ -273,6 +288,7 @@ test("Scientific Imagery forwards polygon coordinates and scaling to the worker"
         sampleCount: 3,
         sampled: false
     };
+
     assert.deepEqual(
         await readImageRegion(
             "scene.nitf",
@@ -286,6 +302,7 @@ test("Scientific Imagery forwards polygon coordinates and scaling to the worker"
                     "real",
                     "100"
                 ]);
+
                 return { stdout: JSON.stringify(expected) };
             },
             "real",
@@ -300,6 +317,7 @@ test("image formation forwards explicit output and settings with a longer timeou
         await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts");
     const { defaultFormationSettings } =
         await import("../../src/types/formation.ts");
+
     await formSicd(
         "input.cphd",
         "output.sicd",
@@ -314,6 +332,7 @@ test("image formation forwards explicit output and settings with a longer timeou
                 JSON.stringify(defaultFormationSettings)
             ]);
             assert.equal(options.timeout, 600_000);
+
             return { stdout: '{"path":"output.sicd"}' };
         }
     );
@@ -325,6 +344,7 @@ test("formed SICDs load durable diagnostic previews and tolerate damaged sidecar
     const directory = await mkdtemp(
         path.join(tmpdir(), "nova-formation-preview-")
     );
+
     try {
         const file = path.join(directory, "formed.sicd");
         const products = [
@@ -345,6 +365,7 @@ test("formed SICDs load durable diagnostic previews and tolerate damaged sidecar
                 }
             })
         });
+
         await writeFile(
             `${file}.formation.json`,
             JSON.stringify({ version: 1, products })
@@ -354,7 +375,9 @@ test("formed SICDs load durable diagnostic previews and tolerate damaged sidecar
             products
         );
         await writeFile(`${file}.formation.json`, "invalid json");
+
         const image = await openScientificImage(file, {}, run);
+
         assert.equal(image.width, 64);
         assert.equal(image.formationProducts, undefined);
         assert.match(
@@ -370,6 +393,7 @@ test("SIDD creation forwards the source, destination, and settings to the worker
     const { createSidd } =
         await import("../../src-electron/electron-assets/plugins/scientific-imagery/index.ts");
     const { defaultSiddSettings } = await import("../../src/types/sidd");
+
     await createSidd(
         "input.sicd",
         "output.sidd",
@@ -384,6 +408,7 @@ test("SIDD creation forwards the source, destination, and settings to the worker
                 JSON.stringify(defaultSiddSettings)
             ]);
             assert.equal(options.timeout, 600_000);
+
             return { stdout: '{"path":"output.sidd"}' };
         }
     );
@@ -400,6 +425,7 @@ test("reader failures show the actual diagnostic without font-cache chatter", as
             assert.ok(error instanceof Error);
             assert.match(error.message, /Set SIDD pixel spacing to 0/);
             assert.ok(!error.message.includes("Matplotlib"));
+
             return true;
         }
     );

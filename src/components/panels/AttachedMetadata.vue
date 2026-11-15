@@ -59,37 +59,55 @@
         </details>
     </section>
 </template>
+
 <script setup lang="ts">
 import { reactive } from "vue";
 import type { MetadataAttachment } from "@/types/metadata";
 import type { MetadataAxesCandidate } from "@/utils/metadata-axes";
+
 const props = defineProps<{
     attachments: MetadataAttachment[];
+
     candidates?: MetadataAxesCandidate[];
+
     axesSource?: string;
+
     hasEmbeddedAxes?: boolean;
+
     notice?: string | undefined;
+
     axesPreference?: string | undefined;
 }>();
+
 defineEmits<{ selectAxes: [source: string] }>();
+
+const expanded = reactive<Record<string, boolean>>({});
+
+/**
+ * Resolve the axis interpretation and status for a particular attached
+ * metadata file.
+ */
 function candidate(path: string) {
     return props.candidates?.find(item => item.path === path);
 }
-const expanded = reactive<Record<string, boolean>>({});
 </script>
+
 <style scoped>
 .attached-metadata {
     margin-top: 16px;
     border-top: 1px solid #ccd4de;
     padding-top: 12px;
 }
+
 details {
     margin-top: 8px;
 }
+
 summary {
     cursor: pointer;
     overflow-wrap: anywhere;
 }
+
 pre {
     white-space: pre-wrap;
     overflow-wrap: anywhere;

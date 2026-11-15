@@ -26,12 +26,15 @@ test("instrumentation preserves original Vue line locations instead of generated
     const context = { getCombinedSourcemap: () => sourceMap };
     const transformed = transform.call(context, "const result = 42;", file);
     const sandbox = vm.createContext({});
+
     vm.runInContext(transformed!.code, sandbox);
+
     const remapped = await sourceMaps
         .createSourceMapStore()
         .transformCoverage(
             coverageLibrary.createCoverageMap(sandbox.__coverage__)
         );
+
     expect(remapped.fileCoverageFor(file).getLineCoverage()).toEqual({ 5: 1 });
     expect(
         transform.call(context, "", "/node_modules/package/index.js")

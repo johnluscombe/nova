@@ -15,12 +15,29 @@ export const scalingOptions = [
     { value: "gamma-zero", label: "Gamma-zero (linear)" },
     { value: "gamma-zero-db", label: "Gamma-zero (dB)" }
 ] as const;
+
+/**
+ * A supported scalar representation of source samples. Availability depends on
+ * the decoder and calibration metadata.
+ */
 export type Scaling = (typeof scalingOptions)[number]["value"];
+
+/**
+ * Active-image scaling choices, current selection, and pending rescale state
+ * for the ribbon.
+ */
 export interface ScalingState {
     options: Scaling[];
+
     value: Scaling;
+
     loading: boolean;
 }
+
+/**
+ * Narrow an unknown value to one of the supported scientific sample
+ * scaling modes.
+ */
 export function isScaling(value: unknown): value is Scaling {
     return scalingOptions.some(option => option.value === value);
 }

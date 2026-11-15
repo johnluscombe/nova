@@ -1,25 +1,64 @@
+/**
+ * A vertex in the original image grid, expressed in pixel-edge coordinates.
+ * Fractional positions and the outer width/height edges are allowed.
+ */
 export interface PolygonPoint {
     row: number;
+
     column: number;
 }
+
+/**
+ * Percentiles and sampling information for a polygon, optionally accompanied
+ * by whole-image reference statistics.
+ */
 export interface RegionStatistics {
+    /**
+     * Percentile names mapped to values; null represents an undefined result.
+     */
     statistics: Record<string, number | null>;
+
+    /** Quantity and units shared by the returned percentile values. */
     valueLabel: string;
+
+    /** Number of valid samples contributing to the selected region. */
     sampleCount: number;
+
+    /** True when the computation uses a reduced sample grid. */
     sampled: boolean;
+
+    /**
+     * Whole-image reference percentiles computed alongside the region, when
+     * available.
+     */
     wholeImageStatistics?: Record<string, number | null>;
 }
+
+/**
+ * Active-image polygon capabilities and selection state used to enable ribbon
+ * controls.
+ */
 export interface RegionState {
     available: boolean;
+
     drawing: boolean;
+
     selected: boolean;
 }
+
+/**
+ * Compute the signed 2D cross product for three source-pixel vertices.
+ */
 function cross(a: PolygonPoint, b: PolygonPoint, c: PolygonPoint) {
     return (
         (b.column - a.column) * (c.row - a.row) -
         (b.row - a.row) * (c.column - a.column)
     );
 }
+
+/**
+ * Test whether a vertex lies on an edge within the polygon tolerance.
+ */
 function onSegment(a: PolygonPoint, b: PolygonPoint, p: PolygonPoint) {
     return (
         Math.abs(cross(a, b, p)) < 1e-8 &&
@@ -29,6 +68,11 @@ function onSegment(a: PolygonPoint, b: PolygonPoint, p: PolygonPoint) {
         p.column <= Math.max(a.column, b.column)
     );
 }
+
+/**
+ * Test polygon edges for an intersection, including collinear boundary
+ * contact.
+ */
 function intersects(
     a: PolygonPoint,
     b: PolygonPoint,
@@ -39,6 +83,7 @@ function intersects(
         abD = cross(a, b, d),
         cdA = cross(c, d, a),
         cdB = cross(c, d, b);
+
     return (
         (abC > 0 !== abD > 0 && cdA > 0 !== cdB > 0) ||
         onSegment(a, b, c) ||
@@ -47,6 +92,18 @@ function intersects(
         onSegment(c, d, b)
     );
 }
+
+/**
+ * Validate a simple polygon with 3–256 finite source-coordinate vertices.
+ *
+ * @param width - Source width; vertices may lie on the right pixel edge at
+ * width.
+ * @param height - Source height; vertices may lie on the bottom pixel edge
+ * at height.
+ * @returns Detached row/column vertices suitable for IPC and persisted
+ * selections.
+ * @throws Error for out-of-bounds, self-intersecting, or zero-area polygons.
+ */
 export function validatePolygon(
     value: unknown,
     width: number,
@@ -55,8 +112,10 @@ export function validatePolygon(
     if (!Array.isArray(value) || value.length < 3 || value.length > 256) {
         throw new Error("A polygon needs 3–256 vertices.");
     }
+
     const points = value.map((point: unknown) => {
         const p = point as PolygonPoint | null;
+
         if (
             !p ||
             typeof p.row !== "number" ||
@@ -70,20 +129,26 @@ export function validatePolygon(
         ) {
             throw new Error("Polygon vertices must be inside the image.");
         }
+
         return { row: p.row, column: p.column };
     });
     let area = 0;
+
     for (let i = 0; i < points.length; i++) {
         const a = points[i]!,
             b = points[(i + 1) % points.length]!;
+
         if (a.row === b.row && a.column === b.column) {
             throw new Error("Polygon vertices must be distinct.");
         }
+
         area += a.column * b.row - b.column * a.row;
+
         for (let j = i + 1; j < points.length; j++) {
             if (j === i + 1 || (i === 0 && j === points.length - 1)) {
                 continue;
             }
+
             if (
                 intersects(a, b, points[j]!, points[(j + 1) % points.length]!)
             ) {
@@ -91,12 +156,17 @@ export function validatePolygon(
             }
         }
     }
+
     if (Math.abs(area) < 1e-8) {
         throw new Error("Polygon must enclose an area.");
     }
+
     return points;
 }
-/** Coordinates are image edges; test pixel centers against the closed polygon. */
+
+/**
+ * Coordinates are image edges; test pixel centers against the closed polygon.
+ */
 export function insidePolygon(
     row: number,
     column: number,
@@ -104,12 +174,15 @@ export function insidePolygon(
 ): boolean {
     let inside = false;
     const p = { row, column };
+
     for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
         const a = points[j]!,
             b = points[i]!;
+
         if (onSegment(a, b, p)) {
             return true;
         }
+
         if (
             a.row > row !== b.row > row &&
             column <
@@ -119,28 +192,36 @@ export function insidePolygon(
             inside = !inside;
         }
     }
+
     return inside;
 }
 
-/** Even/odd scanline intervals, including polygon boundaries, for preview sampling. */
+/**
+ * Even/odd scanline intervals, including polygon boundaries, for preview
+ * sampling.
+ */
 export function polygonIntervals(
     row: number,
     points: PolygonPoint[]
 ): [number, number][] {
     const crossings: number[] = [],
         intervals: [number, number][] = [];
+
     for (let i = 0; i < points.length; i++) {
         const a = points[i]!,
             b = points[(i + 1) % points.length]!;
+
         if (a.row > row !== b.row > row) {
             crossings.push(
                 a.column +
                     ((b.column - a.column) * (row - a.row)) / (b.row - a.row)
             );
         }
+
         if (Math.abs(a.row - row) < 1e-8) {
             intervals.push([a.column, a.column]);
         }
+
         if (Math.abs(a.row - b.row) < 1e-8 && Math.abs(a.row - row) < 1e-8) {
             intervals.push([
                 Math.min(a.column, b.column),
@@ -148,19 +229,26 @@ export function polygonIntervals(
             ]);
         }
     }
+
     crossings.sort((a, b) => a - b);
+
     for (let i = 0; i + 1 < crossings.length; i += 2) {
         intervals.push([crossings[i]!, crossings[i + 1]!]);
     }
+
     intervals.sort((a, b) => a[0] - b[0]);
+
     const merged: [number, number][] = [];
+
     for (const interval of intervals) {
         const last = merged.at(-1);
+
         if (last && interval[0] <= last[1] + 1e-8) {
             last[1] = Math.max(last[1], interval[1]);
         } else {
             merged.push([...interval]);
         }
     }
+
     return merged;
 }

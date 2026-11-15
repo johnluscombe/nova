@@ -4,25 +4,40 @@ import { test, expect, vi, beforeEach, afterEach } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import ImageWorkspace from "../../src/components/ImageWorkspace.vue";
+import ImageWorkspace from "../../src/components/workspace/ImageWorkspace.vue";
 import { activeScenario } from "../../src/composables/useScenario.ts";
+
 let wrapper: VueWrapper<InstanceType<typeof ImageWorkspace>>;
 let resize: (
-    entries: { contentRect: { width: number; height: number } }[]
+    entries: {
+        contentRect: {
+            width: number;
+
+            height: number;
+        };
+    }[]
 ) => void;
 const disconnect = vi.fn();
+
+/**
+ * Dispatch a pointer event with explicit coordinates and flush Vue
+ * updates.
+ */
 async function pointer(
     target: { element: Element },
     type: string,
     properties: Record<string, number> = {}
 ) {
     const event = new Event(type, { bubbles: true });
+
     for (const [name, value] of Object.entries(properties)) {
         Object.defineProperty(event, name, { value });
     }
+
     target.element.dispatchEvent(event);
     await nextTick();
 }
+
 beforeEach(() => {
     vi.stubGlobal(
         "ResizeObserver",
@@ -42,6 +57,11 @@ afterEach(() => {
     vi.unstubAllGlobals();
     activeScenario.value = null;
 });
+
+/**
+ * Mount a workspace with deterministic canvas bounds and expose its public
+ * controller.
+ */
 function workspace() {
     wrapper = mount(ImageWorkspace, {
         global: {
@@ -57,8 +77,10 @@ function workspace() {
             }
         }
     });
+
     return wrapper.vm as unknown as ImageWorkspaceAPI;
 }
+
 const image = {
     name: "image.test",
     path: "/image.test",
@@ -73,11 +95,14 @@ const image = {
 
 test("panels follow image readiness and closing a widget ignores late completion", async () => {
     const api = workspace();
+
     expect(wrapper.text()).toContain("Create or open a scenario");
     activeScenario.value = { name: "Test", path: "/test.scenario", tables: [] };
     await nextTick();
     expect(wrapper.text()).toContain("Open an image");
+
     const id = api.add({ ...image, previewDataUrl: "" }, true);
+
     await nextTick();
     expect(wrapper.text()).toContain("Loading image");
     api.toggleMetadata();
@@ -109,6 +134,7 @@ test("panels follow image readiness and closing a widget ignores late completion
 
 test("hydration preserves window state, failure placeholders and resizes to the canvas", async () => {
     const api = workspace();
+
     api.hydrate([
         {
             id: 4,
@@ -137,7 +163,9 @@ test("hydration preserves window state, failure placeholders and resizes to the 
         width: 300,
         height: 200
     });
+
     const next = api.add(image);
+
     expect(next).toBe(5);
     await nextTick();
     await wrapper.get('[aria-label="Minimize image.test"]').trigger("click");
@@ -145,9 +173,12 @@ test("hydration preserves window state, failure placeholders and resizes to the 
 
 test("pointer gestures distinguish move and resize and ignore wrong pointers", async () => {
     const api = workspace();
+
     api.add(image);
     await nextTick();
+
     const title = wrapper.get(".widget-titlebar");
+
     title.element.setPointerCapture = vi.fn();
     await pointer(title, "pointerdown", { button: 2, pointerId: 1 });
     await pointer(title, "pointermove", {
@@ -155,7 +186,9 @@ test("pointer gestures distinguish move and resize and ignore wrong pointers", a
         clientX: 20,
         clientY: 20
     });
+
     const initial = api.snapshot()[0]!.rect;
+
     await pointer(title, "pointerdown", {
         button: 0,
         pointerId: 1,
@@ -176,9 +209,13 @@ test("pointer gestures distinguish move and resize and ignore wrong pointers", a
     await pointer(title, "pointerup");
     expect(api.snapshot()[0]!.rect.x).toBe(initial.x + 20);
     await title.trigger("keydown", { key: "ArrowLeft" });
+
     const handle = wrapper.get(".resize-se");
+
     handle.element.setPointerCapture = vi.fn();
+
     const width = api.snapshot()[0]!.rect.width;
+
     await pointer(handle, "pointerdown", {
         button: 0,
         pointerId: 3,
@@ -207,18 +244,22 @@ test("clearing a region ignores late statistics and restores the whole-image pan
                 }
             )
     );
+
     window.images = {
         region
     } as unknown as import("../../src/types/image").ImageAPI;
+
     try {
         api.add({ ...image, supportsSourceRegions: true });
         await nextTick();
+
         const points = [
             { row: 0, column: 0 },
             { row: 0, column: 2 },
             { row: 2, column: 2 },
             { row: 2, column: 0 }
         ];
+
         wrapper
             .getComponent({ name: "ImageSliceView" })
             .vm.$emit("region", points);
@@ -255,6 +296,7 @@ test("CPHD image formation opens a loading widget and keeps the source", async (
                 resolve = done;
             })
     );
+
     window.images = { formSicd } as unknown as NonNullable<Window["images"]>;
     api.add({
         ...image,
@@ -264,7 +306,9 @@ test("CPHD image formation opens a loading widget and keeps the source", async (
         metadata: { Format: "CPHD" }
     });
     await nextTick();
+
     const forming = api.formSicd();
+
     await nextTick();
     expect(wrapper.text()).toContain("Loading image");
     expect(api.snapshot()).toHaveLength(1);
@@ -291,6 +335,7 @@ test("CPHD image formation opens a loading widget and keeps the source", async (
 
 test("failed image formation keeps the source and excludes the failed placeholder from saved state", async () => {
     const api = workspace();
+
     window.images = {
         formSicd: vi
             .fn()
@@ -327,9 +372,12 @@ test("formation slides select diagnostic previews, disable image tools, and rest
         formationProducts: products,
         scalingOptions: ["amplitude" as const]
     };
+
     api.add(formed);
     await nextTick();
+
     const navigator = wrapper.get('[aria-label="Formation products"]');
+
     await navigator.get('[aria-label="1. input"]').trigger("click");
     expect(
         wrapper
@@ -341,11 +389,15 @@ test("formation slides select diagnostic previews, disable image tools, and rest
     expect(
         api.snapshot().find(item => item.formationProductId === "input")
     ).toBeDefined();
+
     const savedProducts = api.snapshot();
+
     api.hydrate(savedProducts.map(item => ({ ...item, image, loading: true })));
+
     for (const saved of savedProducts) {
         api.complete(saved.id, formed);
     }
+
     await nextTick();
     expect(
         wrapper.get('[aria-label="1. input"]').attributes("aria-current")
@@ -369,6 +421,7 @@ test("formation slides select diagnostic previews, disable image tools, and rest
 
 test("formation sidebar closes and reopens independently of the image and selected slide", async () => {
     const api = workspace();
+
     api.add({
         ...image,
         formationProducts: [
@@ -421,6 +474,7 @@ test("formation navigator stays available on other windows and opens distinct pr
         description: id,
         previewDataUrl: image.previewDataUrl
     }));
+
     api.add({ ...image, formationProducts: products });
     await nextTick();
     await wrapper.get('[aria-label="1. input"]').trigger("click");
@@ -452,6 +506,7 @@ test("SIDD creation keeps the source SICD and opens the derived image in another
         path: "/detected.sidd",
         metadata: { Format: "SIDD / NITF" }
     });
+
     window.images = { createSidd } as unknown as NonNullable<Window["images"]>;
     api.add({
         ...image,
@@ -487,6 +542,7 @@ test("cropping opens a separate widget and retains the original image", async ()
         width: 8,
         height: 6
     });
+
     window.images = { crop } as unknown as NonNullable<Window["images"]>;
     api.add({ ...image, supportsCrop: true });
     await nextTick();
@@ -495,6 +551,7 @@ test("cropping opens a separate widget and retains the original image", async ()
     expect(wrapper.emitted("cropChange")?.at(-1)).toEqual([
         { available: true, active: true }
     ]);
+
     const selection = {
         left: 2,
         top: 3,
@@ -503,6 +560,7 @@ test("cropping opens a separate widget and retains the original image", async ()
         sourceWidth: 80,
         sourceHeight: 40
     };
+
     wrapper
         .findComponent({ name: "ImageSliceView" })
         .vm.$emit("crop", selection);

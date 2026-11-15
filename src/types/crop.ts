@@ -1,17 +1,37 @@
+/**
+ * Source-pixel rectangle with inclusive left/top and exclusive right/bottom
+ * edges.
+ */
 export interface ImageCrop {
     left: number;
+
     top: number;
+
     width: number;
+
     height: number;
+
     sourceWidth: number;
+
     sourceHeight: number;
 }
+
+/**
+ * Validate integer source-pixel crop bounds and return a detached selection.
+ *
+ * @param width - Authoritative reader width, when known; otherwise use the
+ * supplied source width.
+ * @param height - Authoritative reader height, when known.
+ * @throws Error if the rectangle is empty, fractional, or outside the source
+ * grid.
+ */
 export function validateCrop(
     value: unknown,
     width?: number,
     height?: number
 ): ImageCrop {
     const crop = value as ImageCrop | null;
+
     if (
         !crop ||
         ![
@@ -35,6 +55,7 @@ export function validateCrop(
     ) {
         throw new Error("Choose a crop rectangle inside the image.");
     }
+
     return {
         left: crop.left,
         top: crop.top,

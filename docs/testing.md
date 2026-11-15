@@ -15,8 +15,9 @@ dialogs, missing images, and save failures. Test plugins run inside the real
 Electron process and use release files to control slow decoding deterministically.
 Failure traces are stored under `test-results/`.
 
-The SarPy reader's Python tests remain separate because they require the plugin's
-Python environment: `<venv>/bin/python src-electron/sicd-reader.test.py`.
+Python unit tests live in `tests/unit/python/`. They run separately from Vitest
+because they require the scientific imagery plugin's Python environment:
+`<venv>/bin/python tests/unit/python/sicd-reader.test.py`.
 
 ### Istanbul coverage
 

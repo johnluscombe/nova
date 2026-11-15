@@ -14,6 +14,11 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const source = path.join(root, "public/branding/nova-logo.png");
 const temporary = mkdtempSync(path.join(tmpdir(), "nova-icons-"));
+
+/**
+ * Generate a square icon from the source logo using the macOS image
+ * conversion tool.
+ */
 const resize = (size: number, destination: string) => {
     execFileSync(
         "sips",
@@ -26,6 +31,7 @@ try {
     for (const size of [16, 32, 96, 128, 180, 256]) {
         resize(size, path.join(root, `public/icons/nova-${size}.png`));
     }
+
     resize(512, path.join(root, "src-electron/electron-assets/icons/nova.png"));
     copyFileSync(
         path.join(root, "public/icons/nova-96.png"),
@@ -43,11 +49,15 @@ try {
         readFileSync(path.join(root, `public/icons/nova-${size}.png`))
     );
     const directory = Buffer.alloc(6 + 16 * images.length);
+
     directory.writeUInt16LE(1, 2);
     directory.writeUInt16LE(images.length, 4);
+
     let offset = directory.length;
+
     images.forEach((image, index) => {
         const entry = 6 + index * 16;
+
         directory[entry] = sizes[index]! % 256;
         directory[entry + 1] = sizes[index]! % 256;
         directory.writeUInt16LE(1, entry + 4);
@@ -56,7 +66,9 @@ try {
         directory.writeUInt32LE(offset, entry + 12);
         offset += image.length;
     });
+
     const ico = Buffer.concat([directory, ...images]);
+
     writeFileSync(path.join(root, "public/nova.ico"), ico);
     writeFileSync(
         path.join(root, "src-electron/electron-assets/icons/nova.ico"),
@@ -73,14 +85,19 @@ try {
         ] as const
     ).map(([size, type]) => {
         const file = path.join(temporary, String(size) + ".png");
+
         resize(size, file);
+
         const image = readFileSync(file);
         const header = Buffer.alloc(8);
+
         header.write(type, 0, "ascii");
         header.writeUInt32BE(image.length + 8, 4);
+
         return Buffer.concat([header, image]);
     });
     const header = Buffer.alloc(8);
+
     header.write("icns", 0, "ascii");
     header.writeUInt32BE(
         8 + chunks.reduce((total, chunk) => total + chunk.length, 0),
