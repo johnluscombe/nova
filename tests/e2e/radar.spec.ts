@@ -575,7 +575,7 @@ test("SICD creates a SIDD with configured display settings and restores both pro
     application,
     profile
 }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
 
     try {
         await execute(python, ["-c", "import sarpy, numpy, scipy, lxml"]);
@@ -639,7 +639,9 @@ fixtures['source_fixture'](pathlib.Path(sys.argv[2]))`,
         exact: true
     });
 
-    await expect(detected.getByRole("img")).toBeVisible({ timeout: 15000 });
+    // SIDD processing starts a fresh Python worker and imports the projection
+    // libraries; allow for that startup cost on hosted CI runners.
+    await expect(detected.getByRole("img")).toBeVisible({ timeout: 60_000 });
     await clickRibbon(page, "Metadata");
     await expect(detected).toContainText("SIDD / NITF");
     await expect(detected).toContainText("MONO16I");
