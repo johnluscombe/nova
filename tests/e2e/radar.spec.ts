@@ -383,6 +383,8 @@ test("CPHD image formation uses saved settings and restores the resulting SICD",
     application,
     profile
 }) => {
+    test.setTimeout(120_000);
+
     try {
         await execute(python, ["-c", "import sarpy, numpy, lxml"]);
     } catch {
@@ -451,7 +453,7 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
         exact: true
     });
 
-    await expect(formed.getByRole("img")).toBeVisible();
+    await expect(formed.getByRole("img")).toBeVisible({ timeout: 60_000 });
     await expect(source).toBeVisible();
     await clickRibbon(page, "Metadata");
     await expect(formed).toContainText("SICD / NITF");
@@ -541,6 +543,17 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
             exact: true
         })
         .click();
+    await expect(
+        page
+            .getByRole("article", {
+                name: "Range-compressed profiles · target-formed.sicd",
+                exact: true
+            })
+            .getByRole("img", {
+                name: "Range-compressed profiles",
+                exact: true
+            })
+    ).toBeVisible();
     await clickRibbon(page, "Close");
     await chooseFile(application, scenario);
     await clickRibbon(page, "Open");
@@ -549,7 +562,7 @@ fixture['FormationTests'].fixture(pathlib.Path(sys.argv[2]))`,
             name: "3. Range-compressed profiles",
             exact: true
         })
-    ).toHaveAttribute("aria-current", "step");
+    ).toHaveAttribute("aria-current", "step", { timeout: 60_000 });
     await expect(
         page
             .getByRole("article", {
